@@ -1,0 +1,7 @@
+# Ignore local env files
+infra/.env
+
+# Editor and OS files
+.DS_Store
+node_modules/
+*.log

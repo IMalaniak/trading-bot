@@ -1,0 +1,80 @@
+services:
+  redpanda:
+    image: redpandadata/redpanda:latest
+    container_name: tb_redpanda
+    command:
+      - redpanda
+      - start
+      - --overprovisioned
+      - --smp
+      - "1"
+      - --memory
+      - 1G
+      - --reserve-memory
+      - 0M
+      - --node-id
+      - "0"
+      # this is development only, do not use in production
+      - "--kafka-addr=PLAINTEXT://0.0.0.0:9092"
+      - "--advertise-kafka-addr=PLAINTEXT://localhost:9092"
+    ports:
+      - "9092:9092" # Kafka-compatible broker (Redpanda) for host clients
+    environment:
+      # Redpanda doesn't need Zookeeper (KRaft-mode-like behavior). Keep defaults for local dev.
+      - REDPANDA_AUTO_CREATE_TOPICS=true
+    healthcheck:
+      test: ["CMD-SHELL", "rpk cluster info || rpk admin brokers || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+  postgres:
+    image: "postgres:17"
+    container_name: tb_postgres
+    restart: always
+    env_file:
+      - .env
+    environment:
+      # These will be taken from infra/.env but left here as defaults for clarity
+      POSTGRES_USER: ${POSTGRES_USER:-trading}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-trading_pass}
+      POSTGRES_DB: ${POSTGRES_DB:-trading_db}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  timescaledb:
+    image: timescale/timescaledb:latest-pg17
+    container_name: tb_timescaledb
+    restart: always
+    env_file:
+      - .env
+    environment:
+      POSTGRES_USER: ${TIMESCALE_USER:-timescale}
+      POSTGRES_PASSWORD: ${TIMESCALE_PASSWORD:-timescale_pass}
+      POSTGRES_DB: ${TIMESCALE_DB:-timescale_db}
+    ports:
+      - "5433:5432" # expose on a different host port to avoid conflict with main Postgres
+    volumes:
+      - timescale_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB} -p 5432",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+    name: tb_postgres_data
+  timescale_data:
+    name: tb_timescale_data
