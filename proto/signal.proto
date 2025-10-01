@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+// Package name chosen to reflect the Prediction Engine "Signal API" component
+// shown in docs/workspace.dsl. This groups signal-related RPCs under
+// tradingbot.prediction.signal for clarity.
+package tradingbot.prediction.signal;
+
+// Signals service provides access to recent trading signals produced by the
+// Prediction Engine. The API is used by the API Gateway and other internal
+// services.
+service Signals {
+  // GetLatestSignals returns the most recent signals optionally filtered by symbol.
+  rpc GetLatestSignals(GetLatestSignalsRequest) returns (GetLatestSignalsResponse);
+}
+
+// Signal represents a single trading signal.
+message Signal {
+  string id = 1;         // unique identifier for the signal
+  string symbol = 2;     // market symbol, e.g. "BTC-USD"
+  // Use an enum for the side to avoid clients passing arbitrary strings.
+  SignalSide side = 3;
+  double price = 4;      // suggested price
+  // unix epoch milliseconds (int64) — choose UTC timestamps consistently.
+  int64 timestamp = 5;
+}
+
+// Strongly typed side field.
+enum SignalSide {
+  SIGNAL_SIDE_UNSPECIFIED = 0;
+  BUY = 1;
+  SELL = 2;
+}
+
+// Request to fetch latest signals.
+message GetLatestSignalsRequest {
+  // Optional filter: symbol to return signals for. Empty means all symbols.
+  string symbol = 1;
+  // Optional: limit number of returned signals. 0 means server default.
+  int32 limit = 2;
+}
+
+// Response containing latest signals.
+message GetLatestSignalsResponse {
+  repeated Signal signals = 1;
+}
