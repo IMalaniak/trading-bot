@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+package tradingbot.events;
+
+import "common/instrument.proto";
+
+message InstrumentRegistered {
+  tradingbot.common.Instrument instrument = 1;
+  string registered_at = 2;
+}

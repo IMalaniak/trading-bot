@@ -1,0 +1,37 @@
+syntax = "proto3";
+
+package tradingbot.risk;
+
+import "common/instrument.proto";
+import "common/portfolio.proto";
+
+service RiskAndPortfolioManager {
+  rpc RegisterInstrument (RegisterInstrumentRequest) returns (RegisterInstrumentResponse);
+  rpc GetPortfolio(GetPortfolioRequest) returns (GetPortfolioResponse);
+}
+
+message RegisterInstrumentRequest {
+  tradingbot.common.AssetClass asset_class = 1;
+  string symbol = 2;
+  string venue = 3;
+  string external_symbol = 4; // optional
+}
+
+message RegisterInstrumentResponse {
+  tradingbot.common.Instrument instrument = 1;  // includes instrument_id
+}
+
+// Request for portfolio retrieval
+message GetPortfolioRequest {
+  // Account or portfolio id; empty means default account for the caller.
+  string account_id = 1;
+  // Optional: how many recent trades to include
+  int32 recent_trades_limit = 2;
+}
+
+// Response containing portfolio state and recent trades
+message GetPortfolioResponse {
+  tradingbot.common.PortfolioSummary summary = 1;
+  repeated tradingbot.common.Position positions = 2;
+  repeated tradingbot.common.Trade recent_trades = 3;
+}
