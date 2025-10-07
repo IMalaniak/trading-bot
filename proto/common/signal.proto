@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package tradingbot.common;
+
+// Signal represents a single trading signal.
+message Signal {
+  string id = 1;         // unique identifier for the signal
+  string instrument_id = 2;     // market symbol, e.g. "UUID"
+  // Use an enum for the side to avoid clients passing arbitrary strings.
+  SignalSide side = 3;
+  double price = 4;      // suggested price
+  // unix epoch milliseconds (int64) — choose UTC timestamps consistently.
+  int64 timestamp = 5;
+}
+
+// Strongly typed side field.
+enum SignalSide {
+  SIGNAL_SIDE_UNSPECIFIED = 0;
+  BUY = 1;
+  SELL = 2;
+}

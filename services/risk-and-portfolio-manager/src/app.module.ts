@@ -1,6 +1,7 @@
+import { join } from 'node:path';
+
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { join } from 'path';
 
 import { validate } from './env.validation';
 import { PortfolioModule } from './portfolio/portfolio.module';
@@ -15,5 +16,7 @@ import { PortfolioModule } from './portfolio/portfolio.module';
     }),
     PortfolioModule,
   ],
+  controllers: [],
+  providers: [],
 })
 export class AppModule {}

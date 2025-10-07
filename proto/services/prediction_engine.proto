@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+package tradingbot.prediction;
+
+import "common/signal.proto";
+
+// Signals service provides access to recent trading signals produced by the
+// Prediction Engine. The API is used by the API Gateway and other internal
+// services.
+service Signals {
+  // GetLatestSignals returns the most recent signals optionally filtered by instrument_id.
+  rpc GetLatestSignals(GetLatestSignalsRequest) returns (GetLatestSignalsResponse);
+}
+
+// Request to fetch latest signals.
+message GetLatestSignalsRequest {
+  // Optional filter: instrument_id to return signals for. Empty means all instruments.
+  string instrument_id = 1;
+  // Optional: limit number of returned signals. 0 means server default.
+  int32 limit = 2;
+}
+
+// Response containing latest signals.
+message GetLatestSignalsResponse {
+  // Reference the message defined in proto/common/signal.proto which uses
+  // package `tradingbot.common`.
+  repeated tradingbot.common.Signal signals = 1;
+}
