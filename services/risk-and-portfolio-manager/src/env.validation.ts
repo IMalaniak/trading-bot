@@ -19,6 +19,9 @@ class EnvironmentVariables implements EnvConfig {
 
   @IsString()
   RISK_PORTFOLIO_GRPC_URL: string;
+
+  @IsString()
+  DATABASE_URL: string;
 }
 
 export const defaultEnv: Partial<EnvConfig> = {

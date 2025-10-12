@@ -1,12 +1,20 @@
-import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
-import type { ClientGrpc } from '@nestjs/microservices';
-import { lastValueFrom } from 'rxjs';
-import { RISK_AND_PORTFOLIO_CLIENT } from 'src/grpc/grpc.constants';
 import {
-  RegisterInstrumentRequest,
-  RegisterInstrumentResponse,
-} from 'src/types/services/risk_manager';
+  HttpException,
+  HttpStatus,
+  Inject,
+  Injectable,
+  OnModuleInit,
+} from '@nestjs/common';
+import { type ClientGrpc } from '@nestjs/microservices';
+import { catchError, map, Observable, throwError, timeout } from 'rxjs';
 
+import { RISK_AND_PORTFOLIO_CLIENT } from '../grpc/grpc.constants';
+import { grpcCodeToHttpStatus } from '../utils/grpc-code-to-http-status';
+import { InstrumentDto } from './dto/instrument.dto';
+import {
+  RegisterInstrumentRequestDto,
+  RegisterInstrumentResponseDto,
+} from './dto/register-instrument.dto';
 import { IRiskAndPortfolioManager } from './risk-and-portfolio.client.interface';
 
 @Injectable()
@@ -22,11 +30,66 @@ export class PortfolioService implements OnModuleInit {
       );
   }
 
-  public async registerInstrument(
-    data: RegisterInstrumentRequest,
-  ): Promise<RegisterInstrumentResponse> {
-    return await lastValueFrom(
-      this.riskAndPortfolioManagerClient.registerInstrument(data),
-    );
+  public registerInstrument(
+    data: RegisterInstrumentRequestDto,
+  ): Observable<RegisterInstrumentResponseDto> {
+    const REQUEST_TIMEOUT_MS = 5000;
+
+    interface GrpcServiceError {
+      code: number;
+      details?: string;
+      metadata?: unknown;
+    }
+
+    function isGrpcServiceError(err: unknown): err is GrpcServiceError {
+      if (typeof err !== 'object' || err === null) return false;
+      const maybe = err as Record<string, unknown>;
+      return typeof maybe.code === 'number';
+    }
+
+    return this.riskAndPortfolioManagerClient
+      .registerInstrument(data.toGRPC())
+      .pipe(
+        timeout(REQUEST_TIMEOUT_MS),
+        map(({ instrument }) => {
+          if (!instrument) {
+            // domain-level missing-instrument; map to HTTP 502 (Bad Gateway) because upstream failed
+            throw new HttpException(
+              {
+                message: 'Risk service returned no instrument',
+                type: 'NoInstrument',
+              },
+              HttpStatus.BAD_GATEWAY,
+            );
+          }
+          return InstrumentDto.fromGRPC(instrument);
+        }),
+        catchError((err: unknown) => {
+          if (isGrpcServiceError(err)) {
+            const { code, details } = err;
+            const status = grpcCodeToHttpStatus(code);
+            return throwError(
+              () =>
+                new HttpException(
+                  { message: details || 'gRPC error', grpcCode: code },
+                  status,
+                ),
+            );
+          }
+
+          if (err instanceof HttpException) {
+            return throwError(() => err);
+          }
+
+          const message = err instanceof Error ? err.message : String(err);
+          return throwError(
+            () =>
+              new HttpException(
+                { message: `Failed to register instrument: ${message}` },
+                HttpStatus.INTERNAL_SERVER_ERROR,
+              ),
+          );
+        }),
+      );
   }
 }

@@ -11,7 +11,10 @@ import { PortfolioModule } from './portfolio/portfolio.module';
     ConfigModule.forRoot({
       isGlobal: true,
       expandVariables: true,
-      envFilePath: [join(__dirname, '../../../.env')],
+      envFilePath: [
+        join(__dirname, '../../../.env'),
+        join(__dirname, '../.env'),
+      ],
       validate,
     }),
     PortfolioModule,

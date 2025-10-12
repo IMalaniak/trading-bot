@@ -1,7 +1,10 @@
 import { Body, Controller, Post } from '@nestjs/common';
-import type { RegisterInstrumentResponse } from 'src/types/services/risk_manager';
+import { Observable } from 'rxjs';
 
-import { RegisterInstrumentRequestDto } from './dto/register-instrument.dto';
+import {
+  RegisterInstrumentRequestDto,
+  RegisterInstrumentResponseDto,
+} from './dto/register-instrument.dto';
 import { PortfolioService } from './portfolio.service';
 
 @Controller('portfolio')
@@ -9,9 +12,9 @@ export class PortfolioController {
   constructor(private readonly portfolioService: PortfolioService) {}
 
   @Post('register-instrument')
-  async registerInstrument(
+  registerInstrument(
     @Body() data: RegisterInstrumentRequestDto,
-  ): Promise<RegisterInstrumentResponse> {
-    return await this.portfolioService.registerInstrument(data);
+  ): Observable<RegisterInstrumentResponseDto> {
+    return this.portfolioService.registerInstrument(data);
   }
 }

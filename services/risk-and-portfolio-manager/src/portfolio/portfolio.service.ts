@@ -1,22 +1,46 @@
-import { randomUUID } from 'node:crypto';
-
 import { Injectable } from '@nestjs/common';
+import { RpcException } from '@nestjs/microservices';
+import { Prisma } from '@prisma/client';
 
+import { GrpcStatusCode } from '../grpc/grpc-status-code.enum';
+import { PrismaService } from '../prisma/prisma.service';
 import {
   RegisterInstrumentRequest,
   RegisterInstrumentResponse,
 } from '../types/services/risk_manager';
+import { InstrumentMapper } from './mapper/instrument.mapper';
 
 @Injectable()
 export class PortfolioService {
-  registerInstrument(
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly instrumentMapper: InstrumentMapper,
+  ) {}
+
+  async registerInstrument(
     data: RegisterInstrumentRequest,
   ): Promise<RegisterInstrumentResponse> {
-    return Promise.resolve({
-      instrument: {
-        instrumentId: randomUUID(),
-        ...data,
-      },
-    });
+    const instrument = await this.prisma.instrument
+      .create({
+        data: {
+          symbol: data.symbol,
+          assetClass: data.assetClass,
+          venue: data.venue,
+          externalSymbol: data.externalSymbol,
+        },
+      })
+      .catch((error) => {
+        if (error instanceof Prisma.PrismaClientKnownRequestError) {
+          if (error.code === 'P2002') {
+            throw new RpcException({
+              message: 'Instrument already exists',
+              code: GrpcStatusCode.ALREADY_EXISTS,
+            });
+          }
+        }
+        throw error;
+      });
+
+    return { instrument: this.instrumentMapper.map(instrument) };
   }
 }

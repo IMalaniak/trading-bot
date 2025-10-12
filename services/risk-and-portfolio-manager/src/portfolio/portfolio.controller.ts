@@ -1,10 +1,10 @@
 import { Controller } from '@nestjs/common';
 import { GrpcMethod } from '@nestjs/microservices';
+
 import type {
   RegisterInstrumentRequest,
   RegisterInstrumentResponse,
-} from 'src/types/services/risk_manager';
-
+} from '../types/services/risk_manager';
 import { PortfolioService } from './portfolio.service';
 
 @Controller()
