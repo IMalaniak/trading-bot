@@ -18,13 +18,14 @@ workspace "Trading Bot System" {
                     marketCollector = component "Market Data Collector" "Connects to Binance API/WebSocket to fetch tickers, order books, trades." "Rust"
                     repository = component "Data Ingestion Repository" "Reads/Writes data from/to TimescaleDB." "Rust"
 
-                    kafkaPublisher = component "Kafka Publisher" "Publishes raw data streams to Kafka." "Rust"
+                    kafkaConsumer = component "Kafka Consumer" "Consumes messages from Kafka." "Rust"
 
                     gRPC -> core "Handles market data requests via"
-                    marketCollector -> kafkaPublisher "Publishes raw data to"
                     core -> marketCollector "Controls subscription feeds of"
                     core -> repository "Reads historical data via"
                     marketCollector -> gRPC_Client "Communicates with External API Facade over"
+                    marketCollector -> kafkaConsumer "Reads raw market data from"
+
                 }
 
                 timescale = container "Market Data Store" "Owned by Data Ingestion. Stores historical market/trading data." "TimescaleDB" "Datastore"
@@ -138,7 +139,9 @@ workspace "Trading Bot System" {
 
                 core = component "Facade Core" "Manages connections and interactions with external exchange APIs." "TypeScript"
                 binanceClient = component "Binance Client" "Handles REST and WebSocket connections to Binance API." "TypeScript"
+                kafkaPublisher = component "Kafka Publisher" "Publishes market data to Kafka." "TypeScript"
 
+                core -> kafkaPublisher "Publishes raw data to"
                 gRPC -> core "Handles external API requests via"
                 core -> binanceClient "Sends requests to Binance via"
             }
@@ -191,7 +194,8 @@ workspace "Trading Bot System" {
         
         tradingBot.dataIngestion.repository -> tradingBot.timescale "Writes historical market data to"
 
-        tradingBot.dataIngestion.kafkaPublisher -> tradingBot.messageBus "Publishes raw market data to"
+        tradingBot.externalAPIFacade.kafkaPublisher -> tradingBot.messageBus "Publishes raw market data to"
+        tradingBot.dataIngestion.kafkaConsumer -> tradingBot.messageBus "Consumes raw data published by externalAPIFacade from"
         tradingBot.featureEngineering.kafkaPublisher -> tradingBot.messageBus "Publishes engineered features to"
         tradingBot.predictionEngine.kafkaPublisher -> tradingBot.messageBus "Publishes signals to"
         tradingBot.riskManager.kafkaPublisher -> tradingBot.messageBus "Publishes approved trades to"
@@ -207,7 +211,7 @@ workspace "Trading Bot System" {
         tradingBot.riskManager.repository -> tradingBot.postgres "Writes portfolio and trades to"
 
         tradingBot.executionEngine.gRPC_Client -> tradingBot.externalAPIFacade.gRPC "Places orders on"
-        tradingBot.dataIngestion.gRPC_Client -> tradingBot.externalAPIFacade.gRPC "Fetches market data from"
+        tradingBot.dataIngestion.gRPC_Client -> tradingBot.externalAPIFacade.gRPC "Asks to start/stop fetching market data"
         tradingBot.externalAPIFacade.binanceClient -> binance "Places orders on"
         tradingBot.externalAPIFacade.binanceClient -> binance "Fetches market data from"
 
@@ -232,7 +236,7 @@ workspace "Trading Bot System" {
             include tradingBot.dataIngestion.gRPC
             include tradingBot.dataIngestion.gRPC_Client
             include tradingBot.dataIngestion.repository
-            include tradingBot.dataIngestion.kafkaPublisher
+            include tradingBot.dataIngestion.kafkaConsumer
             include tradingBot.timescale
             include tradingBot.messageBus
             include tradingBot.externalAPIFacade.gRPC
@@ -323,6 +327,8 @@ workspace "Trading Bot System" {
             include tradingBot.externalAPIFacade.core
             include tradingBot.externalAPIFacade.gRPC
             include tradingBot.externalAPIFacade.binanceClient
+            include tradingBot.externalAPIFacade.kafkaPublisher
+            include tradingBot.messageBus
             include binance
             autolayout lr
         }
