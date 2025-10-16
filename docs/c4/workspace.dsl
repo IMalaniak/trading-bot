@@ -67,7 +67,7 @@ workspace "Trading Bot System" {
             }
 
             group "Risk & Portfolio Manager Service" {
-                riskManager = container "Risk & Portfolio Manager" "Validates signals, applies portfolio rules, manages exposure." "Nest.js" {
+                portfolioManager = container "Risk & Portfolio Manager" "Validates signals, applies portfolio rules, manages exposure." "Nest.js" {
                     gRPC = component "Risk & Portfolio API" "Exposes risk/strategy config management gRPC API to API Gateway." "gRPC" "API"
 
                     riskRules = component "Risk Rules Engine" "Applies portfolio rules (max drawdown, stop-loss, diversification, trading enabled/disabled state)." "TypeScript"
@@ -189,8 +189,8 @@ workspace "Trading Bot System" {
         tradingBot.apiGateway.gRPC_Client -> tradingBot.dataIngestion.gRPC "Requests market data and subscription updates (Market Data API)"
         tradingBot.apiGateway.gRPC_Client -> tradingBot.executionEngine.gRPC "Requests portfolio/trade info and sends strategy updates (Portfolio API)"
         tradingBot.apiGateway.gRPC_Client -> tradingBot.predictionEngine.gRPC "Requests current signals / triggers (Signal API)"
-        tradingBot.apiGateway.gRPC_Client -> tradingBot.riskManager.gRPC "Sends updated risk/strategy configuration"
-        tradingBot.apiGateway.gRPC_Client -> tradingBot.riskManager.gRPC "Sends updated risk/strategy configuration and start/stop trading commands"
+        tradingBot.apiGateway.gRPC_Client -> tradingBot.portfolioManager.gRPC "Sends updated risk/strategy configuration"
+        tradingBot.apiGateway.gRPC_Client -> tradingBot.portfolioManager.gRPC "Sends updated risk/strategy configuration and start/stop trading commands"
         
         tradingBot.dataIngestion.repository -> tradingBot.timescale "Writes historical market data to"
 
@@ -198,17 +198,17 @@ workspace "Trading Bot System" {
         tradingBot.dataIngestion.kafkaConsumer -> tradingBot.messageBus "Consumes raw data published by externalAPIFacade from"
         tradingBot.featureEngineering.kafkaPublisher -> tradingBot.messageBus "Publishes engineered features to"
         tradingBot.predictionEngine.kafkaPublisher -> tradingBot.messageBus "Publishes signals to"
-        tradingBot.riskManager.kafkaPublisher -> tradingBot.messageBus "Publishes approved trades to"
+        tradingBot.portfolioManager.kafkaPublisher -> tradingBot.messageBus "Publishes approved trades to"
 
         tradingBot.featureEngineering.kafkaConsumer -> tradingBot.messageBus "Consumes raw data from"
         tradingBot.predictionEngine.kafkaConsumer -> tradingBot.messageBus "Consumes engineered features from"
-        tradingBot.riskManager.kafkaConsumer -> tradingBot.messageBus "Consumes signals from"
+        tradingBot.portfolioManager.kafkaConsumer -> tradingBot.messageBus "Consumes signals from"
         tradingBot.executionEngine.kafkaConsumer -> tradingBot.messageBus "Consumes approved trades from"
 
         tradingBot.predictionEngine.signalCacheManager -> tradingBot.redis "Writes recent signals to"
-        tradingBot.riskManager.riskRules -> tradingBot.redis "Optionally fetches latest signals from"
+        tradingBot.portfolioManager.riskRules -> tradingBot.redis "Optionally fetches latest signals from"
 
-        tradingBot.riskManager.repository -> tradingBot.postgres "Writes portfolio and trades to"
+        tradingBot.portfolioManager.repository -> tradingBot.postgres "Writes portfolio and trades to"
 
         tradingBot.executionEngine.gRPC_Client -> tradingBot.externalAPIFacade.gRPC "Places orders on"
         tradingBot.dataIngestion.gRPC_Client -> tradingBot.externalAPIFacade.gRPC "Asks to start/stop fetching market data"
@@ -265,15 +265,15 @@ workspace "Trading Bot System" {
             autolayout lr
         }
 
-        component tradingBot.riskManager "RiskManager-Components" {
+        component tradingBot.portfolioManager "RiskManager-Components" {
             include tradingBot.apiGateway.gRPC_Client
-            include tradingBot.riskManager.gRPC
-            include tradingBot.riskManager.kafkaConsumer
-            include tradingBot.riskManager.riskRules
-            include tradingBot.riskManager.strategyConfigManager
-            include tradingBot.riskManager.kafkaPublisher
-            include tradingBot.riskManager.portfolioManager
-            include tradingBot.riskManager.repository
+            include tradingBot.portfolioManager.gRPC
+            include tradingBot.portfolioManager.kafkaConsumer
+            include tradingBot.portfolioManager.riskRules
+            include tradingBot.portfolioManager.strategyConfigManager
+            include tradingBot.portfolioManager.kafkaPublisher
+            include tradingBot.portfolioManager.portfolioManager
+            include tradingBot.portfolioManager.repository
             include tradingBot.postgres
             include tradingBot.messageBus
             autolayout lr
@@ -304,7 +304,7 @@ workspace "Trading Bot System" {
             include tradingBot.dataIngestion.gRPC
             include tradingBot.executionEngine.gRPC
             include tradingBot.predictionEngine.gRPC
-            include tradingBot.riskManager.gRPC
+            include tradingBot.portfolioManager.gRPC
             autolayout lr
         }
 

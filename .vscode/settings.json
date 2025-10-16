@@ -2,6 +2,15 @@
     "cSpell.words": [
         "autoincrement",
         "autolayout",
-        "tradingbot"
-    ]
+        "libpeerconnection",
+        "LSTMs",
+        "MACD",
+        "Newsfeed",
+        "nodenext",
+        "protoc",
+        "testem",
+        "tradingbot",
+        "webbrowser"
+    ],
+    "jest.runMode": "on-demand"
 }
