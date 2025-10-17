@@ -1,6 +1,7 @@
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { MicroserviceOptions, Transport } from '@nestjs/microservices';
+import { commonAppSetup } from '@trading-bot/common';
 import {
   PORTFOLIO_MANAGER_PROTO,
   PROTO_FOLDER,
@@ -29,6 +30,8 @@ async function bootstrap() {
       },
     },
   );
+
+  commonAppSetup(app);
 
   await app.listen();
 
