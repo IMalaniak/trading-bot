@@ -2,7 +2,9 @@
   "name": "@trading-bot/source",
   "version": "0.0.0",
   "license": "MIT",
-  "scripts": {},
+  "scripts": {
+    "postinstall": "npx nx run portfolio-manager:migrate:dev"
+  },
   "private": true,
   "dependencies": {
     "@fastify/static": "^8.2.0",
@@ -38,6 +40,8 @@
     "@swc/helpers": "0.5.17",
     "@types/jest": "^30.0.0",
     "@types/node": "^24.6.1",
+    "browserslist": "^4.26.3",
+    "caniuse-lite": "^1.0.30001751",
     "eslint": "^9.36.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.4",

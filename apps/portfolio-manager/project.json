@@ -68,5 +68,23 @@
         "passWithNoTests": true
       }
     }
+    ,
+    "migrate": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "npx prisma migrate",
+        "cwd": "apps/portfolio-manager"
+      },
+      "configurations": {
+        "production": {
+          "command": "npx prisma migrate deploy",
+          "cwd": "apps/portfolio-manager"
+        },
+        "development": {
+          "command": "npx prisma migrate dev",
+          "cwd": "apps/portfolio-manager"
+        }
+      }
+    }
   }
 }
