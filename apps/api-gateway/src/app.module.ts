@@ -1,19 +1,19 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
 import { CommonModule } from '@trading-bot/common';
 import { join } from 'path';
 
 import { validate } from './env.validation';
 import { PortfolioModule } from './portfolio/portfolio.module';
 
+const rootEnvPath = join(process.cwd(), '.env');
+
 @Module({
   imports: [
-    CommonModule,
-    ConfigModule.forRoot({
-      isGlobal: true,
-      expandVariables: true,
-      envFilePath: [join(__dirname, '../../../.env')],
-      validate,
+    CommonModule.forRoot({
+      config: {
+        envFilePath: [rootEnvPath],
+        validate,
+      },
     }),
     PortfolioModule,
   ],

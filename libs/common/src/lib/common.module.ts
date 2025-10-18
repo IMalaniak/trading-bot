@@ -1,19 +1,49 @@
-import { Module } from '@nestjs/common';
-import { LoggerModule } from 'nestjs-pino';
+import { DynamicModule, Module } from '@nestjs/common';
+import { ConfigModule, ConfigModuleOptions } from '@nestjs/config';
+import { LoggerModule, Params as NestjsPinoParams } from 'nestjs-pino';
 
-@Module({
-  imports: [
-    LoggerModule.forRoot({
+export interface CommonModuleOptions {
+  /** Options passed to nestjs-pino LoggerModule.forRoot */
+  logger?: NestjsPinoParams;
+  /** Options passed to @nestjs/config ConfigModule.forRoot */
+  config?: ConfigModuleOptions;
+}
+
+@Module({})
+export class CommonModule {
+  static forRoot(options?: CommonModuleOptions): DynamicModule {
+    const defaultPinoHttp = {
+      level: process.env['NODE_ENV'] !== 'production' ? 'debug' : 'info',
+      transport:
+        process.env['NODE_ENV'] !== 'production'
+          ? { target: 'pino-pretty' }
+          : undefined,
+    };
+
+    const callerLogger = options?.logger ?? {};
+    const callerPinoHttp = callerLogger.pinoHttp;
+
+    const loggerOptions: NestjsPinoParams = {
+      ...callerLogger,
       pinoHttp: {
-        name: 'add some name to every JSON line',
-        level: process.env['NODE_ENV'] !== 'production' ? 'debug' : 'info',
-        // install 'pino-pretty' package in order to use the following option
-        transport:
-          process.env['NODE_ENV'] !== 'production'
-            ? { target: 'pino-pretty' }
-            : undefined,
+        ...defaultPinoHttp,
+        ...(callerPinoHttp || {}),
       },
-    }),
-  ],
-})
-export class CommonModule {}
+    };
+
+    const configOptions: ConfigModuleOptions = {
+      isGlobal: true,
+      expandVariables: true,
+      ...(options?.config || {}),
+    };
+
+    return {
+      module: CommonModule,
+      imports: [
+        LoggerModule.forRoot(loggerOptions),
+        ConfigModule.forRoot(configOptions),
+      ],
+      exports: [ConfigModule, LoggerModule],
+    };
+  }
+}

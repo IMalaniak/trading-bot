@@ -1,29 +1,15 @@
-import { plainToInstance } from 'class-transformer';
-import {
-  IsEnum,
-  IsNumber,
-  IsString,
-  Max,
-  Min,
-  validateSync,
-} from 'class-validator';
-
-enum Environment {
-  Development = 'development',
-  Production = 'production',
-  Test = 'test',
-  Provision = 'provision',
-}
+import { createValidateFunction, NodeEnvironment } from '@trading-bot/common';
+import { IsEnum, IsNumber, IsString, Max, Min } from 'class-validator';
 
 interface EnvConfig {
-  NODE_ENV: Environment;
+  NODE_ENV: NodeEnvironment;
   PORT: number;
   PORTFOLIO_MANAGER_GRPC_URL: string;
 }
 
 class EnvironmentVariables implements EnvConfig {
-  @IsEnum(Environment)
-  NODE_ENV: Environment;
+  @IsEnum(NodeEnvironment)
+  NODE_ENV: NodeEnvironment;
 
   @IsNumber()
   @Min(0)
@@ -35,24 +21,11 @@ class EnvironmentVariables implements EnvConfig {
 }
 
 export const defaultEnv: Partial<EnvConfig> = {
-  NODE_ENV: Environment.Development,
+  NODE_ENV: NodeEnvironment.Development,
   PORT: 3000,
 };
 
-export function validate(config: Record<string, unknown>) {
-  // Merge defaults with actual config values. Provided env vars override defaults.
-  const merged = { ...defaultEnv, ...config };
-
-  const validatedConfig = plainToInstance(EnvironmentVariables, merged, {
-    enableImplicitConversion: true,
-  });
-  const errors = validateSync(validatedConfig, {
-    skipMissingProperties: false,
-    whitelist: true,
-  });
-
-  if (errors.length > 0) {
-    throw new Error(errors.toString());
-  }
-  return validatedConfig;
-}
+export const validate = createValidateFunction(
+  EnvironmentVariables,
+  defaultEnv,
+);
