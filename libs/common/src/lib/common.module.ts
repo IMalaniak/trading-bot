@@ -2,6 +2,8 @@ import { DynamicModule, Module } from '@nestjs/common';
 import { ConfigModule, ConfigModuleOptions } from '@nestjs/config';
 import { LoggerModule, Params as NestjsPinoParams } from 'nestjs-pino';
 
+import { NodeEnvironment } from './const';
+
 export interface CommonModuleOptions {
   /** Options passed to nestjs-pino LoggerModule.forRoot */
   logger?: NestjsPinoParams;
@@ -13,9 +15,12 @@ export interface CommonModuleOptions {
 export class CommonModule {
   static forRoot(options?: CommonModuleOptions): DynamicModule {
     const defaultPinoHttp = {
-      level: process.env['NODE_ENV'] !== 'production' ? 'debug' : 'info',
+      level:
+        process.env['NODE_ENV'] !== NodeEnvironment.Production
+          ? 'debug'
+          : 'info',
       transport:
-        process.env['NODE_ENV'] !== 'production'
+        process.env['NODE_ENV'] !== NodeEnvironment.Production
           ? { target: 'pino-pretty' }
           : undefined,
     };
