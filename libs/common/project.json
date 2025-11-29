@@ -17,7 +17,7 @@
             "command": "mkdir -p libs/common/src/proto"
           },
           {
-            "command": "protoc --plugin=protoc-gen-ts_proto=./node_modules/.bin/protoc-gen-ts_proto --ts_proto_out=libs/common/src/proto --ts_proto_opt=esModuleInterop=true,outputServices=none,outputClientImpl=none,outputEncodeMethods=false,outputJsonMethods=false,outputPartialMethods=false,useOptionals=messages,env=node -I=proto proto/common/*.proto proto/events/*.proto proto/services/*.proto"
+            "command": "protoc --plugin=protoc-gen-ts_proto=./node_modules/.bin/protoc-gen-ts_proto --ts_proto_out=libs/common/src/proto --ts_proto_opt=esModuleInterop=true,outputServices=none,outputClientImpl=none,outputEncodeMethods=true,outputJsonMethods=false,outputPartialMethods=true,useOptionals=messages,env=node -I=proto proto/common/*.proto proto/events/*.proto proto/services/*.proto"
           },
           {
             "command": "node ./scripts/generate-proto-barrel.mjs"
@@ -29,6 +29,11 @@
         "parallel": false
       },
       "description": "Generate TypeScript types from .proto files into libs/common/src/proto using ts-proto"
+    },
+    "test": {
+      "options": {
+        "passWithNoTests": true
+      }
     }
   }
 }

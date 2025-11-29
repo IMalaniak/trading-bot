@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "license": "MIT",
   "scripts": {
-    "postinstall": "npx nx run portfolio-manager:migrate:dev"
+    "postinstall": "npx nx run portfolio-manager:prisma-generate"
   },
   "private": true,
   "dependencies": {
@@ -16,10 +16,12 @@
     "@nestjs/microservices": "^11.1.6",
     "@nestjs/platform-fastify": "^11.1.6",
     "@nestjs/swagger": "^11.2.0",
-    "@prisma/client": "^6.17.1",
+    "@prisma/adapter-pg": "^7.0.1",
+    "@prisma/client": "^7.0.1",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.2",
     "nestjs-pino": "^4.4.1",
+    "pg": "^8.16.3",
     "pino-http": "^10.5.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2"
@@ -41,7 +43,8 @@
     "@swc/core": "1.13.5",
     "@swc/helpers": "0.5.17",
     "@types/jest": "^30.0.0",
-    "@types/node": "^24.6.1",
+    "@types/node": "^24.10.1",
+    "@types/pg": "^8.15.6",
     "browserslist": "^4.26.3",
     "caniuse-lite": "^1.0.30001751",
     "eslint": "^9.36.0",
@@ -56,6 +59,7 @@
     "nx": "21.6.4",
     "pino-pretty": "^13.1.2",
     "prettier": "^3.6.2",
+    "prisma": "^7.0.1",
     "ts-jest": "^29.4.5",
     "ts-node": "10.9.1",
     "ts-proto": "^2.7.7",

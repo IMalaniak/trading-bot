@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { Instrument as PrismaInstrument } from '@prisma/client';
 import { Instrument } from '@trading-bot/common/proto';
+
+import { InstrumentModel as PrismaInstrument } from '../../prisma/generated/models';
 
 @Injectable()
 export class InstrumentMapper {

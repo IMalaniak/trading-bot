@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package tradingbot.risk;
+package tradingbot.portfolio_manager;
 
 import "common/instrument.proto";
 import "common/portfolio.proto";

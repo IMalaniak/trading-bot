@@ -6,9 +6,10 @@ import { assetClassNameToAssetClass } from '../mapper/enum.mapper';
 import { AssetClassName } from './asset-class-name.enum';
 import { InstrumentDto } from './instrument.dto';
 
-export class RegisterInstrumentRequestDto
-  implements Omit<RegisterInstrumentRequest, 'assetClass'>
-{
+export class RegisterInstrumentRequestDto implements Omit<
+  RegisterInstrumentRequest,
+  'assetClass'
+> {
   @ApiProperty({ example: 'BTC/USDT' })
   @IsString()
   symbol: string;

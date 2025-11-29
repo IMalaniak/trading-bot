@@ -12,5 +12,8 @@
         "tradingbot",
         "webbrowser"
     ],
-    "jest.runMode": "on-demand"
+    "jest.runMode": "on-demand",
+    // Ensure Prettier extension resolves the workspace installation when used elsewhere
+    "prettier.prettierPath": "./node_modules/prettier",
+    "prettier.requireConfig": true,
 }

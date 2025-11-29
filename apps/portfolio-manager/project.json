@@ -56,7 +56,8 @@
       },
       "configurations": {
         "development": {
-          "buildTarget": "portfolio-manager:build:development"
+          "buildTarget": "portfolio-manager:build:development",
+          "port": 9230
         },
         "production": {
           "buildTarget": "portfolio-manager:build:production"
@@ -71,9 +72,9 @@
     ,
     "migrate": {
       "executor": "nx:run-commands",
+      "defaultConfiguration": "development",
       "options": {
-        "command": "npx prisma migrate",
-        "cwd": "apps/portfolio-manager"
+        "cwd": "apps/portfolio-manager"        
       },
       "configurations": {
         "production": {
@@ -84,6 +85,24 @@
           "command": "npx prisma migrate dev",
           "cwd": "apps/portfolio-manager"
         }
+      }
+    },
+
+    "prisma-generate": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/portfolio-manager",
+        "commands": [
+          {
+            "command": "rm -rf src/prisma/generated"
+          },
+          {
+            "command": "npx prisma generate"
+          },
+          {
+            "command": "nx lint portfolio-manager --fix"
+          }
+        ]
       }
     }
   }

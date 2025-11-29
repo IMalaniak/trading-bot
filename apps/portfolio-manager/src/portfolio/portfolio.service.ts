@@ -1,12 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { RpcException } from '@nestjs/microservices';
-import { Prisma } from '@prisma/client';
 import { GrpcStatusCode } from '@trading-bot/common';
 import {
   RegisterInstrumentRequest,
   RegisterInstrumentResponse,
 } from '@trading-bot/common/proto';
 
+import { Prisma } from '../prisma/generated/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { InstrumentMapper } from './mapper/instrument.mapper';
 
