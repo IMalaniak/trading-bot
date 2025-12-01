@@ -29,7 +29,7 @@ services:
       retries: 6
 
   postgres:
-    image: "postgres:17"
+    image: "postgres:18"
     container_name: tb_postgres
     restart: always
     env_file:
