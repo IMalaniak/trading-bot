@@ -1,0 +1,38 @@
+{
+  "extends": ["config:base"],
+  "labels": ["dependencies"],
+  "timezone": "UTC",
+  "prConcurrentLimit": 6,
+  "rangeStrategy": "bump",
+  "ignorePaths": [
+    "**/dist/**",
+    "apps/**/prisma/migrations/**"
+  ],
+  "packageRules": [
+    {
+      "matchUpdateTypes": ["minor", "patch"],
+      "automerge": true,
+      "automergeType": "branch",
+      "groupName": "automerge: minor & patch",
+      "separateMajor": false
+    },
+    {
+      "matchPackagePatterns": ["^@nrwl/", "^nx", "^@nrwl"],
+      "groupName": "nx & nrwl",
+      "separateMajor": true,
+      "schedule": ["before 9am on Monday"]
+    },
+    {
+      "matchPackagePrefixes": ["@nestjs/"],
+      "groupName": "nestjs packages",
+      "separateMajor": true,
+      "schedule": ["before 9am on Tuesday"]
+    },
+    {
+      "matchManagers": ["github-actions"],
+      "groupName": "github-actions",
+      "automerge": true,
+      "automergeType": "branch"
+    }
+  ]
+}

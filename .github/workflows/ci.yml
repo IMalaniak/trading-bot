@@ -4,7 +4,10 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
   push:
-    branches: ["main"]
+    # Keep CI on main, and also run on Renovate branches so branch-style automerge waits for checks
+    branches:
+      - "main"
+      - "renovate/**"
 
 # cancel the previous run and run only on the most recent pushed commit
 concurrency:
