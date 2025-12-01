@@ -1,33 +1,62 @@
 {
-  "extends": ["config:base"],
+  "extends": [
+    "config:recommended",
+    ":preserveSemverRanges",
+    ":rebaseStalePrs",
+    ":pinAllExceptPeerDependencies"
+  ],
   "labels": ["dependencies"],
   "timezone": "UTC",
   "prConcurrentLimit": 6,
-  "rangeStrategy": "bump",
-  "ignorePaths": [
-    "**/dist/**",
-    "apps/**/prisma/migrations/**"
-  ],
+  "ignorePaths": ["**/dist/**", "apps/**/prisma/migrations/**"],
   "packageRules": [
     {
-      "matchUpdateTypes": ["minor", "patch"],
+      "matchDepTypes": ["devDependencies"],
       "automerge": true,
-      "automergeType": "branch",
-      "groupName": "automerge: minor & patch"
+      "automergeType": "branch"
+    },
+    {
+      "matchDepTypes": ["dependencies"],
+      "matchUpdateTypes": ["minor", "patch", "pin", "digest"],
+      "automerge": true,
+      "automergeType": "branch"
     },
     {
       "matchPackagePatterns": ["^@nrwl/", "^nx", "^@nrwl"],
-      "groupName": "nx & nrwl"
+      "groupName": "nx & nrwl",
+      "automerge": true,
+      "automergeType": "branch"
     },
     {
       "matchPackagePrefixes": ["@nestjs/"],
-      "groupName": "nestjs packages"
+      "groupName": "nestjs packages",
+      "automerge": true,
+      "automergeType": "branch"
     },
     {
       "matchManagers": ["github-actions"],
       "groupName": "github-actions",
       "automerge": true,
       "automergeType": "branch"
+    },
+    {
+      "matchPackageNames": ["prisma", "@prisma/client", "@prisma/adapter-pg"],
+      "groupName": "prisma packages",
+      "automerge": true,
+      "automergeType": "branch"
+    },
+    {
+        "matchPackagePatterns": [
+            "^@eslint$",
+            "^@nx/eslint",
+            "^eslint-",
+            "^eslint-plugin-",
+            "^eslint-config-",
+            "^typescript-eslint"
+        ],
+        "groupName": "eslint packages",
+        "automerge": true,
+        "automergeType": "branch"
     }
   ]
 }
