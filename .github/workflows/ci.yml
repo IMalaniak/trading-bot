@@ -11,6 +11,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
+env:
+  DATABASE_URL: "test" # Use test variable for now, needed for portfolio-manager postinstall scripts
+
 jobs:
   affected:
     name: "Run affected build / lint / test"
