@@ -46,7 +46,7 @@
     "@types/node": "24.10.1",
     "@types/pg": "8.15.6",
     "browserslist": "4.28.0",
-    "caniuse-lite": "1.0.30001757",
+    "caniuse-lite": "1.0.30001759",
     "eslint": "9.39.1",
     "eslint-config-prettier": "10.1.8",
     "eslint-plugin-prettier": "5.5.4",
