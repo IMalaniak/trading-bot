@@ -44,7 +44,7 @@
     "@swc/helpers": "0.5.17",
     "@types/jest": "30.0.0",
     "@types/node": "24.10.2",
-    "@types/pg": "8.15.6",
+    "@types/pg": "8.16.0",
     "browserslist": "4.28.0",
     "caniuse-lite": "1.0.30001760",
     "eslint": "9.39.1",
