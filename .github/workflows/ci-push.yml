@@ -1,0 +1,260 @@
+name: "CI — Push"
+
+on:
+  push:
+    # Keep CI on main, and also run on Renovate branches so branch-style automerge waits for checks
+    branches:
+      - "main"
+      - "renovate/**"
+
+concurrency:
+  # Cancel older runs for the same branch; separated from PR workflow so events don't cancel each other
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  DATABASE_URL: "test" # Needed for portfolio-manager postinstall scripts
+
+jobs:
+  prepare:
+    name: "Prepare"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      base: ${{ steps.vars.outputs.base }}
+      head: ${{ steps.vars.outputs.head }}
+      run_all: ${{ steps.detect.outputs.run_all }}
+      skip: ${{ steps.skip_push.outputs.skip }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Check for existing PR (skip redundant push run)
+        id: skip_push
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const ref = context.ref.replace('refs/heads/', '');
+            if (ref === 'main') {
+              core.setOutput('skip', 'false');
+              return;
+            }
+            const prs = await github.paginate(github.pulls.list, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              head: `${context.repo.owner}:${ref}`,
+              state: 'open',
+            });
+            const hasPr = prs.length > 0;
+            core.setOutput('skip', hasPr ? 'true' : 'false');
+            core.info(hasPr
+              ? `Open PR detected for ${ref}; skipping this push run in favor of the PR workflow.`
+              : `No open PR detected for ${ref}; continuing push workflow.`);
+
+      - name: Setup Node.js
+        if: steps.skip_push.outputs.skip != 'true'
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Cache Nx
+        if: steps.skip_push.outputs.skip != 'true'
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/nx
+          key: nx-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            nx-${{ runner.os }}-
+
+      - name: Determine base and head shas
+        id: vars
+        if: steps.skip_push.outputs.skip != 'true'
+        run: |
+          # Push events: if before is available and not the zero SHA, use it. Otherwise fallback to origin/main
+          if [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
+            echo "base=${{ github.event.before }}" >> $GITHUB_OUTPUT
+          else
+            echo "base=origin/${{ github.event.repository.default_branch }}" >> $GITHUB_OUTPUT
+            git fetch origin ${{ github.event.repository.default_branch }} --depth=1 || true
+          fi
+          echo "head=${{ github.sha }}" >> $GITHUB_OUTPUT
+
+      - name: Detect package/lockfile changes
+        id: detect
+        if: steps.skip_push.outputs.skip != 'true'
+        env:
+          BASE: ${{ steps.vars.outputs.base }}
+          HEAD: ${{ steps.vars.outputs.head }}
+        run: |
+          changed_files=$(git diff --name-only "$BASE" "$HEAD" || true)
+          echo "Changed files:\n$changed_files"
+          if echo "$changed_files" | grep -E '(^|/)package(-lock)?\.json$|.nvmrc' >/dev/null; then
+            echo "run_all=true" >> $GITHUB_OUTPUT
+          else
+            echo "run_all=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Exit early for redundant push run
+        if: steps.skip_push.outputs.skip == 'true'
+        run: exit 0
+
+  lint:
+    name: "Lint"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    needs: prepare
+    if: needs.prepare.outputs.skip != 'true' && needs.prepare.outputs.run_all != ''
+    env:
+      BASE: ${{ needs.prepare.outputs.base }}
+      HEAD: ${{ needs.prepare.outputs.head }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Cache Nx
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/nx
+          key: nx-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            nx-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: "Full Run: Lint"
+        if: needs.prepare.outputs.run_all == 'true'
+        run: npx nx run-many --target=lint --all --parallel
+
+      - name: "Affected: Lint"
+        if: needs.prepare.outputs.run_all != 'true'
+        run: npx nx affected --target=lint --base=$BASE --head=$HEAD --parallel
+
+      - name: Upload artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lint-logs
+          path: |
+            .nx/cache/terminalOutputs
+            **/junit*.xml
+            **/test-results/**/*.xml
+          if-no-files-found: ignore
+
+  test:
+    name: "Test"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    needs: prepare
+    if: needs.prepare.outputs.skip != 'true' && needs.prepare.outputs.run_all != ''
+    env:
+      BASE: ${{ needs.prepare.outputs.base }}
+      HEAD: ${{ needs.prepare.outputs.head }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Cache Nx
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/nx
+          key: nx-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            nx-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: "Full Run: Test"
+        if: needs.prepare.outputs.run_all == 'true'
+        run: npx nx run-many --target=test --all --parallel --ci
+
+      - name: "Affected: Test"
+        if: needs.prepare.outputs.run_all != 'true'
+        run: npx nx affected --target=test --base=$BASE --head=$HEAD --parallel --ci
+
+      - name: Upload artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-logs
+          path: |
+            .nx/cache/terminalOutputs
+            **/junit*.xml
+            **/test-results/**/*.xml
+          if-no-files-found: ignore
+
+  build:
+    name: "Build"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    needs: prepare
+    if: needs.prepare.outputs.skip != 'true' && needs.prepare.outputs.run_all != ''
+    env:
+      BASE: ${{ needs.prepare.outputs.base }}
+      HEAD: ${{ needs.prepare.outputs.head }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Cache Nx
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/nx
+          key: nx-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            nx-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: "Full Run: Build"
+        if: needs.prepare.outputs.run_all == 'true'
+        run: npx nx run-many --target=build --all --parallel
+
+      - name: "Affected: Build"
+        if: needs.prepare.outputs.run_all != 'true'
+        run: npx nx affected --target=build --base=$BASE --head=$HEAD --parallel
+
+      - name: Upload artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs
+          path: |
+            .nx/cache/terminalOutputs
+            **/junit*.xml
+            **/test-results/**/*.xml
+          if-no-files-found: ignore
