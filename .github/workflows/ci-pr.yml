@@ -76,7 +76,7 @@ jobs:
           fi
 
   lint:
-    name: "Lint"
+    name: "Lint (PR)"
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -128,7 +128,7 @@ jobs:
           if-no-files-found: ignore
 
   test:
-    name: "Test"
+    name: "Test (PR)"
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -180,7 +180,7 @@ jobs:
           if-no-files-found: ignore
 
   build:
-    name: "Build"
+    name: "Build (PR)"
     runs-on: ubuntu-latest
     permissions:
       contents: read

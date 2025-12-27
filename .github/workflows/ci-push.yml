@@ -104,7 +104,7 @@ jobs:
         run: exit 0
 
   lint:
-    name: "Lint"
+    name: "Lint (Push)"
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -156,7 +156,7 @@ jobs:
           if-no-files-found: ignore
 
   test:
-    name: "Test"
+    name: "Test (Push)"
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -208,7 +208,7 @@ jobs:
           if-no-files-found: ignore
 
   build:
-    name: "Build"
+    name: "Build (Push)"
     runs-on: ubuntu-latest
     permissions:
       contents: read
