@@ -72,16 +72,46 @@ export class PortfolioService implements OnModuleInit, OnModuleDestroy {
       }),
     });
 
-    await lastValueFrom(
-      this.kafkaClient.emit('portfolio.instrument.created', {
-        key: String(instrument.id),
-        value: Instrument.encode(kafkaPayload).finish(),
-        headers: {
-          'content-type': 'application/x-protobuf',
-        },
-      }),
-    );
+    await this.emitEvent('portfolio.instrument.created', {
+      key: String(instrument.id),
+      value: Instrument.encode(kafkaPayload).finish(),
+      headers: {
+        'content-type': 'application/x-protobuf',
+      },
+    });
 
     return { instrument: this.instrumentMapper.map(instrument) };
+  }
+
+  // TODO: use a transactional outbox + dispatcher (or CDC) for guaranteed delivery; keep your current best‑effort retry+logging only as a short-term/measured fallback.
+  private async emitEvent(
+    topic: string,
+    message: {
+      key: string;
+      value: Uint8Array;
+      headers?: Record<string, string>;
+    },
+    attempts = 3,
+  ): Promise<void> {
+    for (let attempt = 1; attempt <= attempts; attempt++) {
+      try {
+        await lastValueFrom(this.kafkaClient.emit(topic, message));
+        return;
+      } catch (err) {
+        this.logger.warn(
+          `Failed to emit Kafka event '${topic}' (attempt ${attempt}/${attempts})`,
+          (err as Error)?.message ?? err,
+        );
+        if (attempt < attempts) {
+          // simple backoff
+          await new Promise((res) => setTimeout(res, 50 * attempt));
+        } else {
+          this.logger.error(
+            `Giving up emitting Kafka event '${topic}' after ${attempts} attempts`,
+            err as Error,
+          );
+        }
+      }
+    }
   }
 }
