@@ -68,13 +68,12 @@
       "options": {
         "passWithNoTests": true
       }
-    }
-    ,
+    },
     "migrate": {
       "executor": "nx:run-commands",
       "defaultConfiguration": "development",
       "options": {
-        "cwd": "apps/portfolio-manager"        
+        "cwd": "apps/portfolio-manager"
       },
       "configurations": {
         "production": {
@@ -87,7 +86,6 @@
         }
       }
     },
-
     "prisma-generate": {
       "executor": "nx:run-commands",
       "options": {

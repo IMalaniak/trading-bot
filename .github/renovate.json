@@ -46,17 +46,17 @@
       "automergeType": "branch"
     },
     {
-        "matchPackagePatterns": [
-            "^@eslint$",
-            "^@nx/eslint",
-            "^eslint-",
-            "^eslint-plugin-",
-            "^eslint-config-",
-            "^typescript-eslint"
-        ],
-        "groupName": "eslint packages",
-        "automerge": true,
-        "automergeType": "branch"
+      "matchPackagePatterns": [
+        "^@eslint$",
+        "^@nx/eslint",
+        "^eslint-",
+        "^eslint-plugin-",
+        "^eslint-config-",
+        "^typescript-eslint"
+      ],
+      "groupName": "eslint packages",
+      "automerge": true,
+      "automergeType": "branch"
     }
   ]
 }

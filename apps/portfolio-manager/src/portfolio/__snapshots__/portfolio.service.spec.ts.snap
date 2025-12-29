@@ -1,0 +1,3 @@
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
+
+exports[`PortfolioService throws RpcException with ALREADY_EXISTS when instrument already exists 1`] = `[Error: Instrument already exists]`;

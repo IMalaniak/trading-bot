@@ -1,4 +1,4 @@
-import { DynamicModule, Module } from '@nestjs/common';
+import { DynamicModule, Module, RequestMethod } from '@nestjs/common';
 import { ConfigModule, ConfigModuleOptions } from '@nestjs/config';
 import { LoggerModule, Params as NestjsPinoParams } from 'nestjs-pino';
 
@@ -23,6 +23,7 @@ export class CommonModule {
         process.env['NODE_ENV'] !== NodeEnvironment.Production
           ? { target: 'pino-pretty' }
           : undefined,
+      forRoutes: [{ method: RequestMethod.ALL, path: '*splat' }],
     };
 
     const callerLogger = options?.logger ?? {};
