@@ -1,21 +1,42 @@
-import { Injectable } from '@nestjs/common';
-import { RpcException } from '@nestjs/microservices';
+import {
+  Inject,
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit,
+} from '@nestjs/common';
+import { ClientKafka, RpcException } from '@nestjs/microservices';
 import { GrpcStatusCode } from '@trading-bot/common';
 import {
+  Instrument,
   RegisterInstrumentRequest,
   RegisterInstrumentResponse,
 } from '@trading-bot/common/proto';
+import { lastValueFrom } from 'rxjs';
 
 import { Prisma } from '../prisma/generated/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { PORTFOLIO_KAFKA_CLIENT } from './constants';
 import { InstrumentMapper } from './mapper/instrument.mapper';
 
 @Injectable()
-export class PortfolioService {
+export class PortfolioService implements OnModuleInit, OnModuleDestroy {
+  private readonly logger = new Logger(PortfolioService.name);
+
   constructor(
     private readonly prisma: PrismaService,
+    @Inject(PORTFOLIO_KAFKA_CLIENT)
+    private readonly kafkaClient: ClientKafka,
     private readonly instrumentMapper: InstrumentMapper,
   ) {}
+
+  async onModuleInit() {
+    await this.kafkaClient.connect();
+  }
+
+  async onModuleDestroy() {
+    await this.kafkaClient.close();
+  }
 
   async registerInstrument(
     data: RegisterInstrumentRequest,
@@ -40,6 +61,26 @@ export class PortfolioService {
         }
         throw error;
       });
+
+    const kafkaPayload = Instrument.fromPartial({
+      id: instrument.id,
+      symbol: instrument.symbol,
+      assetClass: instrument.assetClass,
+      venue: instrument.venue,
+      ...(instrument.externalSymbol && {
+        externalSymbol: instrument.externalSymbol,
+      }),
+    });
+
+    await lastValueFrom(
+      this.kafkaClient.emit('portfolio.instrument.created', {
+        key: String(instrument.id),
+        value: Instrument.encode(kafkaPayload).finish(),
+        headers: {
+          'content-type': 'application/x-protobuf',
+        },
+      }),
+    );
 
     return { instrument: this.instrumentMapper.map(instrument) };
   }

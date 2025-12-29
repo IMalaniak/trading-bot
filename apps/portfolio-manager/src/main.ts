@@ -19,6 +19,7 @@ async function bootstrap() {
   const app = await NestFactory.createMicroservice<MicroserviceOptions>(
     AppModule,
     {
+      bufferLogs: true,
       transport: Transport.GRPC,
       options: {
         package: PROTOBUF_SERVICES_PORTFOLIO_MANAGER_PACKAGE,

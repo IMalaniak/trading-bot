@@ -5,6 +5,7 @@ interface EnvConfig {
   NODE_ENV: NodeEnvironment;
   PORTFOLIO_MANAGER_GRPC_URL: string;
   DATABASE_URL: string;
+  KAFKA_BROKERS: string;
 }
 
 class EnvironmentVariables implements EnvConfig {
@@ -16,6 +17,9 @@ class EnvironmentVariables implements EnvConfig {
 
   @IsString()
   DATABASE_URL: string;
+
+  @IsString()
+  KAFKA_BROKERS: string;
 }
 
 export const defaultEnv: Partial<EnvConfig> = {

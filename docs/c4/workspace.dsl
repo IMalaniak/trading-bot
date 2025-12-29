@@ -23,6 +23,7 @@ workspace "Trading Bot System" {
                     gRPC -> core "Handles market data requests via"
                     core -> marketCollector "Controls subscription feeds of"
                     core -> repository "Reads historical data via"
+                    core -> kafkaConsumer "Subscribes to instrument updates via"
                     marketCollector -> gRPC_Client "Communicates with External API Facade over"
                     marketCollector -> kafkaConsumer "Reads raw market data from"
 
