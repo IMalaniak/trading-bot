@@ -16,4 +16,5 @@
     // Ensure Prettier extension resolves the workspace installation when used elsewhere
     "prettier.prettierPath": "./node_modules/prettier",
     "prettier.requireConfig": true,
+    "eslint.format.enable": true
 }
