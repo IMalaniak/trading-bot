@@ -25,3 +25,27 @@ model Instrument {
 
   @@unique([symbol, venue])
 }
+
+enum OutboxEventStatus {
+  PENDING
+  IN_FLIGHT
+  DISPATCHED
+  FAILED
+}
+
+model OutboxEvent {
+  id            String   @id @default(uuid())
+  topic         String
+  key           String
+  value         Bytes
+  headers       Json?
+  status        OutboxEventStatus @default(PENDING)
+  attempts      Int      @default(0)
+  nextAttemptAt DateTime @default(now())
+  lastError     String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  dispatchedAt  DateTime?
+
+  @@index([status, nextAttemptAt])
+}

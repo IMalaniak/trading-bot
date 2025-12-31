@@ -4,21 +4,18 @@ import {
   Instrument as ProtoInstrument,
   RegisterInstrumentRequest,
 } from '@trading-bot/common/proto';
-import { of } from 'rxjs';
 
+import { EventDispatcherService } from '../event-dispatcher/event-dispatcher.service';
 import { Prisma } from '../prisma/generated/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { PORTFOLIO_KAFKA_CLIENT } from './constants';
 import { InstrumentMapper } from './mapper/instrument.mapper';
 import { PortfolioService } from './portfolio.service';
 
 describe('PortfolioService', () => {
   let service: PortfolioService;
   let prismaService: PrismaService;
-  let kafkaClient: {
-    emit: jest.Mock;
-    connect: jest.Mock;
-    close: jest.Mock;
+  let eventDispatcher: {
+    enqueueEvent: jest.Mock;
   };
 
   const request: RegisterInstrumentRequest = {
@@ -29,10 +26,8 @@ describe('PortfolioService', () => {
   };
 
   beforeEach(async () => {
-    kafkaClient = {
-      emit: jest.fn(),
-      connect: jest.fn(),
-      close: jest.fn(),
+    eventDispatcher = {
+      enqueueEvent: jest.fn(),
     };
 
     const moduleRef = await Test.createTestingModule({
@@ -44,11 +39,12 @@ describe('PortfolioService', () => {
             instrument: {
               create: jest.fn(),
             },
+            $transaction: jest.fn(),
           },
         },
         {
-          provide: PORTFOLIO_KAFKA_CLIENT,
-          useValue: kafkaClient,
+          provide: EventDispatcherService,
+          useValue: eventDispatcher,
         },
         InstrumentMapper,
       ],
@@ -58,19 +54,7 @@ describe('PortfolioService', () => {
     prismaService = moduleRef.get(PrismaService);
   });
 
-  it('connects Kafka producer on module init', async () => {
-    await service.onModuleInit();
-
-    expect(kafkaClient.connect).toHaveBeenCalledTimes(1);
-  });
-
-  it('closes Kafka producer on module destroy', async () => {
-    await service.onModuleDestroy();
-
-    expect(kafkaClient.close).toHaveBeenCalledTimes(1);
-  });
-
-  it('creates an instrument, emits kafka event, and returns mapped result', async () => {
+  it('creates an instrument, enqueues outbox event, and returns mapped result', async () => {
     const createdInstrument = {
       id: 'instrument-1',
       assetClass: AssetClass.CRYPTO,
@@ -78,16 +62,19 @@ describe('PortfolioService', () => {
       venue: request.venue,
       externalSymbol: request.externalSymbol,
     };
-    (prismaService.instrument.create as jest.Mock).mockResolvedValue(
-      createdInstrument,
+    const tx = {
+      instrument: {
+        create: jest.fn().mockResolvedValue(createdInstrument),
+      },
+      $executeRaw: jest.fn(),
+    };
+    (prismaService.$transaction as jest.Mock).mockImplementation(
+      (cb: (client: typeof tx) => unknown) => cb(tx),
     );
-
-    kafkaClient.emit.mockReturnValue(of(undefined));
 
     const result = await service.registerInstrument(request);
 
-    // eslint-disable-next-line @typescript-eslint/unbound-method
-    expect(prismaService.instrument.create).toHaveBeenCalledWith({
+    expect(tx.instrument.create).toHaveBeenCalledWith({
       data: {
         symbol: request.symbol,
         assetClass: request.assetClass,
@@ -105,10 +92,11 @@ describe('PortfolioService', () => {
     });
     const expectedBuffer = ProtoInstrument.encode(expectedPayload).finish();
 
-    expect(kafkaClient.emit).toHaveBeenCalledWith(
+    expect(eventDispatcher.enqueueEvent).toHaveBeenCalledWith(
+      tx,
       'portfolio.instrument.created',
       {
-        key: String(createdInstrument.id),
+        key: createdInstrument.id,
         value: expectedBuffer,
         headers: { 'content-type': 'application/x-protobuf' },
       },
@@ -126,12 +114,18 @@ describe('PortfolioService', () => {
         clientVersion: '',
       },
     );
-    (prismaService.instrument.create as jest.Mock).mockRejectedValue(
-      uniqueError,
+    const tx = {
+      instrument: {
+        create: jest.fn().mockRejectedValue(uniqueError),
+      },
+      $executeRaw: jest.fn(),
+    };
+    (prismaService.$transaction as jest.Mock).mockImplementation(
+      (cb: (client: typeof tx) => unknown) => cb(tx),
     );
 
     await expect(service.registerInstrument(request)).rejects.toMatchSnapshot();
 
-    expect(kafkaClient.emit).not.toHaveBeenCalled();
+    expect(eventDispatcher.enqueueEvent).not.toHaveBeenCalled();
   });
 });
