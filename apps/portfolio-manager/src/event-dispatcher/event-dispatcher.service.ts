@@ -23,6 +23,8 @@ const OUTBOX_RETRY_MAX_MS = 30_000;
 const OUTBOX_RETRY_EXPONENT_CAP = 10;
 // Base delay for immediate in-process emit retries (linear backoff: 50ms, 100ms, 150ms).
 const EMIT_RETRY_BASE_MS = 50;
+// Timeout for stale IN_FLIGHT events (reclaim if stuck for >30s due to crash/exception).
+const OUTBOX_IN_FLIGHT_TIMEOUT_MS = 30_000;
 
 @Injectable()
 export class EventDispatcherService implements OnModuleInit, OnModuleDestroy {
@@ -87,6 +89,7 @@ export class EventDispatcherService implements OnModuleInit, OnModuleDestroy {
     this.outboxDispatchRunning = true;
     try {
       // Raw SQL atomically claims events with SKIP LOCKED and marks them IN_FLIGHT for concurrent dispatchers.
+      // Includes stale IN_FLIGHT rows (stuck due to crashes/exceptions) older than timeout threshold.
       const claimedEvents = await this.prisma.$queryRaw<
         Array<{
           id: string;
@@ -100,8 +103,14 @@ export class EventDispatcherService implements OnModuleInit, OnModuleDestroy {
         WITH cte AS (
           SELECT "id"
           FROM "OutboxEvent"
-          WHERE "status" IN ('PENDING'::"OutboxEventStatus", 'FAILED'::"OutboxEventStatus")
-            AND "nextAttemptAt" <= NOW()
+          WHERE (
+              "status" IN ('PENDING'::"OutboxEventStatus", 'FAILED'::"OutboxEventStatus")
+              AND "nextAttemptAt" <= NOW()
+            )
+            OR (
+              "status" = 'IN_FLIGHT'::"OutboxEventStatus"
+              AND "updatedAt" < NOW() - INTERVAL '${Prisma.raw(`${OUTBOX_IN_FLIGHT_TIMEOUT_MS} milliseconds`)}'
+            )
           ORDER BY "createdAt" ASC
           LIMIT ${OUTBOX_BATCH_SIZE}
           FOR UPDATE SKIP LOCKED
