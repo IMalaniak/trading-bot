@@ -412,6 +412,6 @@ npx nx run-many -t test -p common,portfolio-manager,api-gateway,execution-engine
 - 1 iteration = 1 week (or 4-5 focused sessions)
 - Ship small and frequently:
   - Day 1: contracts + scaffolding
-  - Day 2-3: core logic
+  - Days 2-3: core logic
   - Day 4: tests + smoke
   - Day 5: docs + polish

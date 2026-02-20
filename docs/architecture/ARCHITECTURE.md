@@ -84,7 +84,7 @@ The C4 model diagrams for the trading bot platform are available in the `docs/ar
 
 ## Workflows of Trading Bot Platform
 
-Bellow are represented a detailed sequence diagrams illustrating different workflows of a trading bot platform. This diagram captures the interactions between various components, including user interfaces, backend services, data ingestion, feature engineering, prediction engines, risk management, and trade execution.
+Below are represented a detailed sequence diagrams illustrating different workflows of a trading bot platform. This diagram captures the interactions between various components, including user interfaces, backend services, data ingestion, feature engineering, prediction engines, risk management, and trade execution.
 
 ### Registering a new trading instrument and executing trades
 
