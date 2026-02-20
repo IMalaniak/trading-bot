@@ -176,6 +176,11 @@ workspace "Trading Bot System" {
 
             // Message bus
             messageBus = container "Message Bus" "Event-driven communication and streaming backbone." "Apache Kafka" "Queue"
+            schemaRegistry = container "Schema Registry" "Kafka schema registry for event contracts and versioning." "Schema Registry" "Service"
+
+            // ML training pipeline placeholder (out of scope for now)
+            modelRegistry = container "Model Registry" "Stores versioned ML models for deployment." "Registry" "Service"
+            trainingPipeline = container "Model Training Pipeline" "Offline training/evaluation pipeline (placeholder)." "Batch/ML" "Service"
         }
 
         // External systems
@@ -215,6 +220,13 @@ workspace "Trading Bot System" {
         tradingBot.dataIngestion.gRPC_Client -> tradingBot.externalAPIFacade.gRPC "Asks to start/stop fetching market data"
         tradingBot.externalAPIFacade.binanceClient -> binance "Places orders on"
         tradingBot.externalAPIFacade.binanceClient -> binance "Fetches market data from"
+
+        tradingBot.executionEngine.kafkaPublisher -> tradingBot.messageBus "Publishes order/fill updates to"
+        tradingBot.portfolioManager.kafkaConsumer -> tradingBot.messageBus "Consumes order/fill updates from"
+
+        tradingBot.messageBus -> tradingBot.schemaRegistry "Uses schemas from"
+        tradingBot.predictionEngine.modelRunner -> tradingBot.modelRegistry "Loads versioned models from"
+        tradingBot.trainingPipeline -> tradingBot.modelRegistry "Publishes trained models to"
 
     } /* end model */
 
@@ -263,6 +275,7 @@ workspace "Trading Bot System" {
             include tradingBot.predictionEngine.kafkaPublisher
             include tradingBot.redis
             include tradingBot.messageBus
+            include tradingBot.modelRegistry
             autolayout lr
         }
 
@@ -277,6 +290,12 @@ workspace "Trading Bot System" {
             include tradingBot.portfolioManager.repository
             include tradingBot.postgres
             include tradingBot.messageBus
+            autolayout lr
+        }
+
+        container tradingBot "Kafka-Containers" {
+            include tradingBot.messageBus
+            include tradingBot.schemaRegistry
             autolayout lr
         }
 
@@ -349,6 +368,9 @@ workspace "Trading Bot System" {
             element "External" {
                 background #999999
                 color #ffffff
+            }
+            element "Service" {
+                shape roundedbox
             }
             element "Web Server" {
                 shape folder
