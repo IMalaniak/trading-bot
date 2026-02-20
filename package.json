@@ -28,7 +28,7 @@
     "rxjs": "7.8.2"
   },
   "devDependencies": {
-    "@eslint/js": "9.39.2",
+    "@eslint/js": "9.39.3",
     "@nestjs/schematics": "11.0.9",
     "@nestjs/testing": "11.1.14",
     "@nx/eslint": "22.5.1",
@@ -48,7 +48,7 @@
     "@types/pg": "8.16.0",
     "browserslist": "4.28.1",
     "caniuse-lite": "1.0.30001770",
-    "eslint": "9.39.2",
+    "eslint": "9.39.3",
     "eslint-config-prettier": "10.1.8",
     "eslint-plugin-prettier": "5.5.5",
     "eslint-plugin-simple-import-sort": "12.1.1",
