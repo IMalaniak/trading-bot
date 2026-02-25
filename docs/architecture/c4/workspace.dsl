@@ -10,22 +10,21 @@ workspace "Trading Bot System" {
             // Containers
 
             group "Data Ingestion Service" {
-                dataIngestion = container "Data Ingestion" "Collects market data from exchanges and streams it to Kafka." "Rust" {
+                dataIngestion = container "Data Ingestion" "Subscribes to market data topics, stores raw/indicator time-series data, and manages stream subscriptions." "Rust" {
                     gRPC = component "Market Data API" "Exposes gRPC API for API Gateway to fetch historical data." "gRPC" "API"
                     gRPC_Client = component "gRPC Client" "Handles internal service-to-service communication." "gRPC"
 
-                    core = component "Ingestion Core" "Main logic for managing data ingestion and subscriptions." "Rust"
-                    marketCollector = component "Market Data Collector" "Connects to Binance API/WebSocket to fetch tickers, order books, trades." "Rust"
+                    core = component "Ingestion Core" "Main logic for managing data ingestion and stream subscription orchestration." "Rust"
+                    marketCollector = component "Market Data Collector" "Orchestrates market stream subscriptions via External API Facade." "Rust"
                     repository = component "Data Ingestion Repository" "Reads/Writes data from/to TimescaleDB." "Rust"
 
-                    kafkaConsumer = component "Kafka Consumer" "Consumes messages from Kafka." "Rust"
+                    kafkaConsumer = component "Kafka Consumer" "Consumes instrument registration, raw market data, and engineered indicator topics from Kafka." "Rust"
 
                     gRPC -> core "Handles market data requests via"
                     core -> marketCollector "Controls subscription feeds of"
-                    core -> repository "Reads historical data via"
-                    core -> kafkaConsumer "Subscribes to instrument updates via"
+                    core -> repository "Reads historical data and writes raw/indicator series via"
+                    core -> kafkaConsumer "Subscribes to instrument registration and market topics via"
                     marketCollector -> gRPC_Client "Communicates with External API Facade over"
-                    marketCollector -> kafkaConsumer "Reads raw market data from"
 
                 }
 
@@ -52,7 +51,7 @@ workspace "Trading Bot System" {
                     apiService = component "API Service" "Handles gRPC requests for current signals and recommendations." "Python"
                     modelRunner = component "Model Runner" "Runs ML models (LSTMs, Transformers, RL)." "Python"
                     newsAnalyzer = component "Newsfeed Analyzer" "Processes sentiment / news / social data and produces features." "Python"
-                    signalCacheManager = component "Signal Cache Manager" "Manages Redis cache: deduplicates signals, keeps short-term history for Risk Manager, used internally by Prediction Engine for fast retrieval." "Python"
+                    signalCacheManager = component "Signal Cache Manager" "Manages Redis cache: deduplicates signals and keeps short-term history for fast internal retrieval." "Python"
 
                     kafkaConsumer = component "Kafka Consumer" "Consumes engineered features from Kafka." "Python"
                     kafkaPublisher = component "Kafka Publisher" "Publishes signals to Kafka." "Python"
@@ -76,14 +75,16 @@ workspace "Trading Bot System" {
                     portfolioManager = component "Portfolio Manager" "Tracks positions, balances, allocations and risk exposure." "TypeScript"
                     repository = component "Repository" "Persists trades, fills and portfolio state into PostgreSQL." "TypeScript"
 
-                    kafkaConsumer = component "Kafka Consumer" "Consumes trading signals from Kafka." "TypeScript"
-                    kafkaPublisher = component "Kafka Publisher" "Publishes approved trades to Kafka." "TypeScript"
+                    kafkaConsumer = component "Kafka Consumer" "Consumes trading.signals, trading.signals.portfolio, and execution updates (orders.placed/orders.fills) from Kafka." "TypeScript"
+                    kafkaPublisher = component "Kafka Publisher" "Publishes trading.signals.portfolio, trades.approved/trades.rejected, and portfolio.updated events to Kafka." "TypeScript"
 
                     gRPC -> strategyConfigManager "Handles risk/strategy config updates via"
                     gRPC -> portfolioManager "Handles portfolio/trade requests via"
-                    kafkaConsumer -> riskRules "Feeds signals into"
+                    kafkaConsumer -> riskRules "Feeds trading.signals and trading.signals.portfolio into"
+                    kafkaConsumer -> portfolioManager "Feeds orders.placed/orders.fills updates into"
                     strategyConfigManager -> riskRules "Provides rule updates to"
-                    riskRules -> kafkaPublisher "Publishes approved trades to"
+                    riskRules -> kafkaPublisher "Publishes portfolio-ordered signals and trade decisions to"
+                    portfolioManager -> kafkaPublisher "Publishes instrument registration and portfolio update events to"
                     portfolioManager -> repository "Persists portfolio state and trades via"
                     riskRules -> repository "Logs risk decisions via"
                 }
@@ -94,18 +95,18 @@ workspace "Trading Bot System" {
 
             group "Execution Engine Service" {
                 executionEngine = container "Execution Engine" "Places and manages orders on exchanges." "Nest.js" {
-                    gRPC = component "Trades API" "Exposes trade history gRPC API to API Gateway." "gRPC" "API"
+                    gRPC = component "Trades API" "Exposes execution/order lifecycle gRPC API for internal consumers." "gRPC" "API"
                     gRPC_Client = component "gRPC Client" "Handles internal service-to-service communication." "gRPC"
 
                     core = component "Execution Core" "Main logic for order management and execution." "TypeScript"
                     tradeExecutor = component "Trade Executor" "Sends orders to exchanges via APIs, manages order lifecycle." "TypeScript"
 
-                    kafkaPublisher = component "Kafka Publisher" "Publishes trade fills and execution reports to Kafka." "TypeScript"
+                    kafkaPublisher = component "Kafka Publisher" "Publishes orders.placed and orders.fills execution updates to Kafka." "TypeScript"
                     kafkaConsumer = component "Kafka Consumer" "Consumes approved trades from Kafka." "TypeScript"
 
                     gRPC -> core "Handles trade requests via"
                     core -> tradeExecutor "Sends trade orders via"
-                    tradeExecutor -> kafkaPublisher "Notifies about fills to"
+                    tradeExecutor -> kafkaPublisher "Publishes orders.placed and orders.fills updates to"
                     kafkaConsumer -> tradeExecutor "Delivers approved trades to"
                     tradeExecutor -> gRPC_Client "Communicates with External API Facade over"
                 }
@@ -119,9 +120,9 @@ workspace "Trading Bot System" {
                     core = component "Core Orchestration" "Coordinates between services, manages workflows." "TypeScript"
 
                     marketDataProxy = component "Market Data Proxy" "Forwards dashboard queries to Data Ingestion (Market Data API)." "TypeScript"
-                    portfolioProxy = component "Portfolio Proxy" "Forwards dashboard queries to Execution Engine (Portfolio API)." "TypeScript"
+                    portfolioProxy = component "Portfolio Proxy" "Forwards dashboard portfolio/trade read queries to Risk & Portfolio Manager (source-of-truth Portfolio API)." "TypeScript"
                     signalProxy = component "Signal Proxy" "Forwards dashboard queries to Prediction Engine (Signal API)." "TypeScript"
-                    riskProxy = component "Risk Proxy" "Forwards strategy/risk config updates to Risk Manager (Risk API)." "TypeScript"
+                    riskProxy = component "Risk Proxy" "Forwards strategy/risk config updates to Risk & Portfolio Manager (Risk API)." "TypeScript"
 
                     REST -> core "Handles API requests via"
                     core -> marketDataProxy "Sends market data requests to"
@@ -129,9 +130,9 @@ workspace "Trading Bot System" {
                     core -> signalProxy "Sends signal requests to"
                     core -> riskProxy "Forwards strategy/risk config updates AND start/stop trading commands to"
                     marketDataProxy -> gRPC_Client "Communicates with Data Ingestion over gRPC"
-                    portfolioProxy -> gRPC_Client "Communicates with Execution Engine over gRPC"
+                    portfolioProxy -> gRPC_Client "Communicates with Risk & Portfolio Manager over gRPC"
                     signalProxy -> gRPC_Client "Communicates with Prediction Engine over gRPC"
-                    riskProxy -> gRPC_Client "Communicates with Risk Manager over gRPC"
+                    riskProxy -> gRPC_Client "Communicates with Risk & Portfolio Manager over gRPC"
                 }
             }
             
@@ -193,26 +194,29 @@ workspace "Trading Bot System" {
 
         tradingBot.dashboard.apiClient -> tradingBot.apiGateway.REST "Sends API requests (UI)"
         tradingBot.apiGateway.gRPC_Client -> tradingBot.dataIngestion.gRPC "Requests market data and subscription updates (Market Data API)"
-        tradingBot.apiGateway.gRPC_Client -> tradingBot.executionEngine.gRPC "Requests portfolio/trade info and sends strategy updates (Portfolio API)"
         tradingBot.apiGateway.gRPC_Client -> tradingBot.predictionEngine.gRPC "Requests current signals / triggers (Signal API)"
-        tradingBot.apiGateway.gRPC_Client -> tradingBot.portfolioManager.gRPC "Sends updated risk/strategy configuration"
+        tradingBot.apiGateway.gRPC_Client -> tradingBot.portfolioManager.gRPC "Requests portfolio/trade info (source-of-truth Portfolio API)"
         tradingBot.apiGateway.gRPC_Client -> tradingBot.portfolioManager.gRPC "Sends updated risk/strategy configuration and start/stop trading commands"
         
         tradingBot.dataIngestion.repository -> tradingBot.timescale "Writes historical market data to"
 
-        tradingBot.externalAPIFacade.kafkaPublisher -> tradingBot.messageBus "Publishes raw market data to"
-        tradingBot.dataIngestion.kafkaConsumer -> tradingBot.messageBus "Consumes raw data published by externalAPIFacade from"
-        tradingBot.featureEngineering.kafkaPublisher -> tradingBot.messageBus "Publishes engineered features to"
-        tradingBot.predictionEngine.kafkaPublisher -> tradingBot.messageBus "Publishes signals to"
-        tradingBot.portfolioManager.kafkaPublisher -> tradingBot.messageBus "Publishes approved trades to"
+        tradingBot.externalAPIFacade.kafkaPublisher -> tradingBot.messageBus "Publishes market.raw.data to"
+        tradingBot.featureEngineering.kafkaPublisher -> tradingBot.messageBus "Publishes features.indicators to"
+        tradingBot.predictionEngine.kafkaPublisher -> tradingBot.messageBus "Publishes trading.signals to"
+        tradingBot.portfolioManager.kafkaPublisher -> tradingBot.messageBus "Publishes instrument.registered to"
+        tradingBot.portfolioManager.kafkaPublisher -> tradingBot.messageBus "Publishes trading.signals.portfolio to"
+        tradingBot.portfolioManager.kafkaPublisher -> tradingBot.messageBus "Publishes trades.approved and trades.rejected to"
+        tradingBot.portfolioManager.kafkaPublisher -> tradingBot.messageBus "Publishes portfolio.updated to"
+        tradingBot.executionEngine.kafkaPublisher -> tradingBot.messageBus "Publishes orders.placed and orders.fills to"
 
-        tradingBot.featureEngineering.kafkaConsumer -> tradingBot.messageBus "Consumes raw data from"
-        tradingBot.predictionEngine.kafkaConsumer -> tradingBot.messageBus "Consumes engineered features from"
-        tradingBot.portfolioManager.kafkaConsumer -> tradingBot.messageBus "Consumes signals from"
-        tradingBot.executionEngine.kafkaConsumer -> tradingBot.messageBus "Consumes approved trades from"
+        tradingBot.dataIngestion.kafkaConsumer -> tradingBot.messageBus "Consumes instrument.registered, market.raw.data, and features.indicators from"
+        tradingBot.featureEngineering.kafkaConsumer -> tradingBot.messageBus "Consumes market.raw.data from"
+        tradingBot.predictionEngine.kafkaConsumer -> tradingBot.messageBus "Consumes features.indicators from"
+        tradingBot.portfolioManager.kafkaConsumer -> tradingBot.messageBus "Consumes trading.signals and trading.signals.portfolio from"
+        tradingBot.portfolioManager.kafkaConsumer -> tradingBot.messageBus "Consumes orders.placed and orders.fills from"
+        tradingBot.executionEngine.kafkaConsumer -> tradingBot.messageBus "Consumes trades.approved from"
 
         tradingBot.predictionEngine.signalCacheManager -> tradingBot.redis "Writes recent signals to"
-        tradingBot.portfolioManager.riskRules -> tradingBot.redis "Optionally fetches latest signals from"
 
         tradingBot.portfolioManager.repository -> tradingBot.postgres "Writes portfolio and trades to"
 
@@ -220,9 +224,6 @@ workspace "Trading Bot System" {
         tradingBot.dataIngestion.gRPC_Client -> tradingBot.externalAPIFacade.gRPC "Asks to start/stop fetching market data"
         tradingBot.externalAPIFacade.binanceClient -> binance "Places orders on"
         tradingBot.externalAPIFacade.binanceClient -> binance "Fetches market data from"
-
-        tradingBot.executionEngine.kafkaPublisher -> tradingBot.messageBus "Publishes order/fill updates to"
-        tradingBot.portfolioManager.kafkaConsumer -> tradingBot.messageBus "Consumes order/fill updates from"
 
         tradingBot.messageBus -> tradingBot.schemaRegistry "Uses schemas from"
         tradingBot.predictionEngine.modelRunner -> tradingBot.modelRegistry "Loads versioned models from"
@@ -322,7 +323,6 @@ workspace "Trading Bot System" {
             include tradingBot.apiGateway.signalProxy
             include tradingBot.apiGateway.riskProxy
             include tradingBot.dataIngestion.gRPC
-            include tradingBot.executionEngine.gRPC
             include tradingBot.predictionEngine.gRPC
             include tradingBot.portfolioManager.gRPC
             autolayout lr

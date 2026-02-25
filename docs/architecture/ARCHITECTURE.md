@@ -51,13 +51,13 @@ Risk ordering strategy:
 | `instrument.registered` | Risk & Portfolio Manager | Data Ingestion | `instrument_key` | Per instrument |
 | `market.raw.data` | External API Facade | Data Ingestion, Feature Engineering | `instrument_key` | Per instrument |
 | `features.indicators` | Feature Engineering | Prediction Engine, Data Ingestion | `instrument_key` | Per instrument |
-| `trading.signals` | Prediction Engine | Risk Manager (instrument stage) | `instrument_key` | Per instrument |
-| `trading.signals.portfolio` | Risk Manager (repartition stage) | Risk Manager (portfolio stage) | `portfolio_key` | Per portfolio |
-| `trades.approved` | Risk Manager | Execution Engine | `portfolio_key` | Per portfolio |
-| `trades.rejected` | Risk Manager | Audit, Monitoring, Dashboard adapters | `portfolio_key` | Per portfolio |
-| `orders.placed` | Execution Engine | Risk Manager, API read models | `portfolio_key` | Per portfolio |
-| `orders.fills` | Execution Engine | Risk Manager | `portfolio_key` | Per portfolio |
-| `portfolio.updated` | Risk Manager | API Gateway, Dashboard, Analytics | `portfolio_key` | Per portfolio |
+| `trading.signals` | Prediction Engine | Risk & Portfolio Manager (instrument stage) | `instrument_key` | Per instrument |
+| `trading.signals.portfolio` | Risk & Portfolio Manager (repartition stage) | Risk & Portfolio Manager (portfolio stage) | `portfolio_key` | Per portfolio |
+| `trades.approved` | Risk & Portfolio Manager | Execution Engine | `portfolio_key` | Per portfolio |
+| `trades.rejected` | Risk & Portfolio Manager | Downstream adapters (audit/monitoring/dashboard) | `portfolio_key` | Per portfolio |
+| `orders.placed` | Execution Engine | Risk & Portfolio Manager | `portfolio_key` | Per portfolio |
+| `orders.fills` | Execution Engine | Risk & Portfolio Manager | `portfolio_key` | Per portfolio |
+| `portfolio.updated` | Risk & Portfolio Manager | Downstream adapters and analytics | `portfolio_key` | Per portfolio |
 
 Current retention policy:
 - No topics are configured as compacted at this stage; all topics are append-only event streams with time/size retention.
@@ -65,6 +65,7 @@ Current retention policy:
 ## Fills Reconciliation and Source of Truth
 
 The Risk & Portfolio Manager is the system of record for orders, fills, and portfolio state. The Execution Engine emits order and fill updates to Kafka, and the Risk & Portfolio Manager consumes these events to persist final state and emit portfolio-updated/order-updated events for downstream services and the dashboard.
+Portfolio and trade read queries exposed to clients are served by Risk & Portfolio Manager (via API Gateway), not by Execution Engine.
 
 ## ML Training and Deployment (Placeholder)
 
@@ -195,7 +196,8 @@ sequenceDiagram
         RiskManager->>Kafka: Publish portfolio updated
         Note right of Kafka: Topic: portfolio.updated
         
-        ExecutionEngine-->>APIGateway: Trade executed notification
+        APIGateway->>RiskManager: gRPC: GetPortfolio()
+        RiskManager-->>APIGateway: Updated portfolio snapshot
         APIGateway-->>Dashboard: Update portfolio view
         Dashboard-->>Trader: Show new position
     else Signal Rejected
