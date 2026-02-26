@@ -19,7 +19,7 @@
     "@prisma/adapter-pg": "7.4.1",
     "@prisma/client": "7.4.1",
     "class-transformer": "0.5.1",
-    "class-validator": "0.14.4",
+    "class-validator": "0.15.1",
     "kafkajs": "2.2.4",
     "nestjs-pino": "4.6.0",
     "pg": "8.18.0",
