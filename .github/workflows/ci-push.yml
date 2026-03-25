@@ -12,9 +12,6 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
-env:
-  DATABASE_URL: "test" # Needed for portfolio-manager postinstall scripts
-
 jobs:
   prepare:
     name: "Prepare"
@@ -134,6 +131,8 @@ jobs:
             nx-${{ runner.os }}-
 
       - name: Install dependencies
+        env:
+          DATABASE_URL: "test"
         run: npm ci
 
       - name: "Full Run: Lint"
@@ -186,6 +185,8 @@ jobs:
             nx-${{ runner.os }}-
 
       - name: Install dependencies
+        env:
+          DATABASE_URL: "test"
         run: npm ci
 
       - name: "Full Run: Test"
@@ -201,6 +202,64 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: test-logs
+          path: |
+            .nx/cache/terminalOutputs
+            **/junit*.xml
+            **/test-results/**/*.xml
+          if-no-files-found: ignore
+
+  test-integration:
+    name: "Integration Test (Push)"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    needs: prepare
+    if: needs.prepare.outputs.skip != 'true' && needs.prepare.outputs.run_all != ''
+    env:
+      BASE: ${{ needs.prepare.outputs.base }}
+      HEAD: ${{ needs.prepare.outputs.head }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Cache Nx
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/nx
+          key: nx-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            nx-${{ runner.os }}-
+
+      - name: Install dependencies
+        env:
+          DATABASE_URL: "test"
+        run: npm ci
+
+      - name: "Full Run: Integration Test"
+        if: needs.prepare.outputs.run_all == 'true'
+        run: npx nx run-many --target=test-integration --all --parallel=1 --outputStyle=static
+
+      - name: "Affected: Integration Test"
+        if: needs.prepare.outputs.run_all != 'true'
+        run: npx nx affected --target=test-integration --base=$BASE --head=$HEAD --parallel=1 --outputStyle=static
+
+      - name: Tear down isolated integration infra
+        if: always()
+        run: npx nx run portfolio-manager:integration-infra-down:test-integration || true
+
+      - name: Upload artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: integration-test-logs
           path: |
             .nx/cache/terminalOutputs
             **/junit*.xml
@@ -238,6 +297,8 @@ jobs:
             nx-${{ runner.os }}-
 
       - name: Install dependencies
+        env:
+          DATABASE_URL: "test"
         run: npm ci
 
       - name: "Full Run: Build"
