@@ -6,12 +6,14 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 import { ClientKafka } from '@nestjs/microservices';
+import { KAFKA_EVENT_HEADER_NAMES } from '@trading-bot/common';
 import { randomUUID } from 'crypto';
 import { lastValueFrom } from 'rxjs';
 
 import { OutboxEventStatus, Prisma } from '../prisma/generated/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { PORTFOLIO_MANAGER_KAFKA_CLIENT } from './const';
+import { OutboxMessageInput } from './types/outbox-message';
 
 const OUTBOX_DISPATCH_INTERVAL_MS = 1000;
 const OUTBOX_BATCH_SIZE = 50;
@@ -54,22 +56,29 @@ export class EventDispatcherService implements OnModuleInit, OnModuleDestroy {
   async enqueueEvent(
     tx: Prisma.TransactionClient,
     topic: string,
-    message: {
-      key: string;
-      value: Uint8Array;
-      headers?: Record<string, string>;
-    },
-  ): Promise<void> {
+    message: OutboxMessageInput,
+  ): Promise<string> {
+    const eventId =
+      message.eventId ??
+      message.headers?.[KAFKA_EVENT_HEADER_NAMES.EVENT_ID] ??
+      randomUUID();
+    const headers = {
+      ...(message.headers ?? {}),
+      [KAFKA_EVENT_HEADER_NAMES.EVENT_ID]: eventId,
+    };
+
     await tx.outboxEvent.create({
       data: {
-        id: randomUUID(),
+        id: eventId,
         topic,
         key: message.key,
         value: Buffer.from(message.value),
-        headers: message.headers ?? undefined,
+        headers,
         status: OutboxEventStatus.PENDING,
       },
     });
+
+    return eventId;
   }
 
   private startOutboxDispatcher(): void {
@@ -181,18 +190,21 @@ export class EventDispatcherService implements OnModuleInit, OnModuleDestroy {
 
   private async emitEvent(
     topic: string,
-    message: {
-      key: string;
-      value: Uint8Array;
-      headers?: Record<string, string>;
-    },
+    message: OutboxMessageInput,
     attempts = 3,
   ): Promise<string | null> {
     let lastError: unknown;
 
     for (let attempt = 1; attempt <= attempts; attempt++) {
       try {
-        await lastValueFrom(this.kafkaClient.emit(topic, message));
+        await lastValueFrom(
+          this.kafkaClient.emit(topic, {
+            ...message,
+            value: Buffer.isBuffer(message.value)
+              ? message.value
+              : Buffer.from(message.value),
+          }),
+        );
         return null;
       } catch (err: unknown) {
         lastError = err;

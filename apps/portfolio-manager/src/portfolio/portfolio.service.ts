@@ -2,7 +2,6 @@ import { Injectable } from '@nestjs/common';
 import { RpcException } from '@nestjs/microservices';
 import { GrpcStatusCode } from '@trading-bot/common';
 import {
-  Instrument,
   RegisterInstrumentRequest,
   RegisterInstrumentResponse,
 } from '@trading-bot/common/proto';
@@ -10,6 +9,7 @@ import {
 import { EventDispatcherService } from '../event-dispatcher/event-dispatcher.service';
 import { Prisma } from '../prisma/generated/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { InstrumentRegisteredEventFactory } from './events/instrument-registered-event.factory';
 import { InstrumentMapper } from './mapper/instrument.mapper';
 
 @Injectable()
@@ -17,6 +17,7 @@ export class PortfolioService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly instrumentMapper: InstrumentMapper,
+    private readonly instrumentRegisteredEventFactory: InstrumentRegisteredEventFactory,
     private readonly eventDispatcher: EventDispatcherService,
   ) {}
 
@@ -45,26 +46,13 @@ export class PortfolioService {
           throw error;
         });
 
-      const kafkaPayload = Instrument.fromPartial({
-        id: createdInstrument.id,
-        symbol: createdInstrument.symbol,
-        assetClass: createdInstrument.assetClass,
-        venue: createdInstrument.venue,
-        ...(createdInstrument.externalSymbol && {
-          externalSymbol: createdInstrument.externalSymbol,
-        }),
-      });
+      const registrationEvent =
+        this.instrumentRegisteredEventFactory.create(createdInstrument);
 
       await this.eventDispatcher.enqueueEvent(
         tx,
-        'portfolio.instrument.created',
-        {
-          key: createdInstrument.id,
-          value: Instrument.encode(kafkaPayload).finish(),
-          headers: {
-            'content-type': 'application/x-protobuf',
-          },
-        },
+        registrationEvent.topic,
+        registrationEvent.message,
       );
 
       return createdInstrument;

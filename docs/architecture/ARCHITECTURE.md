@@ -1,95 +1,240 @@
 # Trading Bot Platform Architecture
 
 ## Table of Contents
+
 - [Trading Bot Platform Architecture](#trading-bot-platform-architecture)
   - [Table of Contents](#table-of-contents)
-  - [Architecture summary](#architecture-summary)
+  - [Architecture Summary](#architecture-summary)
+  - [Current Implementation Status](#current-implementation-status)
+  - [Target Architecture](#target-architecture)
   - [Eventing, Ordering, and Consistency](#eventing-ordering-and-consistency)
+    - [Current event transport contract](#current-event-transport-contract)
+    - [Ordering and idempotency rules](#ordering-and-idempotency-rules)
+    - [Versioning rules](#versioning-rules)
+    - [Outbox pattern](#outbox-pattern)
   - [Kafka Topics and Partition Keys](#kafka-topics-and-partition-keys)
-  - [Fills Reconciliation and Source of Truth](#fills-reconciliation-and-source-of-truth)
-  - [ML Training and Deployment (Placeholder)](#ml-training-and-deployment-placeholder)
+  - [Local Development Workflow](#local-development-workflow)
   - [C4 Model Diagrams](#c4-model-diagrams)
-  - [Workflows of Trading Bot Platform](#workflows-of-trading-bot-platform)
-    - [Registering a new trading instrument and executing trades](#registering-a-new-trading-instrument-and-executing-trades)
+  - [Workflows](#workflows)
+    - [Current: Instrument Registration](#current-instrument-registration)
+    - [Planned: End-to-End Trading Flow](#planned-end-to-end-trading-flow)
 
-## Architecture summary
+## Architecture Summary
 
-The trading bot platform is designed to facilitate automated trading by integrating various components that handle data ingestion, feature engineering, prediction generation, risk management, and trade execution. The architecture leverages microservices, message queues, and external APIs to ensure scalability, reliability, and real-time processing.
+The platform is an event-driven trading system built around small services, explicit Kafka topic contracts, and service-owned datastores.
 
-Main components include:
-- **User Interface (Dashboard)**: A web-based interface for traders to register instruments, monitor portfolios, and view trading signals.
-- **API Gateway**: Acts as a single entry point for all client requests, routing them to appropriate backend services.
-- **Risk & Portfolio Manager**: Manages instrument registrations, portfolio data, and enforces risk management rules.
-- **Message Bus (Kafka)**: Facilitates asynchronous communication between services through event-driven architecture, with a schema registry for event contracts and versioning.
-- **Data Ingestion Service**: Subscribes to market data streams and stores raw data in a time-series database.
-- **Feature Engineering Service**: Processes raw market data to compute technical indicators and other features.
-- **Prediction Engine**: Utilizes machine learning models to generate trading signals based on engineered features.
-- **Execution Engine**: Validates approved trades and interacts with external trading APIs to place orders.
+Two principles are already active in the current codebase and should remain stable as the MVP grows:
+
+- Business state changes are committed to Postgres before being published to Kafka.
+- Kafka topics, keys, and event metadata are treated as explicit contracts, not ad-hoc strings.
+
+The current implementation is still intentionally narrow:
+
+- `api-gateway` exposes the registration REST path.
+- `portfolio-manager` stores instruments, writes an outbox record, and dispatches Kafka events.
+- `common` owns shared proto contracts and Kafka contract helpers.
+- Local infra provides Redpanda, Postgres, and TimescaleDB.
+
+Everything else in this document should be read as either:
+
+- implemented now, or
+- planned target state, explicitly marked below.
+
+## Current Implementation Status
+
+| Area                             | Status               | Notes                                                                           |
+| -------------------------------- | -------------------- | ------------------------------------------------------------------------------- |
+| API Gateway                      | Implemented          | REST entrypoint forwards registration to `portfolio-manager` over gRPC.         |
+| Risk & Portfolio Manager         | Implemented          | Instrument registration, Postgres persistence, outbox storage, Kafka dispatch.  |
+| Outbox Dispatcher                | Implemented          | Kafka publish happens from the outbox, not inline with the DB write.            |
+| Shared Contracts (`common`)      | Implemented          | Proto types, topic constants, key builders, and Kafka header helpers live here. |
+| Message Bus (Redpanda/Kafka API) | Implemented          | Local development uses Redpanda.                                                |
+| Portfolio DB (Postgres)          | Implemented          | Source of truth for current registration flow and outbox storage.               |
+| Market Data Store (TimescaleDB)  | Implemented in infra | Provisioned locally, but not yet exercised by application code in this repo.    |
+| Data Ingestion Service           | Planned              | Not implemented in this repo yet.                                               |
+| Feature Engineering Service      | Planned              | Not implemented in this repo yet.                                               |
+| Prediction Engine                | Planned              | Not implemented in this repo yet.                                               |
+| Execution Engine                 | Planned              | Not implemented in this repo yet.                                               |
+| External API Facade              | Planned              | Not implemented in this repo yet.                                               |
+| Dashboard                        | Planned              | Not implemented in this repo yet.                                               |
+| Schema Registry                  | Planned              | Documented as a future capability; not provisioned in local infra.              |
+
+## Target Architecture
+
+The intended MVP direction remains:
+
+- `instrument.registered` starts per-instrument downstream activity.
+- `trading.signals` is consumed in instrument order.
+- `trading.signals.portfolio` is the repartitioned portfolio-order stage.
+- `trades.approved` and `trades.rejected` are the risk decision outputs.
+- `orders.placed` and `orders.fills` come from the execution engine.
+- `portfolio.updated` is emitted by the risk and portfolio manager after reconciliation.
+
+That target architecture is still valid, but only the registration slice is implemented today.
 
 ## Eventing, Ordering, and Consistency
 
-- **Schema governance**: All Kafka topics are versioned and validated through a schema registry to prevent breaking changes and enable safe evolution.
-- **Ordering boundaries**: Strict ordering for risk checks is implemented as a two-stage flow: instrument-ordered stream first, then a portfolio-ordered repartition stream.
-- **Idempotency**: Trade approvals and fill events carry idempotency keys to guard against retries and replay.
+### Current event transport contract
+
+Kafka messages use:
+
+- Kafka record key as the authoritative partition key
+- protobuf domain payload in the message value
+- metadata in Kafka headers
+
+Standard headers:
+
+- `event-id`
+- `event-type`
+- `schema-version`
+- `occurred-at`
+- `producer`
+- `content-type`
+
+For Iteration 1:
+
+- `event-type` is the topic name
+- `schema-version` starts at `"1"`
+- `event-id` is the outbox row ID and stays stable across retries
+- `content-type` is `application/x-protobuf`
+
+### Ordering and idempotency rules
+
+- `instrument_key = <VENUE>:<instrument_id>`
+- `portfolio_key = <portfolio_id>`
+- `risk_key = <portfolio_id>:<instrument_id>`
+- `instrumentKey()` normalizes `venue` to uppercase before joining the key.
+- The outbox row ID is the idempotency identity for the current registration event flow.
+
+### Versioning rules
+
+- Additive protobuf field additions are allowed on the same topic.
+- Breaking semantic changes require a new documented event type or topic and a new schema version.
+- Schema registry is still planned, so version discipline is currently enforced by shared contracts, tests, and documentation.
+
+### Outbox pattern
+
+`portfolio-manager` does not publish Kafka events directly from the write path. It:
+
+1. writes the business record,
+2. writes an outbox row in the same transaction,
+3. dispatches the outbox row to Kafka asynchronously.
+
+This is the main currently implemented reliability mechanism and should remain visible in both the code and diagrams.
 
 ## Kafka Topics and Partition Keys
 
-The platform uses explicit partition keys so ordering behavior is deterministic and auditable.
+Local development bootstraps all documented topics explicitly and disables broker auto-creation so topic-name mistakes fail fast.
 
-Key conventions:
-- `instrument_key = <exchange>:<instrument_id>`
-- `portfolio_key = <portfolio_id>`
-- `risk_key = <portfolio_id>:<instrument_id>` (used inside payloads and for deduplication/idempotency)
+| Topic                       | Status      | Producer                                             | Main consumers                                      | Partition key    | Ordering guarantee |
+| --------------------------- | ----------- | ---------------------------------------------------- | --------------------------------------------------- | ---------------- | ------------------ |
+| `instrument.registered`     | Implemented | Risk & Portfolio Manager                             | Planned Data Ingestion                              | `instrument_key` | Per instrument     |
+| `market.raw.data`           | Planned     | Planned External API Facade                          | Planned Data Ingestion, Feature Engineering         | `instrument_key` | Per instrument     |
+| `features.indicators`       | Planned     | Planned Feature Engineering                          | Planned Prediction Engine, Data Ingestion           | `instrument_key` | Per instrument     |
+| `trading.signals`           | Planned     | Planned Prediction Engine                            | Planned Risk & Portfolio Manager (instrument stage) | `instrument_key` | Per instrument     |
+| `trading.signals.portfolio` | Planned     | Planned Risk & Portfolio Manager (repartition stage) | Planned Risk & Portfolio Manager (portfolio stage)  | `portfolio_key`  | Per portfolio      |
+| `trades.approved`           | Planned     | Planned Risk & Portfolio Manager                     | Planned Execution Engine                            | `portfolio_key`  | Per portfolio      |
+| `trades.rejected`           | Planned     | Planned Risk & Portfolio Manager                     | Planned downstream adapters                         | `portfolio_key`  | Per portfolio      |
+| `orders.placed`             | Planned     | Planned Execution Engine                             | Planned Risk & Portfolio Manager                    | `portfolio_key`  | Per portfolio      |
+| `orders.fills`              | Planned     | Planned Execution Engine                             | Planned Risk & Portfolio Manager                    | `portfolio_key`  | Per portfolio      |
+| `portfolio.updated`         | Planned     | Planned Risk & Portfolio Manager                     | Planned downstream adapters and analytics           | `portfolio_key`  | Per portfolio      |
 
-Risk ordering strategy:
-- Stage 1 (instrument checks): consume `trading.signals` keyed by `instrument_key`.
-- Stage 2 (portfolio checks): republish passing events to `trading.signals.portfolio` keyed by `portfolio_key`.
-- Final decision: publish `trades.approved` or `trades.rejected` keyed by `portfolio_key`.
+Local bootstrap defaults:
 
-| Topic | Producer | Main consumers | Partition key | Ordering guarantee |
-| --- | --- | --- | --- | --- |
-| `instrument.registered` | Risk & Portfolio Manager | Data Ingestion | `instrument_key` | Per instrument |
-| `market.raw.data` | External API Facade | Data Ingestion, Feature Engineering | `instrument_key` | Per instrument |
-| `features.indicators` | Feature Engineering | Prediction Engine, Data Ingestion | `instrument_key` | Per instrument |
-| `trading.signals` | Prediction Engine | Risk & Portfolio Manager (instrument stage) | `instrument_key` | Per instrument |
-| `trading.signals.portfolio` | Risk & Portfolio Manager (repartition stage) | Risk & Portfolio Manager (portfolio stage) | `portfolio_key` | Per portfolio |
-| `trades.approved` | Risk & Portfolio Manager | Execution Engine | `portfolio_key` | Per portfolio |
-| `trades.rejected` | Risk & Portfolio Manager | Downstream adapters (audit/monitoring/dashboard) | `portfolio_key` | Per portfolio |
-| `orders.placed` | Execution Engine | Risk & Portfolio Manager | `portfolio_key` | Per portfolio |
-| `orders.fills` | Execution Engine | Risk & Portfolio Manager | `portfolio_key` | Per portfolio |
-| `portfolio.updated` | Risk & Portfolio Manager | Downstream adapters and analytics | `portfolio_key` | Per portfolio |
+- partitions: `3`
+- replication factor: `1`
+- cleanup policy: `delete`
 
-Current retention policy:
-- No topics are configured as compacted at this stage; all topics are append-only event streams with time/size retention.
+No compacted topics are configured at this stage.
 
-## Fills Reconciliation and Source of Truth
+## Local Development Workflow
 
-The Risk & Portfolio Manager is the system of record for orders, fills, and portfolio state. The Execution Engine emits order and fill updates to Kafka, and the Risk & Portfolio Manager consumes these events to persist final state and emit portfolio-updated/order-updated events for downstream services and the dashboard.
-Portfolio and trade read queries exposed to clients are served by Risk & Portfolio Manager (via API Gateway), not by Execution Engine.
+Expected env files:
 
-## ML Training and Deployment (Placeholder)
+- root `.env`
+  - `PORTFOLIO_MANAGER_GRPC_URL`
+  - `KAFKA_BROKERS`
+  - optional `PORT` for `api-gateway`
+- `apps/portfolio-manager/.env`
+  - `DATABASE_URL`
+- `apps/portfolio-manager/.env.test-integration`
+  - isolated integration-test `DATABASE_URL`
+  - isolated integration-test `KAFKA_BROKERS`
+- `infra/.env`
+  - Postgres and Timescale credentials for Docker Compose
 
-Model training and deployment are intentionally left out of the current scope. A future addition will cover:
-- Offline training and evaluation pipeline
-- Model registry and versioned artifacts
-- Feature store or feature lineage for offline/online consistency
-- Deployment strategy and rollback for Prediction Engine models
+Suggested local run order:
+
+```bash
+docker compose -f infra/docker-compose.yml up -d
+npx nx run portfolio-manager:migrate
+npx nx serve portfolio-manager
+npx nx serve api-gateway
+```
+
+If local Kafka topics need to be re-created after startup, rerun:
+
+```bash
+docker compose -f infra/docker-compose.yml run --rm redpanda-init
+```
+
+Useful validation commands:
+
+```bash
+npx nx run portfolio-manager:test-integration
+```
+
+`portfolio-manager:test-integration` uses the isolated
+`infra/docker-compose.test.yml` stack, bootstraps topics via `redpanda-init`,
+runs `portfolio-manager:migrate:test-integration`, and then executes the
+integration Jest suite. It does not require the shared local development stack
+to be running first.
+
+Manual registration smoke:
+
+1. Start infra and both apps.
+2. Call `POST /portfolio/register-instrument` on `api-gateway`.
+3. Consume from `instrument.registered`.
+4. Verify key, headers, and decoded `InstrumentRegistered` payload.
 
 ## C4 Model Diagrams
 
-The C4 model diagrams for the trading bot platform are available in the `docs/architecture/c4` directory. These diagrams provide a visual representation of the system's components, their interactions, and the overall architecture. To view the diagrams interactively in the browser, run the following script:
+The C4 model diagrams live in `docs/architecture/c4`.
+
+To view them interactively:
 
 ```bash
 ./scripts/structurizr-lite.sh
 ```
 
-## Workflows of Trading Bot Platform
+## Workflows
 
-Below are represented a detailed sequence diagrams illustrating different workflows of a trading bot platform. This diagram captures the interactions between various components, including user interfaces, backend services, data ingestion, feature engineering, prediction engines, risk management, and trade execution.
+### Current: Instrument Registration
 
-### Registering a new trading instrument and executing trades
+This is the implemented flow today.
 
-When a trader wants to register a new trading instrument (e.g., BTC/USDT) and execute trades based on generated signals, the following sequence of interactions occurs:
+```mermaid
+sequenceDiagram
+    participant Client
+    participant APIGateway as API Gateway
+    participant PortfolioManager as Risk & Portfolio Manager
+    participant DB as Portfolio DB
+    participant Outbox as Outbox Dispatcher
+    participant Kafka as Message Bus
+
+    Client->>APIGateway: POST /portfolio/register-instrument
+    APIGateway->>PortfolioManager: gRPC RegisterInstrument()
+    PortfolioManager->>DB: Insert instrument + outbox row (same transaction)
+    DB-->>PortfolioManager: Commit successful
+    PortfolioManager-->>APIGateway: Registration response
+    Outbox->>DB: Claim pending outbox row
+    Outbox->>Kafka: Publish InstrumentRegistered
+    Note right of Kafka: Topic: instrument.registered\nKey: <VENUE>:<instrument_id>
+```
+
+### Planned: End-to-End Trading Flow
+
+The flow below is the intended target architecture, not the current repo state.
 
 ```mermaid
 sequenceDiagram
@@ -108,101 +253,42 @@ sequenceDiagram
     participant ExecutionEngine as Execution Engine
     participant ExternalAPI as External API Facade
     end
-    
+
     box External Systems
     participant Binance as Binance API
     end
 
-    %% Instrument Registration Flow
-    Note over Trader,Binance: Instrument Registration & Trading Flow
-    
-    Trader->>Dashboard: Register new instrument<br/>(e.g., BTC/USDT)
-    Dashboard->>APIGateway: POST /instruments<br/>(instrumentData)
-    APIGateway->>RiskManager: gRPC: RegisterInstrument()
-    
-    RiskManager->>DB: Store instrument config
-    DB-->>RiskManager: Saved ✓
-    
-    RiskManager->>Kafka: Publish InstrumentRegistered event
-    Note right of Kafka: Topic: instrument.registered
-    
-    RiskManager-->>APIGateway: Registration success
-    APIGateway-->>Dashboard: 201 Created
-    Dashboard-->>Trader: Instrument registered
+    Trader->>Dashboard: Register new instrument
+    Dashboard->>APIGateway: POST /portfolio/register-instrument
+    APIGateway->>RiskManager: gRPC RegisterInstrument()
+    RiskManager->>DB: Store instrument config + outbox row
+    Kafka-->>DataIngestion: Consume instrument.registered
 
-    %% Data Collection Flow
-    DataIngestion->>Kafka: Subscribe to instrument.registered
-    Kafka-->>DataIngestion: InstrumentRegistered event
-    
-    DataIngestion->>ExternalAPI: gRPC: StartMarketDataStream()<br/>(BTC/USDT)
-    ExternalAPI->>Binance: Subscribe WebSocket<br/>(ticker, orderbook, trades)
-    Binance-->>ExternalAPI: Market data stream
-    
-    ExternalAPI->>Kafka: Publish raw market data
-    Note right of Kafka: Topic: market.raw.data
-    
-    %% Parallel Processing: Data Ingestion
-    par Data Ingestion Processing
-        Kafka-->>DataIngestion: Consume raw market data
-        DataIngestion->>TimescaleDB: Store raw market data<br/>(OHLCV, orderbook, trades)
-        TimescaleDB-->>DataIngestion: Stored ✓
-    
-    %% Parallel Processing: Feature Engineering
-    and Feature Engineering Processing
-        Kafka-->>FeatureEng: Consume raw market data
-        FeatureEng->>FeatureEng: Calculate indicators<br/>(RSI, MACD, Volatility)
-        FeatureEng->>Kafka: Publish engineered features
-        Note right of Kafka: Topic: features.indicators
-        
-        Kafka-->>DataIngestion: Consume indicators
-        DataIngestion->>TimescaleDB: Store computed indicators
-        TimescaleDB-->>DataIngestion: Stored ✓
-    end
+    DataIngestion->>ExternalAPI: Start market data stream
+    ExternalAPI->>Binance: Subscribe to market data
+    ExternalAPI->>Kafka: Publish market.raw.data
 
-    %% Prediction & Signal Generation
-    Kafka-->>PredictionEngine: Consume features
-    PredictionEngine->>PredictionEngine: Run ML models<br/>(LSTM, Transformers, RL)
-    PredictionEngine->>Kafka: Publish trading signals<br/>(BUY/SELL/HOLD)
-    Note right of Kafka: Topic: trading.signals
+    Kafka-->>FeatureEng: Consume market.raw.data
+    FeatureEng->>Kafka: Publish features.indicators
 
-    %% Risk Validation
-    Kafka-->>RiskManager: Consume trading signals<br/>(instrument ordered)
-    RiskManager->>RiskManager: Validate instrument-level rules
-    RiskManager->>Kafka: Repartition signal for portfolio checks
-    Note right of Kafka: Topic: trading.signals.portfolio
-    Kafka-->>RiskManager: Consume portfolio-ordered signal
-    RiskManager->>RiskManager: Validate portfolio-level rules
+    Kafka-->>PredictionEngine: Consume features.indicators
+    PredictionEngine->>Kafka: Publish trading.signals
 
-    alt Signal Approved
-        RiskManager->>Kafka: Publish approved trade
-        Note right of Kafka: Topic: trades.approved
-        
-        %% Trade Execution
-        Kafka-->>ExecutionEngine: Consume approved trade
-        ExecutionEngine->>ExternalAPI: gRPC: PlaceOrder()<br/>(BUY 0.1 BTC)
-        ExternalAPI->>Binance: REST: POST /api/v3/order
-        Binance-->>ExternalAPI: Order placed<br/>(orderId: 12345)
-        ExternalAPI-->>ExecutionEngine: Order confirmation
-        
-        ExecutionEngine->>Kafka: Publish OrderPlaced event
-        Note right of Kafka: Topic: orders.placed
+    Kafka-->>RiskManager: Consume trading.signals
+    RiskManager->>Kafka: Publish trading.signals.portfolio
+    Kafka-->>RiskManager: Consume trading.signals.portfolio
 
-        %% Fills and Reconciliation
-        ExternalAPI-->>ExecutionEngine: Execution report/fill
-        ExecutionEngine->>Kafka: Publish order/fill update
-        Note right of Kafka: Topic: orders.fills
-        Kafka-->>RiskManager: Consume order/fill updates
-        RiskManager->>DB: Persist fills/order status
-        RiskManager->>Kafka: Publish portfolio updated
-        Note right of Kafka: Topic: portfolio.updated
-        
-        APIGateway->>RiskManager: gRPC: GetPortfolio()
-        RiskManager-->>APIGateway: Updated portfolio snapshot
-        APIGateway-->>Dashboard: Update portfolio view
-        Dashboard-->>Trader: Show new position
-    else Signal Rejected
-        RiskManager->>Kafka: Publish SignalRejected event
-        Note right of Kafka: Topic: trades.rejected
-        Note right of Kafka: Reason: Risk limit exceeded
+    alt Signal approved
+        RiskManager->>Kafka: Publish trades.approved
+        Kafka-->>ExecutionEngine: Consume trades.approved
+        ExecutionEngine->>ExternalAPI: Place order
+        ExternalAPI->>Binance: Submit exchange order
+        ExecutionEngine->>Kafka: Publish orders.placed
+        ExecutionEngine->>Kafka: Publish orders.fills
+        Kafka-->>RiskManager: Consume orders.fills
+        RiskManager->>DB: Reconcile orders, fills, positions
+        RiskManager->>Kafka: Publish portfolio.updated
+    else Signal rejected
+        RiskManager->>Kafka: Publish trades.rejected
     end
 ```
