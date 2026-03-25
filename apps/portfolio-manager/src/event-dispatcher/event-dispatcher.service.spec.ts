@@ -1,3 +1,4 @@
+import { KAFKA_EVENT_HEADER_NAMES, KAFKA_TOPICS } from '@trading-bot/common';
 import { of, throwError } from 'rxjs';
 
 import { EventDispatcherService } from './event-dispatcher.service';
@@ -63,22 +64,101 @@ describe('EventDispatcherService', () => {
       },
     };
 
-    await service.enqueueEvent(tx as never, 'topic', {
-      key: 'key-1',
-      value: new Uint8Array([1, 2, 3]),
-      headers: { 'content-type': 'application/x-protobuf' },
-    });
+    const eventId = await service.enqueueEvent(
+      tx as never,
+      KAFKA_TOPICS.INSTRUMENT_REGISTERED,
+      {
+        eventId: 'event-1',
+        key: 'key-1',
+        value: new Uint8Array([1, 2, 3]),
+        headers: {
+          [KAFKA_EVENT_HEADER_NAMES.EVENT_ID]: 'event-1',
+          'content-type': 'application/x-protobuf',
+        },
+      },
+    );
 
+    expect(eventId).toBe('event-1');
     expect(tx.outboxEvent.create).toHaveBeenCalledTimes(1);
+    expect(tx.outboxEvent.create).toHaveBeenCalledWith({
+      data: {
+        id: 'event-1',
+        topic: KAFKA_TOPICS.INSTRUMENT_REGISTERED,
+        key: 'key-1',
+        value: Buffer.from([1, 2, 3]),
+        headers: {
+          [KAFKA_EVENT_HEADER_NAMES.EVENT_ID]: 'event-1',
+          'content-type': 'application/x-protobuf',
+        },
+        status: 'PENDING',
+      },
+    });
+  });
+
+  it('falls back to the header event id when one is already present', async () => {
+    const tx = {
+      outboxEvent: {
+        create: jest.fn(),
+      },
+    };
+
+    const eventId = await service.enqueueEvent(
+      tx as never,
+      KAFKA_TOPICS.INSTRUMENT_REGISTERED,
+      {
+        key: 'key-1',
+        value: new Uint8Array([1, 2, 3]),
+        headers: {
+          [KAFKA_EVENT_HEADER_NAMES.EVENT_ID]: 'event-2',
+        },
+      },
+    );
+
+    expect(eventId).toBe('event-2');
+  });
+
+  it('backfills the event-id header when generating a new outbox id', async () => {
+    const tx = {
+      outboxEvent: {
+        create: jest.fn(),
+      },
+    };
+
+    const eventId = await service.enqueueEvent(
+      tx as never,
+      KAFKA_TOPICS.INSTRUMENT_REGISTERED,
+      {
+        key: 'key-1',
+        value: new Uint8Array([1, 2, 3]),
+        headers: {
+          [KAFKA_EVENT_HEADER_NAMES.CONTENT_TYPE]: 'application/x-protobuf',
+        },
+      },
+    );
+
+    expect(eventId).toEqual(expect.any(String));
+    expect(tx.outboxEvent.create).toHaveBeenCalledWith({
+      data: {
+        id: eventId,
+        topic: KAFKA_TOPICS.INSTRUMENT_REGISTERED,
+        key: 'key-1',
+        value: Buffer.from([1, 2, 3]),
+        headers: {
+          [KAFKA_EVENT_HEADER_NAMES.EVENT_ID]: eventId,
+          [KAFKA_EVENT_HEADER_NAMES.CONTENT_TYPE]: 'application/x-protobuf',
+        },
+        status: 'PENDING',
+      },
+    });
   });
 
   it('dispatches claimed events and marks them as dispatched', async () => {
     prisma.$queryRaw.mockResolvedValue([
       {
         id: 'event-1',
-        topic: 'portfolio.instrument.created',
+        topic: KAFKA_TOPICS.INSTRUMENT_REGISTERED,
         key: 'key-1',
-        value: Buffer.from([1, 2, 3]),
+        value: new Uint8Array([1, 2, 3]),
         headers: { 'content-type': 'application/x-protobuf' },
         attempts: 0,
       },
@@ -88,11 +168,14 @@ describe('EventDispatcherService', () => {
 
     await service.dispatchOutboxBatch();
 
-    expect(kafka.emit).toHaveBeenCalledWith('portfolio.instrument.created', {
-      key: 'key-1',
-      value: Buffer.from([1, 2, 3]),
-      headers: { 'content-type': 'application/x-protobuf' },
-    });
+    expect(kafka.emit).toHaveBeenCalledWith(
+      KAFKA_TOPICS.INSTRUMENT_REGISTERED,
+      {
+        key: 'key-1',
+        value: Buffer.from([1, 2, 3]),
+        headers: { 'content-type': 'application/x-protobuf' },
+      },
+    );
     expect(prisma.outboxEvent.update).toHaveBeenCalledTimes(1);
   });
 
@@ -100,9 +183,9 @@ describe('EventDispatcherService', () => {
     prisma.$queryRaw.mockResolvedValue([
       {
         id: 'event-1',
-        topic: 'portfolio.instrument.created',
+        topic: KAFKA_TOPICS.INSTRUMENT_REGISTERED,
         key: 'key-1',
-        value: Buffer.from([1, 2, 3]),
+        value: new Uint8Array([1, 2, 3]),
         headers: null,
         attempts: 1,
       },
@@ -112,11 +195,14 @@ describe('EventDispatcherService', () => {
 
     await service.dispatchOutboxBatch();
 
-    expect(kafka.emit).toHaveBeenCalledWith('portfolio.instrument.created', {
-      key: 'key-1',
-      value: Buffer.from([1, 2, 3]),
-      headers: undefined,
-    });
+    expect(kafka.emit).toHaveBeenCalledWith(
+      KAFKA_TOPICS.INSTRUMENT_REGISTERED,
+      {
+        key: 'key-1',
+        value: Buffer.from([1, 2, 3]),
+        headers: undefined,
+      },
+    );
     expect(prisma.outboxEvent.update).toHaveBeenCalledWith({
       where: { id: 'event-1' },
       data: expect.objectContaining({

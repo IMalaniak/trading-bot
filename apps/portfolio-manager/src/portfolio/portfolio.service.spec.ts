@@ -1,33 +1,45 @@
 import { Test } from '@nestjs/testing';
 import {
+  instrumentKey,
+  KAFKA_EVENT_HEADER_NAMES,
+  KAFKA_EVENT_PRODUCERS,
+  KAFKA_EVENT_SCHEMA_VERSIONS,
+  KAFKA_TOPICS,
+} from '@trading-bot/common';
+import {
   AssetClass,
-  Instrument as ProtoInstrument,
+  InstrumentRegistered,
   RegisterInstrumentRequest,
 } from '@trading-bot/common/proto';
 
 import { EventDispatcherService } from '../event-dispatcher/event-dispatcher.service';
 import { Prisma } from '../prisma/generated/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { InstrumentRegisteredEventFactory } from './events/instrument-registered-event.factory';
 import { InstrumentMapper } from './mapper/instrument.mapper';
 import { PortfolioService } from './portfolio.service';
 
 describe('PortfolioService', () => {
   let service: PortfolioService;
   let prismaService: PrismaService;
+  let enqueueEventMock: jest.MockedFunction<
+    EventDispatcherService['enqueueEvent']
+  >;
   let eventDispatcher: {
-    enqueueEvent: jest.Mock;
+    enqueueEvent: EventDispatcherService['enqueueEvent'];
   };
 
   const request: RegisterInstrumentRequest = {
     assetClass: AssetClass.CRYPTO,
-    symbol: 'BTCUSDT',
+    symbol: 'BTC/USDT',
     venue: 'BINANCE',
-    externalSymbol: 'BTC/USDT',
+    externalSymbol: 'BTCUSDT',
   };
 
   beforeEach(async () => {
+    enqueueEventMock = jest.fn().mockResolvedValue('event-1');
     eventDispatcher = {
-      enqueueEvent: jest.fn(),
+      enqueueEvent: enqueueEventMock,
     };
 
     const moduleRef = await Test.createTestingModule({
@@ -47,6 +59,7 @@ describe('PortfolioService', () => {
           useValue: eventDispatcher,
         },
         InstrumentMapper,
+        InstrumentRegisteredEventFactory,
       ],
     }).compile();
 
@@ -83,23 +96,45 @@ describe('PortfolioService', () => {
       },
     });
 
-    const expectedPayload = ProtoInstrument.fromPartial({
+    expect(eventDispatcher.enqueueEvent).toHaveBeenCalledTimes(1);
+
+    const firstEnqueueCall = enqueueEventMock.mock.calls[0];
+    if (!firstEnqueueCall) {
+      throw new Error('Expected enqueueEvent to be called once');
+    }
+    const [, topic, message] = firstEnqueueCall;
+    const messageHeaders = message.headers;
+    if (!messageHeaders) {
+      throw new Error('Expected enqueueEvent headers to be defined');
+    }
+    const payload = InstrumentRegistered.decode(message.value);
+
+    expect(topic).toBe(KAFKA_TOPICS.INSTRUMENT_REGISTERED);
+    expect(message.key).toBe(
+      instrumentKey(createdInstrument.venue, createdInstrument.id),
+    );
+    expect(message.eventId).toEqual(expect.any(String));
+    expect(messageHeaders).toEqual(
+      expect.objectContaining({
+        [KAFKA_EVENT_HEADER_NAMES.EVENT_ID]: message.eventId,
+        [KAFKA_EVENT_HEADER_NAMES.EVENT_TYPE]:
+          KAFKA_TOPICS.INSTRUMENT_REGISTERED,
+        [KAFKA_EVENT_HEADER_NAMES.SCHEMA_VERSION]:
+          KAFKA_EVENT_SCHEMA_VERSIONS.INSTRUMENT_REGISTERED,
+        [KAFKA_EVENT_HEADER_NAMES.PRODUCER]:
+          KAFKA_EVENT_PRODUCERS.PORTFOLIO_MANAGER,
+        [KAFKA_EVENT_HEADER_NAMES.CONTENT_TYPE]: 'application/x-protobuf',
+      }),
+    );
+    expect(payload.instrument).toEqual({
       id: createdInstrument.id,
       symbol: createdInstrument.symbol,
       assetClass: createdInstrument.assetClass,
       venue: createdInstrument.venue,
       externalSymbol: createdInstrument.externalSymbol,
     });
-    const expectedBuffer = ProtoInstrument.encode(expectedPayload).finish();
-
-    expect(eventDispatcher.enqueueEvent).toHaveBeenCalledWith(
-      tx,
-      'portfolio.instrument.created',
-      {
-        key: createdInstrument.id,
-        value: expectedBuffer,
-        headers: { 'content-type': 'application/x-protobuf' },
-      },
+    expect(payload.registeredAt).toBe(
+      messageHeaders[KAFKA_EVENT_HEADER_NAMES.OCCURRED_AT],
     );
     expect(result).toEqual({
       instrument: createdInstrument,

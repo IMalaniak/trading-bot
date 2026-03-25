@@ -1,0 +1,35 @@
+name: tb-portfolio-manager-integration
+
+services:
+  redpanda:
+    extends:
+      file: docker-compose.base.yml
+      service: redpanda
+    command:
+      - redpanda
+      - start
+      - --overprovisioned
+      - --smp
+      - '1'
+      - --memory
+      - 1G
+      - --reserve-memory
+      - 0M
+      - --node-id
+      - '0'
+      - '--kafka-addr=PLAINTEXT://0.0.0.0:9092,INTERNAL://0.0.0.0:29092'
+      - '--advertise-kafka-addr=PLAINTEXT://${INTEGRATION_KAFKA_HOST}:${INTEGRATION_KAFKA_PORT},INTERNAL://redpanda:29092'
+    ports:
+      - '${INTEGRATION_KAFKA_PORT}:9092'
+
+  redpanda-init:
+    extends:
+      file: docker-compose.base.yml
+      service: redpanda-init
+
+  postgres:
+    extends:
+      file: docker-compose.base.yml
+      service: postgres
+    ports:
+      - '${INTEGRATION_POSTGRES_PORT}:5432'

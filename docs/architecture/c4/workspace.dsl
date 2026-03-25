@@ -11,6 +11,7 @@ workspace "Trading Bot System" {
 
             group "Data Ingestion Service" {
                 dataIngestion = container "Data Ingestion" "Subscribes to market data topics, stores raw/indicator time-series data, and manages stream subscriptions." "Rust" {
+                    tags "Planned"
                     gRPC = component "Market Data API" "Exposes gRPC API for API Gateway to fetch historical data." "gRPC" "API"
                     gRPC_Client = component "gRPC Client" "Handles internal service-to-service communication." "gRPC"
 
@@ -28,11 +29,14 @@ workspace "Trading Bot System" {
 
                 }
 
-                timescale = container "Market Data Store" "Owned by Data Ingestion. Stores historical market/trading data." "TimescaleDB" "Datastore"
+                timescale = container "Market Data Store" "Owned by Data Ingestion. Stores historical market/trading data." "TimescaleDB" "Datastore" {
+                    tags "Implemented"
+                }
             }
 
             group "Feature Engineering Service" {
                 featureEngineering = container "Feature Engineering" "Computes indicators and transforms raw data for prediction." "Rust" {
+                    tags "Planned"
                     featureCalculator = component "Feature Calculator" "Computes indicators (RSI, MACD, volatility, correlations)." "Rust"
 
                     kafkaConsumer = component "Kafka Consumer" "Consumes raw market data from Kafka." "Rust"
@@ -46,6 +50,7 @@ workspace "Trading Bot System" {
 
             group "Prediction Engine Service" {
                 predictionEngine = container "Prediction Engine" "Runs ML/NLP models to generate trading signals. Owns Signal Cache." "Python" {
+                    tags "Planned"
                     gRPC = component "Signal API" "Exposes signals and recommendations gRPC API to API Gateway." "gRPC" "API"
 
                     apiService = component "API Service" "Handles gRPC requests for current signals and recommendations." "Python"
@@ -67,34 +72,54 @@ workspace "Trading Bot System" {
             }
 
             group "Risk & Portfolio Manager Service" {
-                portfolioManager = container "Risk & Portfolio Manager" "Validates signals, applies portfolio rules, manages exposure." "Nest.js" {
-                    gRPC = component "Risk & Portfolio API" "Exposes risk/strategy config management gRPC API to API Gateway." "gRPC" "API"
+                portfolioManager = container "Risk & Portfolio Manager" "Implements instrument registration today and is the planned home for risk, exposure, and reconciliation workflows." "Nest.js" {
+                    tags "Implemented"
+                    gRPC = component "Risk & Portfolio API" "Exposes instrument registration today and is the planned gRPC surface for risk/strategy configuration and portfolio workflows." "gRPC" "API"
 
-                    riskRules = component "Risk Rules Engine" "Applies portfolio rules (max drawdown, stop-loss, diversification, trading enabled/disabled state)." "TypeScript"
-                    strategyConfigManager = component "Strategy Config Manager" "Receives strategy updates and start/stop commands from API Gateway and manages rule sets." "TypeScript"
-                    portfolioManager = component "Portfolio Manager" "Tracks positions, balances, allocations and risk exposure." "TypeScript"
-                    repository = component "Repository" "Persists trades, fills and portfolio state into PostgreSQL." "TypeScript"
+                    riskRules = component "Risk Rules Engine" "Applies portfolio rules (max drawdown, stop-loss, diversification, trading enabled/disabled state)." "TypeScript" {
+                        tags "Planned"
+                    }
+                    strategyConfigManager = component "Strategy Config Manager" "Receives strategy updates and start/stop commands from API Gateway and manages rule sets." "TypeScript" {
+                        tags "Planned"
+                    }
+                    portfolioManager = component "Portfolio Manager" "Handles instrument registration today and will grow into position, balance, and exposure management." "TypeScript" {
+                        tags "Implemented"
+                    }
+                    repository = component "Repository" "Persists instruments and outbox rows today; later persists trades, fills, and portfolio state into PostgreSQL." "TypeScript" {
+                        tags "Implemented"
+                    }
+                    outboxDispatcher = component "Outbox Dispatcher" "Claims committed outbox rows and publishes Kafka events asynchronously." "TypeScript" {
+                        tags "Implemented"
+                    }
 
-                    kafkaConsumer = component "Kafka Consumer" "Consumes trading.signals, trading.signals.portfolio, and execution updates (orders.placed/orders.fills) from Kafka." "TypeScript"
-                    kafkaPublisher = component "Kafka Publisher" "Publishes trading.signals.portfolio, trades.approved/trades.rejected, and portfolio.updated events to Kafka." "TypeScript"
+                    kafkaConsumer = component "Kafka Consumer" "Consumes trading.signals, trading.signals.portfolio, and execution updates (orders.placed/orders.fills) from Kafka." "TypeScript" {
+                        tags "Planned"
+                    }
+                    kafkaPublisher = component "Kafka Publisher" "Publishes instrument.registered today and will later publish trading.signals.portfolio, trades.approved/trades.rejected, and portfolio.updated." "TypeScript" {
+                        tags "Implemented"
+                    }
 
-                    gRPC -> strategyConfigManager "Handles risk/strategy config updates via"
-                    gRPC -> portfolioManager "Handles portfolio/trade requests via"
+                    gRPC -> strategyConfigManager "Handles planned risk/strategy config updates via"
+                    gRPC -> portfolioManager "Handles instrument registration today and planned portfolio/trade requests via"
                     kafkaConsumer -> riskRules "Feeds trading.signals and trading.signals.portfolio into"
                     kafkaConsumer -> portfolioManager "Feeds orders.placed/orders.fills updates into"
                     strategyConfigManager -> riskRules "Provides rule updates to"
                     riskRules -> kafkaPublisher "Publishes portfolio-ordered signals and trade decisions to"
-                    portfolioManager -> kafkaPublisher "Publishes instrument registration and portfolio update events to"
-                    portfolioManager -> repository "Persists portfolio state and trades via"
+                    portfolioManager -> repository "Persists instrument state and outbox rows via"
+                    outboxDispatcher -> repository "Claims outbox rows from"
+                    outboxDispatcher -> kafkaPublisher "Publishes claimed outbox rows via"
                     riskRules -> repository "Logs risk decisions via"
                 }
 
-                postgres = container "Portfolio DB" "Stores portfolio, positions, users and trade history." "PostgreSQL" "Datastore"
+                postgres = container "Portfolio DB" "Stores instruments and outbox rows today; later stores portfolios, positions, users, and trade history." "PostgreSQL" "Datastore" {
+                    tags "Implemented"
+                }
 
             }
 
             group "Execution Engine Service" {
                 executionEngine = container "Execution Engine" "Places and manages orders on exchanges." "Nest.js" {
+                    tags "Planned"
                     gRPC = component "Trades API" "Exposes execution/order lifecycle gRPC API for internal consumers." "gRPC" "API"
                     gRPC_Client = component "gRPC Client" "Handles internal service-to-service communication." "gRPC"
 
@@ -113,20 +138,21 @@ workspace "Trading Bot System" {
             }
 
             group "API Gateway Service" {
-                apiGateway = container "API Gateway" "Coordinates services, exposes API to dashboard." "Nest.js" {
-                    REST = component "API" "Allows users to configure strategies and risk profiles. Fetches data from other services." "REST" "API"
+                apiGateway = container "API Gateway" "Routes instrument registration today and is the planned coordination layer for broader dashboard-facing workflows." "Nest.js" {
+                    tags "Implemented"
+                    REST = component "API" "Exposes instrument registration today and will later expand to strategy, portfolio, and market-data endpoints." "REST" "API"
                     gRPC_Client = component "gRPC Client" "Handles internal service-to-service communication." "gRPC"
 
-                    core = component "Core Orchestration" "Coordinates between services, manages workflows." "TypeScript"
+                    core = component "Core Orchestration" "Coordinates the current registration workflow and will later orchestrate broader cross-service flows." "TypeScript"
 
                     marketDataProxy = component "Market Data Proxy" "Forwards dashboard queries to Data Ingestion (Market Data API)." "TypeScript"
-                    portfolioProxy = component "Portfolio Proxy" "Forwards dashboard portfolio/trade read queries to Risk & Portfolio Manager (source-of-truth Portfolio API)." "TypeScript"
+                    portfolioProxy = component "Portfolio Proxy" "Forwards instrument registration today and will later handle portfolio/trade read queries to Risk & Portfolio Manager." "TypeScript"
                     signalProxy = component "Signal Proxy" "Forwards dashboard queries to Prediction Engine (Signal API)." "TypeScript"
                     riskProxy = component "Risk Proxy" "Forwards strategy/risk config updates to Risk & Portfolio Manager (Risk API)." "TypeScript"
 
                     REST -> core "Handles API requests via"
                     core -> marketDataProxy "Sends market data requests to"
-                    core -> portfolioProxy "Sends portfolio/trade requests to"
+                    core -> portfolioProxy "Sends instrument registration today and planned portfolio/trade requests to"
                     core -> signalProxy "Sends signal requests to"
                     core -> riskProxy "Forwards strategy/risk config updates AND start/stop trading commands to"
                     marketDataProxy -> gRPC_Client "Communicates with Data Ingestion over gRPC"
@@ -137,6 +163,7 @@ workspace "Trading Bot System" {
             }
             
             externalAPIFacade = container "External API Facade" "Handles external API integrations (e.g., Binance)." "Nest.js" {
+                tags "Planned"
                 gRPC = component "External Facade API" "Exposes gRPC API for internal services to interact with external exchanges." "gRPC" "API"
 
                 core = component "Facade Core" "Manages connections and interactions with external exchange APIs." "TypeScript"
@@ -149,6 +176,7 @@ workspace "Trading Bot System" {
             }
 
             dashboard = container "Dashboard" "React" "User interface for monitoring and controlling the bot." "Single Page Application" {
+                tags "Planned"
                 router = component "Router" "Handles navigation and routing between UI components." "TypeScript/React"
                 strategyConfigUI = component "Strategy Config UI" "Lets user define/edit strategy preferences." "TypeScript/React"
                 portfolioUI = component "Portfolio View" "Displays portfolio balances, positions, trades." "TypeScript/React"
@@ -173,15 +201,25 @@ workspace "Trading Bot System" {
             }
 
             // Databases (each owned/isolated to one service)
-            redis = container "Signal Cache" "Owned by Prediction Engine. Stores recent signals for fast access." "Redis" "Datastore"
+            redis = container "Signal Cache" "Owned by Prediction Engine. Stores recent signals for fast access." "Redis" "Datastore" {
+                tags "Planned"
+            }
 
             // Message bus
-            messageBus = container "Message Bus" "Event-driven communication and streaming backbone." "Apache Kafka" "Queue"
-            schemaRegistry = container "Schema Registry" "Kafka schema registry for event contracts and versioning." "Schema Registry" "Service"
+            messageBus = container "Message Bus" "Event-driven communication and streaming backbone. Local development uses Redpanda with the Kafka API." "Apache Kafka" "Queue" {
+                tags "Implemented"
+            }
+            schemaRegistry = container "Schema Registry" "Kafka schema registry for event contracts and versioning." "Schema Registry" "Service" {
+                tags "Planned"
+            }
 
             // ML training pipeline placeholder (out of scope for now)
-            modelRegistry = container "Model Registry" "Stores versioned ML models for deployment." "Registry" "Service"
-            trainingPipeline = container "Model Training Pipeline" "Offline training/evaluation pipeline (placeholder)." "Batch/ML" "Service"
+            modelRegistry = container "Model Registry" "Stores versioned ML models for deployment." "Registry" "Service" {
+                tags "Planned"
+            }
+            trainingPipeline = container "Model Training Pipeline" "Offline training/evaluation pipeline (placeholder)." "Batch/ML" "Service" {
+                tags "Planned"
+            }
         }
 
         // External systems
@@ -195,8 +233,7 @@ workspace "Trading Bot System" {
         tradingBot.dashboard.apiClient -> tradingBot.apiGateway.REST "Sends API requests (UI)"
         tradingBot.apiGateway.gRPC_Client -> tradingBot.dataIngestion.gRPC "Requests market data and subscription updates (Market Data API)"
         tradingBot.apiGateway.gRPC_Client -> tradingBot.predictionEngine.gRPC "Requests current signals / triggers (Signal API)"
-        tradingBot.apiGateway.gRPC_Client -> tradingBot.portfolioManager.gRPC "Requests portfolio/trade info (source-of-truth Portfolio API)"
-        tradingBot.apiGateway.gRPC_Client -> tradingBot.portfolioManager.gRPC "Sends updated risk/strategy configuration and start/stop trading commands"
+        tradingBot.apiGateway.gRPC_Client -> tradingBot.portfolioManager.gRPC "Registers instruments today; later requests portfolio/trade data and sends risk/strategy updates"
         
         tradingBot.dataIngestion.repository -> tradingBot.timescale "Writes historical market data to"
 
@@ -218,7 +255,7 @@ workspace "Trading Bot System" {
 
         tradingBot.predictionEngine.signalCacheManager -> tradingBot.redis "Writes recent signals to"
 
-        tradingBot.portfolioManager.repository -> tradingBot.postgres "Writes portfolio and trades to"
+        tradingBot.portfolioManager.repository -> tradingBot.postgres "Writes instruments and outbox rows today; later stores portfolio and trade state in"
 
         tradingBot.executionEngine.gRPC_Client -> tradingBot.externalAPIFacade.gRPC "Places orders on"
         tradingBot.dataIngestion.gRPC_Client -> tradingBot.externalAPIFacade.gRPC "Asks to start/stop fetching market data"
@@ -287,6 +324,7 @@ workspace "Trading Bot System" {
             include tradingBot.portfolioManager.riskRules
             include tradingBot.portfolioManager.strategyConfigManager
             include tradingBot.portfolioManager.kafkaPublisher
+            include tradingBot.portfolioManager.outboxDispatcher
             include tradingBot.portfolioManager.portfolioManager
             include tradingBot.portfolioManager.repository
             include tradingBot.postgres
@@ -386,6 +424,14 @@ workspace "Trading Bot System" {
             }
             element "Queue" {
                 shape pipe
+            }
+            element "Implemented" {
+                background #2d7d46
+                color #ffffff
+            }
+            element "Planned" {
+                background #b2b2b2
+                color #111111
             }
         }
     }

@@ -69,20 +69,74 @@
         "passWithNoTests": true
       }
     },
+    "integration-infra-up": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "defaultConfiguration": "test-integration",
+      "options": {
+        "cwd": "{workspaceRoot}",
+        "parallel": false,
+        "commands": [
+          {
+            "command": "docker compose -f infra/docker-compose.test.yml up -d --wait postgres redpanda"
+          },
+          {
+            "command": "docker compose -f infra/docker-compose.test.yml run --rm redpanda-init"
+          }
+        ]
+      },
+      "configurations": {
+        "test-integration": {}
+      }
+    },
+    "integration-infra-down": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "defaultConfiguration": "test-integration",
+      "options": {
+        "cwd": "{workspaceRoot}",
+        "command": "docker compose -f infra/docker-compose.test.yml down --remove-orphans"
+      },
+      "configurations": {
+        "test-integration": {}
+      }
+    },
+    "test-integration": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "dependsOn": ["integration-infra-up"],
+      "options": {
+        "cwd": "{workspaceRoot}",
+        "parallel": false,
+        "env": {
+          "NODE_OPTIONS": "--experimental-vm-modules"
+        },
+        "commands": [
+          {
+            "command": "npx nx run portfolio-manager:migrate:test-integration"
+          },
+          {
+            "command": "jest --config apps/portfolio-manager/jest.integration.config.ts --runInBand"
+          }
+        ]
+      }
+    },
     "migrate": {
       "executor": "nx:run-commands",
+      "cache": false,
       "defaultConfiguration": "development",
       "options": {
         "cwd": "apps/portfolio-manager"
       },
       "configurations": {
-        "production": {
-          "command": "npx prisma migrate deploy",
-          "cwd": "apps/portfolio-manager"
-        },
         "development": {
-          "command": "npx prisma migrate dev",
-          "cwd": "apps/portfolio-manager"
+          "command": "npx prisma migrate dev"
+        },
+        "production": {
+          "command": "npx prisma migrate deploy"
+        },
+        "test-integration": {
+          "command": "npx prisma migrate deploy"
         }
       }
     },
@@ -98,7 +152,7 @@
             "command": "npx prisma generate"
           },
           {
-            "command": "nx lint portfolio-manager --fix"
+            "command": "npx nx run portfolio-manager:lint --fix"
           }
         ]
       }

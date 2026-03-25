@@ -18,11 +18,11 @@ export class RegisterInstrumentRequestDto implements Omit<
   @IsEnum(AssetClassName)
   assetClass: AssetClassName;
 
-  @ApiProperty({ example: 'Binance' })
+  @ApiProperty({ example: 'BINANCE' })
   @IsString()
   venue: string;
 
-  @ApiPropertyOptional({ example: 'BTC/USDT' })
+  @ApiPropertyOptional({ example: 'BTCUSDT' })
   @IsOptional()
   @IsString()
   externalSymbol: string;

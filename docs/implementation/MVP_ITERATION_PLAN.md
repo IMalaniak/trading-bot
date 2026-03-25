@@ -8,7 +8,9 @@ This plan breaks MVP delivery into small, testable iterations. Each iteration is
 
 - Existing apps: `api-gateway`, `portfolio-manager`
 - Existing shared library: `common` (proto + shared utilities)
-- Existing infra: Redpanda/Kafka + Postgres + Timescale via `infra/docker-compose.yml`
+- Existing infra:
+  - local development stack via `infra/docker-compose.yml`
+  - isolated integration stack via `infra/docker-compose.test.yml`
 - Existing implemented flow: REST (`api-gateway`) -> gRPC (`portfolio-manager`) -> DB write + outbox dispatch to Kafka
 
 ## Working Rules For All Iterations
@@ -41,7 +43,7 @@ Normalize event contracts and topic/key usage so downstream iterations can build
 
 - In scope:
   - Central Kafka topic and partition-key constants.
-  - Event envelope standard (metadata + payload).
+  - Event metadata standard (headers + payload).
   - Instrument registration event aligned with architecture topic names.
   - Local bootstrap scripts/checklist for topics.
 - Out of scope:
@@ -53,11 +55,11 @@ Normalize event contracts and topic/key usage so downstream iterations can build
 1. Shared constants and conventions in `common`
    - Add topic constants (for example: `instrument.registered`, `trading.signals`, `trading.signals.portfolio`, `trades.approved`, `trades.rejected`, `orders.placed`, `orders.fills`, `portfolio.updated`).
    - Add key builder helpers:
-     - `instrumentKey(exchange, instrumentId)`
+     - `instrumentKey(venue, instrumentId)`
      - `portfolioKey(portfolioId)`
      - `riskKey(portfolioId, instrumentId)`
-2. Event envelope contract
-   - Add an envelope type/contract with:
+2. Event metadata contract
+   - Add standard event metadata definitions for:
      - `eventId`
      - `eventType`
      - `schemaVersion`
@@ -65,40 +67,49 @@ Normalize event contracts and topic/key usage so downstream iterations can build
      - `producer`
      - `key`
      - `payload`
-   - Decide one transport strategy and apply consistently:
-     - protobuf envelope in value, or
-     - headers + protobuf payload in value.
+   - Selected transport strategy:
+     - Kafka headers for metadata
+     - protobuf payload in value
+     - Kafka record key as the authoritative `key`
 3. Registration event alignment
    - Replace current registration event topic usage with architecture-aligned topic.
    - Ensure partition key is deterministic and documented.
 4. Topic bootstrap support
-   - Add infra helper script to create required topics and partition counts in local Redpanda.
-   - Add one smoke script to produce/consume a sample registration event.
+   - Add infra-managed topic bootstrap for required topics and partition counts in local Redpanda.
+   - Disable broker topic auto-creation in local development.
 5. Docs and developer workflow
    - Add setup section with expected env vars and local run order.
    - Add brief "event contract versioning rules" subsection.
+   - Defer dedicated smoke/e2e automation to a separate testing app.
 
 ### Suggested File Touchpoints
 
-- `libs/common/src/lib/...` (new kafka constants and key helpers)
-- `libs/common/src/proto/...` (if envelope is modeled in proto)
+- `libs/common/src/lib/kafka/...` (topic constants, key helpers, metadata builders)
+- `libs/common/src/index.ts` (shared Kafka contract exports)
 - `apps/portfolio-manager/src/portfolio/portfolio.service.ts` (topic/key/event structure)
+- `apps/portfolio-manager/src/portfolio/events/...` (event factory/builder)
 - `apps/portfolio-manager/src/event-dispatcher/event-dispatcher.service.ts` (header/envelope handling if needed)
+- `apps/portfolio-manager/src/portfolio/portfolio.integration.spec.ts` (isolated Postgres + Kafka acceptance path)
 - `infra/...` (topic bootstrap helper + docs)
 
 ### Acceptance Criteria
 
 - Registering an instrument emits exactly one event on the correct topic with correct key.
 - Topic names and keys are consumed from shared constants only.
-- Smoke script demonstrates successful produce/consume in local environment.
+- `portfolio-manager:test-integration` covers the isolated Postgres + Kafka acceptance path.
 
 ### Validation Commands
 
 ```bash
 npx nx run portfolio-manager:test
 npx nx run api-gateway:test
+npx nx run portfolio-manager:test-integration
 npx nx run-many -t test -p common,portfolio-manager,api-gateway
 ```
+
+`portfolio-manager:test-integration` provisions its own isolated Docker Compose
+stack, runs `portfolio-manager:migrate:test-integration`, and executes the
+integration suite against that stack.
 
 ---
 

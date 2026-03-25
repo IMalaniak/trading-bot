@@ -14,10 +14,10 @@ export class InstrumentDto implements Omit<Instrument, 'assetClass'> {
   @ApiProperty({ enum: AssetClassName, example: AssetClassName.CRYPTO })
   assetClass: AssetClassName;
 
-  @ApiProperty({ example: 'Binance' })
+  @ApiProperty({ example: 'BINANCE' })
   venue: string;
 
-  @ApiPropertyOptional({ example: 'BTC/USDT' })
+  @ApiPropertyOptional({ example: 'BTCUSDT' })
   externalSymbol?: string;
 
   static fromGRPC(instrument: Instrument): InstrumentDto {

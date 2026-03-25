@@ -1,0 +1,55 @@
+services:
+  redpanda:
+    image: redpandadata/redpanda:latest
+    command:
+      - redpanda
+      - start
+      - --overprovisioned
+      - --smp
+      - '1'
+      - --memory
+      - 1G
+      - --reserve-memory
+      - 0M
+      - --node-id
+      - '0'
+      - '--kafka-addr=PLAINTEXT://0.0.0.0:9092,INTERNAL://0.0.0.0:29092'
+      - '--advertise-kafka-addr=PLAINTEXT://localhost:9092,INTERNAL://redpanda:29092'
+    environment:
+      - REDPANDA_AUTO_CREATE_TOPICS=false
+    healthcheck:
+      test: ['CMD-SHELL', 'rpk cluster info || rpk admin brokers || exit 1']
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+  redpanda-init:
+    image: redpandadata/redpanda:latest
+    depends_on:
+      redpanda:
+        condition: service_healthy
+    entrypoint:
+      - /bin/bash
+      - /etc/redpanda/init-topics.sh
+    environment:
+      REDPANDA_BROKERS: redpanda:29092
+      REDPANDA_TOPIC_FILE: /etc/redpanda/topics.txt
+      REDPANDA_TOPIC_PARTITIONS: '3'
+      REDPANDA_TOPIC_REPLICAS: '1'
+      REDPANDA_TOPIC_CONFIG: cleanup.policy=delete
+    volumes:
+      - ./scripts/bootstrap-topics.sh:/etc/redpanda/init-topics.sh:ro
+      - ./redpanda/topics.txt:/etc/redpanda/topics.txt:ro
+
+  postgres:
+    image: postgres:17
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-trading}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-trading_pass}
+      POSTGRES_DB: ${POSTGRES_DB:-trading_db}
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
