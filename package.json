@@ -46,7 +46,7 @@
     "@types/jest": "30.0.0",
     "@types/node": "24.10.12",
     "@types/pg": "8.20.0",
-    "browserslist": "4.28.1",
+    "browserslist": "4.28.2",
     "caniuse-lite": "1.0.30001784",
     "eslint": "10.1.0",
     "eslint-config-prettier": "10.1.8",
