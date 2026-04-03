@@ -48,7 +48,7 @@
     "@types/pg": "8.20.0",
     "browserslist": "4.28.2",
     "caniuse-lite": "1.0.30001784",
-    "eslint": "10.1.0",
+    "eslint": "10.2.0",
     "eslint-config-prettier": "10.1.8",
     "eslint-plugin-prettier": "5.5.5",
     "eslint-plugin-simple-import-sort": "12.1.1",
