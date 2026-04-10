@@ -32,7 +32,7 @@ jobs:
 
       - name: Check for existing PR (skip redundant push run)
         id: skip_push
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         with:
           script: |
             const ref = context.ref.replace('refs/heads/', '');
