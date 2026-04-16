@@ -15,7 +15,7 @@
     "@nestjs/core": "11.1.19",
     "@nestjs/microservices": "11.1.19",
     "@nestjs/platform-fastify": "11.1.19",
-    "@nestjs/swagger": "11.2.7",
+    "@nestjs/swagger": "11.3.0",
     "@prisma/adapter-pg": "7.7.0",
     "@prisma/client": "7.7.0",
     "class-transformer": "0.5.1",
@@ -29,7 +29,7 @@
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
-    "@nestjs/schematics": "11.0.10",
+    "@nestjs/schematics": "11.1.0",
     "@nestjs/testing": "11.1.19",
     "@nx/eslint": "22.6.5",
     "@nx/eslint-plugin": "22.6.5",
