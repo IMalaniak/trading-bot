@@ -12,7 +12,7 @@ export default [
       sourceType: 'commonjs',
       parserOptions: {
         projectService: {
-          allowDefaultProject: ['apps/portfolio-manager/webpack.config.js'],
+          allowDefaultProject: ['webpack.config.js'],
         },
       },
     },

@@ -3,8 +3,44 @@ syntax = "proto3";
 package tradingbot.events;
 
 import "common/instrument.proto";
+import "common/signal.proto";
 
 message InstrumentRegistered {
   tradingbot.common.Instrument instrument = 1;
   string registered_at = 2;
+}
+
+message PortfolioSignalCandidate {
+  tradingbot.common.Signal signal = 1;
+  string source_event_id = 2;
+  string portfolio_id = 3;
+  string candidate_idempotency_key = 4;
+  string signal_received_at = 5;
+}
+
+enum TradeDecisionKind {
+  TRADE_DECISION_KIND_UNSPECIFIED = 0;
+  APPROVED = 1;
+  REJECTED = 2;
+}
+
+enum TradeDecisionReason {
+  TRADE_DECISION_REASON_UNSPECIFIED = 0;
+  SUBSCRIPTION_DISABLED = 1;
+  TRADE_CAP_EXCEEDED = 2;
+  INSTRUMENT_EXPOSURE_CAP_EXCEEDED = 3;
+  PORTFOLIO_EXPOSURE_CAP_EXCEEDED = 4;
+}
+
+message TradeDecision {
+  tradingbot.common.Signal signal = 1;
+  string source_event_id = 2;
+  string portfolio_id = 3;
+  string candidate_idempotency_key = 4;
+  TradeDecisionKind decision = 5;
+  repeated TradeDecisionReason reason_codes = 6;
+  string requested_notional = 7;
+  string requested_quantity = 8;
+  string reference_price = 9;
+  string decided_at = 10;
 }

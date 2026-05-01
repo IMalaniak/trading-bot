@@ -5,11 +5,13 @@ import {
   OnModuleDestroy,
   OnModuleInit,
 } from '@nestjs/common';
+import type { ConfigType } from '@nestjs/config';
 import { ClientKafka } from '@nestjs/microservices';
 import { KAFKA_EVENT_HEADER_NAMES } from '@trading-bot/common';
 import { randomUUID } from 'crypto';
 import { lastValueFrom } from 'rxjs';
 
+import { portfolioManagerRuntimeConfig } from '../config/runtime.config';
 import { OutboxEventStatus, Prisma } from '../prisma/generated/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { PORTFOLIO_MANAGER_KAFKA_CLIENT } from './const';
@@ -38,6 +40,10 @@ export class EventDispatcherService implements OnModuleInit, OnModuleDestroy {
     private readonly prisma: PrismaService,
     @Inject(PORTFOLIO_MANAGER_KAFKA_CLIENT)
     private readonly kafkaClient: ClientKafka,
+    @Inject(portfolioManagerRuntimeConfig.KEY)
+    private readonly runtimeConfig: ConfigType<
+      typeof portfolioManagerRuntimeConfig
+    >,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -82,7 +88,10 @@ export class EventDispatcherService implements OnModuleInit, OnModuleDestroy {
   }
 
   private startOutboxDispatcher(): void {
-    if (this.outboxDispatchInterval) {
+    if (
+      this.outboxDispatchInterval ||
+      !this.runtimeConfig.enableOutboxInterval
+    ) {
       return;
     }
     this.outboxDispatchInterval = setInterval(() => {

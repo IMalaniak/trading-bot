@@ -16,6 +16,7 @@ import { randomUUID } from 'crypto';
 import { Admin, Kafka, logLevel } from 'kafkajs';
 
 import { AppModule } from '../app.module';
+import { portfolioManagerRuntimeConfig } from '../config/runtime.config';
 import { EventDispatcherService } from '../event-dispatcher/event-dispatcher.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { PortfolioService } from './portfolio.service';
@@ -63,7 +64,15 @@ describe('PortfolioService integration', () => {
   beforeAll(async () => {
     moduleRef = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+      .overrideProvider(portfolioManagerRuntimeConfig.KEY)
+      .useValue({
+        enableOutboxInterval: false,
+        // This spec validates registration only, so skip the risk Kafka
+        // consumers to reduce startup cost and avoid unrelated handles.
+        enableRiskPipelineConsumers: false,
+      })
+      .compile();
 
     await moduleRef.init();
 
@@ -237,6 +246,7 @@ describe('PortfolioService integration', () => {
       if (timeout) {
         clearTimeout(timeout);
       }
+      await consumer.stop();
       await consumer.disconnect();
     }
   }, 15000);

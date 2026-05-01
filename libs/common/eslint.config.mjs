@@ -12,7 +12,7 @@ export default [
       sourceType: 'commonjs',
       parserOptions: {
         projectService: {
-          allowDefaultProject: ['libs/common/webpack.config.js'],
+          allowDefaultProject: ['webpack.config.js'],
         },
       },
     },

@@ -10,7 +10,11 @@ export { PortfolioSummary, Position, Trade } from './common/portfolio';
 export { Signal, SignalSide } from './common/signal';
 export {
   InstrumentRegistered,
+  PortfolioSignalCandidate,
   protobufPackage as PROTOBUF_EVENTS_PACKAGE,
+  TradeDecision,
+  TradeDecisionKind,
+  TradeDecisionReason,
 } from './events/events';
 export {
   GetPortfolioRequest,

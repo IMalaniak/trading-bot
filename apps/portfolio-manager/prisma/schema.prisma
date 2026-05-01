@@ -22,8 +22,149 @@ model Instrument {
   updatedAt      DateTime @updatedAt
   venue          String
   externalSymbol String?
+  portfolioInstrumentConfigs PortfolioInstrumentConfig[]
 
   @@unique([symbol, venue])
+}
+
+model Portfolio {
+  id                  String                        @id
+  name                String
+  exposureCapNotional Decimal                       @db.Decimal(36, 18)
+  isActive            Boolean                       @default(true)
+  createdAt           DateTime                      @default(now())
+  updatedAt           DateTime                      @updatedAt
+  instrumentConfigs   PortfolioInstrumentConfig[]
+  candidateRecords    PortfolioSignalCandidateRecord[]
+  decisions           RiskDecision[]
+  reservations        ExposureReservation[]
+}
+
+model PortfolioInstrumentConfig {
+  id                  String    @id @default(uuid())
+  portfolioId         String
+  instrumentId        String
+  enabled             Boolean   @default(true)
+  targetNotional      Decimal   @db.Decimal(36, 18)
+  maxTradeNotional    Decimal   @db.Decimal(36, 18)
+  maxPositionNotional Decimal   @db.Decimal(36, 18)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  portfolio           Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  instrument          Instrument @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
+
+  @@unique([portfolioId, instrumentId])
+  @@index([instrumentId, enabled])
+}
+
+enum SignalReceiptStatus {
+  PENDING
+  FANNED_OUT
+  NO_ELIGIBLE_PORTFOLIOS
+  UNKNOWN_INSTRUMENT
+}
+
+model SignalReceipt {
+  id                   String                        @id @default(uuid())
+  sourceEventId        String                        @unique
+  signalId             String
+  instrumentId         String
+  kafkaKey             String
+  receivedAt           DateTime
+  status               SignalReceiptStatus           @default(PENDING)
+  eligiblePortfolioCount Int                        @default(0)
+  createdAt            DateTime                      @default(now())
+  updatedAt            DateTime                      @updatedAt
+  candidateRecords     PortfolioSignalCandidateRecord[]
+}
+
+enum PortfolioSignalCandidateStatus {
+  PENDING
+  DECIDED
+}
+
+model PortfolioSignalCandidateRecord {
+  id                     String                         @id @default(uuid())
+  candidateIdempotencyKey String                       @unique
+  signalReceiptId        String
+  sourceEventId          String
+  portfolioId            String
+  instrumentId           String
+  signalId               String
+  side                   Int
+  referencePrice         Decimal                        @db.Decimal(36, 18)
+  targetNotionalSnapshot Decimal                        @db.Decimal(36, 18)
+  signalTimestamp        DateTime
+  receivedAt             DateTime
+  status                 PortfolioSignalCandidateStatus @default(PENDING)
+  createdAt              DateTime                       @default(now())
+  updatedAt              DateTime                       @updatedAt
+  signalReceipt          SignalReceipt                  @relation(fields: [signalReceiptId], references: [id], onDelete: Cascade)
+  portfolio              Portfolio                      @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  decision               RiskDecision?
+
+  @@index([portfolioId, createdAt])
+  @@index([sourceEventId])
+}
+
+enum RiskDecisionStatus {
+  APPROVED
+  REJECTED
+}
+
+enum RiskDecisionReasonCode {
+  SUBSCRIPTION_DISABLED
+  TRADE_CAP_EXCEEDED
+  INSTRUMENT_EXPOSURE_CAP_EXCEEDED
+  PORTFOLIO_EXPOSURE_CAP_EXCEEDED
+}
+
+model RiskDecision {
+  id                     String                  @id @default(uuid())
+  candidateRecordId      String                  @unique
+  candidateIdempotencyKey String                 @unique
+  sourceEventId          String
+  portfolioId            String
+  instrumentId           String
+  decision               RiskDecisionStatus
+  reasonCodes            RiskDecisionReasonCode[]
+  requestedNotional      Decimal                 @db.Decimal(36, 18)
+  requestedQuantity      Decimal                 @db.Decimal(36, 18)
+  referencePrice         Decimal                 @db.Decimal(36, 18)
+  emittedTopic           String
+  decidedAt              DateTime
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+  candidateRecord        PortfolioSignalCandidateRecord @relation(fields: [candidateRecordId], references: [id], onDelete: Cascade)
+  portfolio              Portfolio               @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  reservation            ExposureReservation?
+
+  @@index([portfolioId, decision])
+  @@index([portfolioId, instrumentId, decision])
+}
+
+enum ExposureReservationStatus {
+  ACTIVE
+  RELEASED
+}
+
+model ExposureReservation {
+  id                     String                    @id @default(uuid())
+  riskDecisionId         String                    @unique
+  candidateIdempotencyKey String                   @unique
+  portfolioId            String
+  instrumentId           String
+  reservedNotional       Decimal                   @db.Decimal(36, 18)
+  reservedQuantity       Decimal                   @db.Decimal(36, 18)
+  status                 ExposureReservationStatus @default(ACTIVE)
+  createdAt              DateTime                  @default(now())
+  updatedAt              DateTime                  @updatedAt
+  releasedAt             DateTime?
+  riskDecision           RiskDecision              @relation(fields: [riskDecisionId], references: [id], onDelete: Cascade)
+  portfolio              Portfolio                 @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+
+  @@index([portfolioId, status])
+  @@index([portfolioId, instrumentId, status])
 }
 
 enum OutboxEventStatus {

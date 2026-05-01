@@ -136,7 +136,7 @@
           "command": "npx prisma migrate deploy"
         },
         "test-integration": {
-          "command": "npx prisma migrate deploy"
+          "command": "npx prisma migrate reset --force"
         }
       }
     },
