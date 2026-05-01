@@ -12,7 +12,7 @@ export default [
       sourceType: 'commonjs',
       parserOptions: {
         projectService: {
-          allowDefaultProject: ['webpack.config.js'],
+          allowDefaultProject: ['webpack.config.js', 'apps/portfolio-manager/prisma/seed.ts'],
         },
       },
     },

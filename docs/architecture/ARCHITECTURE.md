@@ -197,6 +197,7 @@ Suggested local run order:
 ```bash
 docker compose -f infra/docker-compose.yml up -d
 npx nx run portfolio-manager:migrate
+npx nx run portfolio-manager:seed
 npx nx serve portfolio-manager
 npx nx serve api-gateway
 ```
@@ -229,7 +230,7 @@ Manual registration smoke:
 Manual risk-pipeline smoke:
 
 1. Start infra and `portfolio-manager`.
-2. Insert at least one portfolio, one instrument, and one `PortfolioInstrumentConfig` row in Postgres.
+2. Insert at least one portfolio, one instrument, and one `PortfolioInstrumentConfig` row in Postgres or seed portfolios and sample configs with `npx nx run portfolio-manager:seed`.
 3. Publish a `common.Signal` to `trading.signals` with Kafka header `event-id`.
 4. Consume from `trading.signals.portfolio`, `trades.approved`, and `trades.rejected`.
 5. Verify `SignalReceipt`, `PortfolioSignalCandidateRecord`, `RiskDecision`, and `ExposureReservation` rows in Postgres.

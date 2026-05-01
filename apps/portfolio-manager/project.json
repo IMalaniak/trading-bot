@@ -140,6 +140,14 @@
         }
       }
     },
+    "seed": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "options": {
+        "cwd": "apps/portfolio-manager",
+        "command": "npx tsx prisma/seed.ts"
+      }
+    },
     "prisma-generate": {
       "executor": "nx:run-commands",
       "options": {
