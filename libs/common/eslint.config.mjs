@@ -9,10 +9,9 @@ export default [
         ...globals.node,
         ...globals.jest,
       },
-      sourceType: 'commonjs',
       parserOptions: {
         projectService: {
-          allowDefaultProject: ['libs/common/webpack.config.js'],
+          allowDefaultProject: ['webpack.config.js'],
         },
       },
     },

@@ -72,46 +72,71 @@ workspace "Trading Bot System" {
             }
 
             group "Risk & Portfolio Manager Service" {
-                portfolioManager = container "Risk & Portfolio Manager" "Implements instrument registration today and is the planned home for risk, exposure, and reconciliation workflows." "Nest.js" {
+                portfolioManager = container "Risk & Portfolio Manager" "Implements instrument registration and the current two-stage risk pipeline today; it remains the planned home for broader risk, exposure, and reconciliation workflows." "Nest.js" {
                     tags "Implemented"
-                    gRPC = component "Risk & Portfolio API" "Exposes instrument registration today and is the planned gRPC surface for risk/strategy configuration and portfolio workflows." "gRPC" "API"
+                    gRPC = component "Risk & Portfolio API" "Exposes instrument registration today and remains the planned gRPC surface for broader risk/strategy configuration and portfolio workflows." "gRPC" "API"
 
-                    riskRules = component "Risk Rules Engine" "Applies portfolio rules (max drawdown, stop-loss, diversification, trading enabled/disabled state)." "TypeScript" {
-                        tags "Planned"
+                    riskRules = component "Risk Rules Engine" "Applies the current deterministic portfolio-stage checks in order, using exact decimals: subscription enabled, per-trade cap, per-instrument reserved exposure cap, then per-portfolio reserved exposure cap." "TypeScript" {
+                        tags "Implemented"
                     }
                     strategyConfigManager = component "Strategy Config Manager" "Receives strategy updates and start/stop commands from API Gateway and manages rule sets." "TypeScript" {
                         tags "Planned"
                     }
-                    portfolioManager = component "Portfolio Manager" "Handles instrument registration today and will grow into position, balance, and exposure management." "TypeScript" {
+                    portfolioManager = component "Portfolio Manager" "Handles instrument registration and portfolio-facing workflows inside the service." "TypeScript" {
                         tags "Implemented"
                     }
-                    repository = component "Repository" "Persists instruments and outbox rows today; later persists trades, fills, and portfolio state into PostgreSQL." "TypeScript" {
+                    instrumentStageService = component "Instrument Stage Service" "Deduplicates source signals, validates instruments, loads active portfolio-instrument configs including disabled subscriptions, snapshots target notional, and fans one source signal out into portfolio candidates." "TypeScript" {
+                        tags "Implemented"
+                    }
+                    portfolioStageService = component "Portfolio Stage Service" "Loads portfolio candidates, sizes requested trades with exact decimals, evaluates rules, persists decisions and reservations, and emits final trade decisions." "TypeScript" {
+                        tags "Implemented"
+                    }
+                    tradeSizingService = component "Trade Sizing Service" "Derives requested notional and quantity from portfolio configuration and the signal reference price." "TypeScript" {
+                        tags "Implemented"
+                    }
+                    riskConfigRepository = component "Risk Config Repository" "Loads active portfolio-instrument configs, enablement flags, and exact exposure caps from PostgreSQL." "TypeScript" {
+                        tags "Implemented"
+                    }
+                    riskStateRepository = component "Risk State Repository" "Persists instruments, outbox rows, signal receipts, candidate audit rows, risk decisions, and exposure reservations into PostgreSQL." "TypeScript" {
                         tags "Implemented"
                     }
                     outboxDispatcher = component "Outbox Dispatcher" "Claims committed outbox rows and publishes Kafka events asynchronously." "TypeScript" {
                         tags "Implemented"
                     }
-
-                    kafkaConsumer = component "Kafka Consumer" "Consumes trading.signals, trading.signals.portfolio, and execution updates (orders.placed/orders.fills) from Kafka." "TypeScript" {
+                    instrumentStageConsumer = component "Instrument Stage Consumer" "Consumes trading.signals keyed by instrument_key." "TypeScript" {
+                        tags "Implemented"
+                    }
+                    portfolioStageConsumer = component "Portfolio Stage Consumer" "Consumes trading.signals.portfolio keyed by portfolio_key." "TypeScript" {
+                        tags "Implemented"
+                    }
+                    executionUpdatesConsumer = component "Execution Updates Consumer" "Consumes planned orders.placed and orders.fills reconciliation events from Kafka." "TypeScript" {
                         tags "Planned"
                     }
-                    kafkaPublisher = component "Kafka Publisher" "Publishes instrument.registered today and will later publish trading.signals.portfolio, trades.approved/trades.rejected, and portfolio.updated." "TypeScript" {
+                    kafkaPublisher = component "Kafka Publisher" "Publishes instrument.registered, trading.signals.portfolio, and trades.approved/trades.rejected today; later it will also publish portfolio.updated." "TypeScript" {
                         tags "Implemented"
                     }
 
                     gRPC -> strategyConfigManager "Handles planned risk/strategy config updates via"
                     gRPC -> portfolioManager "Handles instrument registration today and planned portfolio/trade requests via"
-                    kafkaConsumer -> riskRules "Feeds trading.signals and trading.signals.portfolio into"
-                    kafkaConsumer -> portfolioManager "Feeds orders.placed/orders.fills updates into"
+                    instrumentStageConsumer -> instrumentStageService "Feeds trading.signals into"
+                    instrumentStageService -> riskConfigRepository "Loads active portfolio configs from"
+                    instrumentStageService -> riskStateRepository "Writes signal receipts, candidate rows, and outbox rows via"
+                    instrumentStageService -> kafkaPublisher "Publishes trading.signals.portfolio via outbox"
+                    portfolioStageConsumer -> portfolioStageService "Feeds trading.signals.portfolio into"
+                    portfolioStageService -> tradeSizingService "Derives requested size via"
+                    portfolioStageService -> riskRules "Evaluates candidates against"
+                    portfolioStageService -> riskConfigRepository "Loads portfolio caps from"
+                    portfolioStageService -> riskStateRepository "Writes decisions, reservations, and outbox rows via"
+                    portfolioStageService -> kafkaPublisher "Publishes trades.approved and trades.rejected via outbox"
+                    executionUpdatesConsumer -> portfolioManager "Feeds orders.placed/orders.fills updates into"
                     strategyConfigManager -> riskRules "Provides rule updates to"
-                    riskRules -> kafkaPublisher "Publishes portfolio-ordered signals and trade decisions to"
-                    portfolioManager -> repository "Persists instrument state and outbox rows via"
-                    outboxDispatcher -> repository "Claims outbox rows from"
+                    riskRules -> riskStateRepository "Logs risk decisions via"
+                    portfolioManager -> riskStateRepository "Persists instrument state and outbox rows via"
+                    outboxDispatcher -> riskStateRepository "Claims outbox rows from"
                     outboxDispatcher -> kafkaPublisher "Publishes claimed outbox rows via"
-                    riskRules -> repository "Logs risk decisions via"
                 }
 
-                postgres = container "Portfolio DB" "Stores instruments and outbox rows today; later stores portfolios, positions, users, and trade history." "PostgreSQL" "Datastore" {
+                postgres = container "Portfolio DB" "Stores instruments, outbox rows, portfolios, signal receipts, candidate audit rows, risk decisions, and exposure reservations today; later it can also store positions, users, and trade history." "PostgreSQL" "Datastore" {
                     tags "Implemented"
                 }
 
@@ -243,19 +268,21 @@ workspace "Trading Bot System" {
         tradingBot.portfolioManager.kafkaPublisher -> tradingBot.messageBus "Publishes instrument.registered to"
         tradingBot.portfolioManager.kafkaPublisher -> tradingBot.messageBus "Publishes trading.signals.portfolio to"
         tradingBot.portfolioManager.kafkaPublisher -> tradingBot.messageBus "Publishes trades.approved and trades.rejected to"
-        tradingBot.portfolioManager.kafkaPublisher -> tradingBot.messageBus "Publishes portfolio.updated to"
+        tradingBot.portfolioManager.kafkaPublisher -> tradingBot.messageBus "Will publish portfolio.updated to"
         tradingBot.executionEngine.kafkaPublisher -> tradingBot.messageBus "Publishes orders.placed and orders.fills to"
 
         tradingBot.dataIngestion.kafkaConsumer -> tradingBot.messageBus "Consumes instrument.registered, market.raw.data, and features.indicators from"
         tradingBot.featureEngineering.kafkaConsumer -> tradingBot.messageBus "Consumes market.raw.data from"
         tradingBot.predictionEngine.kafkaConsumer -> tradingBot.messageBus "Consumes features.indicators from"
-        tradingBot.portfolioManager.kafkaConsumer -> tradingBot.messageBus "Consumes trading.signals and trading.signals.portfolio from"
-        tradingBot.portfolioManager.kafkaConsumer -> tradingBot.messageBus "Consumes orders.placed and orders.fills from"
+        tradingBot.portfolioManager.instrumentStageConsumer -> tradingBot.messageBus "Consumes trading.signals from"
+        tradingBot.portfolioManager.portfolioStageConsumer -> tradingBot.messageBus "Consumes trading.signals.portfolio from"
+        tradingBot.portfolioManager.executionUpdatesConsumer -> tradingBot.messageBus "Consumes orders.placed and orders.fills from"
         tradingBot.executionEngine.kafkaConsumer -> tradingBot.messageBus "Consumes trades.approved from"
 
         tradingBot.predictionEngine.signalCacheManager -> tradingBot.redis "Writes recent signals to"
 
-        tradingBot.portfolioManager.repository -> tradingBot.postgres "Writes instruments and outbox rows today; later stores portfolio and trade state in"
+        tradingBot.portfolioManager.riskConfigRepository -> tradingBot.postgres "Reads portfolio subscriptions and caps from"
+        tradingBot.portfolioManager.riskStateRepository -> tradingBot.postgres "Writes instruments, audit state, decisions, reservations, and outbox rows to"
 
         tradingBot.executionEngine.gRPC_Client -> tradingBot.externalAPIFacade.gRPC "Places orders on"
         tradingBot.dataIngestion.gRPC_Client -> tradingBot.externalAPIFacade.gRPC "Asks to start/stop fetching market data"
@@ -320,13 +347,19 @@ workspace "Trading Bot System" {
         component tradingBot.portfolioManager "RiskManager-Components" {
             include tradingBot.apiGateway.gRPC_Client
             include tradingBot.portfolioManager.gRPC
-            include tradingBot.portfolioManager.kafkaConsumer
+            include tradingBot.portfolioManager.instrumentStageConsumer
+            include tradingBot.portfolioManager.instrumentStageService
+            include tradingBot.portfolioManager.portfolioStageConsumer
+            include tradingBot.portfolioManager.portfolioStageService
+            include tradingBot.portfolioManager.executionUpdatesConsumer
             include tradingBot.portfolioManager.riskRules
+            include tradingBot.portfolioManager.tradeSizingService
             include tradingBot.portfolioManager.strategyConfigManager
             include tradingBot.portfolioManager.kafkaPublisher
             include tradingBot.portfolioManager.outboxDispatcher
             include tradingBot.portfolioManager.portfolioManager
-            include tradingBot.portfolioManager.repository
+            include tradingBot.portfolioManager.riskConfigRepository
+            include tradingBot.portfolioManager.riskStateRepository
             include tradingBot.postgres
             include tradingBot.messageBus
             autolayout lr

@@ -1,4 +1,10 @@
 import {
+  Signal,
+  SignalSide,
+  TradeDecision,
+  TradeDecisionKind,
+} from '../../proto';
+import {
   buildEventMetadataHeaders,
   instrumentKey,
   KAFKA_EVENT_CONTENT_TYPES,
@@ -41,5 +47,33 @@ describe('Kafka contract', () => {
       [KAFKA_EVENT_HEADER_NAMES.CONTENT_TYPE]:
         KAFKA_EVENT_CONTENT_TYPES.PROTOBUF,
     });
+  });
+
+  it('round-trips trade decision decimal fields as strings', () => {
+    const decision = TradeDecision.fromPartial({
+      signal: Signal.fromPartial({
+        id: 'signal-1',
+        instrumentId: 'instrument-1',
+        side: SignalSide.BUY,
+        price: 100,
+        timestamp: 1775044800000,
+      }),
+      sourceEventId: 'source-event-1',
+      portfolioId: 'portfolio-1',
+      candidateIdempotencyKey: 'source-event-1:portfolio-1',
+      decision: TradeDecisionKind.APPROVED,
+      requestedNotional: '100.000000000000000001',
+      requestedQuantity: '0.333333333333333333',
+      referencePrice: '300.000000000000000003',
+      decidedAt: '2026-03-22T12:34:56.789Z',
+    });
+
+    const decoded = TradeDecision.decode(
+      TradeDecision.encode(decision).finish(),
+    );
+
+    expect(decoded.requestedNotional).toBe('100.000000000000000001');
+    expect(decoded.requestedQuantity).toBe('0.333333333333333333');
+    expect(decoded.referencePrice).toBe('300.000000000000000003');
   });
 });

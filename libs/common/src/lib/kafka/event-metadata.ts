@@ -15,10 +15,15 @@ export const KAFKA_EVENT_CONTENT_TYPES = {
 
 export const KAFKA_EVENT_PRODUCERS = {
   PORTFOLIO_MANAGER: 'portfolio-manager',
+  PREDICTION_ENGINE: 'prediction-engine',
 } as const;
 
 export const KAFKA_EVENT_SCHEMA_VERSIONS = {
   INSTRUMENT_REGISTERED: '1',
+  TRADING_SIGNALS: '1',
+  TRADING_SIGNALS_PORTFOLIO: '1',
+  TRADES_APPROVED: '1',
+  TRADES_REJECTED: '1',
 } as const;
 
 export type KafkaEventProducer =

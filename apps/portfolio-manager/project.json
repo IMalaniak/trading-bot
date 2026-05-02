@@ -136,8 +136,16 @@
           "command": "npx prisma migrate deploy"
         },
         "test-integration": {
-          "command": "npx prisma migrate deploy"
+          "command": "npx prisma migrate reset --force"
         }
+      }
+    },
+    "seed": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "options": {
+        "cwd": "apps/portfolio-manager",
+        "command": "npx tsx prisma/seed.ts"
       }
     },
     "prisma-generate": {

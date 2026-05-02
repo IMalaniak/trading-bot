@@ -9,10 +9,9 @@ export default [
         ...globals.node,
         ...globals.jest,
       },
-      sourceType: 'commonjs',
       parserOptions: {
         projectService: {
-          allowDefaultProject: ['apps/portfolio-manager/webpack.config.js'],
+          allowDefaultProject: ['webpack.config.js', 'apps/portfolio-manager/prisma/seed.ts'],
         },
       },
     },

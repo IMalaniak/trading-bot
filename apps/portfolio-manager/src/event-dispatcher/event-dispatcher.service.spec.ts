@@ -1,6 +1,7 @@
 import { KAFKA_EVENT_HEADER_NAMES, KAFKA_TOPICS } from '@trading-bot/common';
 import { of, throwError } from 'rxjs';
 
+import { portfolioManagerRuntimeConfig } from '../config/runtime.config';
 import { EventDispatcherService } from './event-dispatcher.service';
 
 describe('EventDispatcherService', () => {
@@ -16,6 +17,10 @@ describe('EventDispatcherService', () => {
     connect: jest.Mock;
     close: jest.Mock;
   };
+  let runtimeConfig: {
+    enableOutboxInterval: boolean;
+    enableRiskPipelineConsumers: boolean;
+  };
 
   beforeEach(() => {
     prisma = {
@@ -29,7 +34,12 @@ describe('EventDispatcherService', () => {
       connect: jest.fn(),
       close: jest.fn(),
     };
-    service = new EventDispatcherService(prisma as never, kafka as never);
+    runtimeConfig = portfolioManagerRuntimeConfig();
+    service = new EventDispatcherService(
+      prisma as never,
+      kafka as never,
+      runtimeConfig,
+    );
 
     // spy on logger to avoid cluttering test output
     jest.spyOn(service['logger'], 'debug').mockImplementation(() => jest.fn());
@@ -41,7 +51,7 @@ describe('EventDispatcherService', () => {
     jest.useRealTimers();
   });
 
-  it('connects Kafka and starts dispatcher on module init', async () => {
+  it('connects Kafka and starts dispatcher on module init when enabled', async () => {
     jest.useFakeTimers();
     const setIntervalSpy = jest.spyOn(global, 'setInterval');
 
@@ -53,6 +63,29 @@ describe('EventDispatcherService', () => {
     await service.onModuleDestroy();
 
     expect(kafka.close).toHaveBeenCalledTimes(1);
+
+    setIntervalSpy.mockRestore();
+  });
+
+  it('does not start the dispatcher interval when runtime config disables it', async () => {
+    jest.useFakeTimers();
+    const setIntervalSpy = jest.spyOn(global, 'setInterval');
+    runtimeConfig.enableOutboxInterval = false;
+    service = new EventDispatcherService(
+      prisma as never,
+      kafka as never,
+      runtimeConfig,
+    );
+    jest.spyOn(service['logger'], 'debug').mockImplementation(() => jest.fn());
+    jest.spyOn(service['logger'], 'warn').mockImplementation(() => jest.fn());
+    jest.spyOn(service['logger'], 'error').mockImplementation(() => jest.fn());
+
+    await service.onModuleInit();
+
+    expect(kafka.connect).toHaveBeenCalledTimes(1);
+    expect(setIntervalSpy).not.toHaveBeenCalled();
+
+    await service.onModuleDestroy();
 
     setIntervalSpy.mockRestore();
   });
