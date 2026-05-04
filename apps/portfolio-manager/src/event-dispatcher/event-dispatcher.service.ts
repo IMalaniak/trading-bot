@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import type { ConfigType } from '@nestjs/config';
 import { ClientKafka } from '@nestjs/microservices';
+import type { OutboxMessageInput } from '@trading-bot/common';
 import { KAFKA_EVENT_HEADER_NAMES } from '@trading-bot/common';
 import { randomUUID } from 'crypto';
 import { lastValueFrom } from 'rxjs';
@@ -15,7 +16,6 @@ import { portfolioManagerRuntimeConfig } from '../config/runtime.config';
 import { OutboxEventStatus, Prisma } from '../prisma/generated/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { PORTFOLIO_MANAGER_KAFKA_CLIENT } from './const';
-import { OutboxMessageInput } from './types/outbox-message';
 
 const OUTBOX_DISPATCH_INTERVAL_MS = 1000;
 const OUTBOX_BATCH_SIZE = 50;

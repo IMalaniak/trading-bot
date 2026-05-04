@@ -1,18 +1,7 @@
 {
-    "cSpell.words": [
-        "autoincrement",
-        "autolayout",
-        "libpeerconnection",
-        "LSTMs",
-        "MACD",
-        "Newsfeed",
-        "nodenext",
-        "protoc",
-        "testem",
-        "tradingbot",
-        "webbrowser"
-    ],
     "jest.runMode": "on-demand",
+    "js/ts.tsdk.path": "node_modules/typescript/lib",
+    "js/ts.tsdk.promptToUseWorkspaceVersion": true,
     // Ensure Prettier extension resolves the workspace installation when used elsewhere
     "prettier.prettierPath": "./node_modules/prettier",
     "prettier.requireConfig": true,

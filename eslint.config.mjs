@@ -75,4 +75,10 @@ export default defineConfig(
       'simple-import-sort/exports': 'error',
     },
   },
+  {
+    files: ['**/*.spec.ts', '**/*.test.ts', '**/*.e2e-spec.ts', '**/*.integration.ts'],
+    rules: {
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+    },
+  },
 );

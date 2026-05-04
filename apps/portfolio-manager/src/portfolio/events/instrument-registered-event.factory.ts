@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import type { OutboxMessageInput } from '@trading-bot/common';
 import {
   buildEventMetadataHeaders,
   instrumentKey,
@@ -9,7 +10,6 @@ import {
 import { InstrumentRegistered } from '@trading-bot/common/proto';
 import { randomUUID } from 'crypto';
 
-import { OutboxMessageInput } from '../../event-dispatcher/types/outbox-message';
 import { InstrumentModel as PrismaInstrument } from '../../prisma/generated/models';
 import { InstrumentMapper } from '../mapper/instrument.mapper';
 

@@ -7,14 +7,13 @@ import {
 } from '@nestjs/common';
 import type { ConfigType } from '@nestjs/config';
 import { ConfigService } from '@nestjs/config';
-import { KAFKA_TOPICS } from '@trading-bot/common';
+import { KAFKA_TOPICS, nextKafkaOffset } from '@trading-bot/common';
 import { PortfolioSignalCandidate } from '@trading-bot/common/proto';
 import { Consumer, Kafka, logLevel } from 'kafkajs';
 
 import { portfolioManagerRuntimeConfig } from '../config/runtime.config';
 import { KAFKA_CONSUMER_GROUPS } from './const/kafka-consumer-groups';
 import { PortfolioStageService } from './services/portfolio-stage.service';
-import { nextKafkaOffset } from './utils/kafka-header';
 
 @Injectable()
 export class PortfolioTopicConsumer implements OnModuleInit, OnModuleDestroy {

@@ -39,5 +39,12 @@
       }
     }
   ],
+  "targetDefaults": {
+    "typecheck": {
+      "dependsOn": ["^typecheck"],
+      "inputs": ["default", "^default"],
+      "cache": true
+    }
+  },
   "analytics": false
 }

@@ -6,7 +6,9 @@ type KafkaHeaderValue =
 
 type KafkaHeaders = Record<string, KafkaHeaderValue> | undefined;
 
-const headerValueToString = (value: KafkaHeaderValue): string | undefined => {
+export const kafkaHeaderValueToString = (
+  value: KafkaHeaderValue,
+): string | undefined => {
   if (value === undefined) {
     return undefined;
   }
@@ -26,7 +28,7 @@ export const readRequiredKafkaHeader = (
   headers: KafkaHeaders,
   name: string,
 ): string => {
-  const value = headerValueToString(headers?.[name]);
+  const value = kafkaHeaderValueToString(headers?.[name]);
 
   if (!value) {
     throw new Error(`Missing required Kafka header '${name}'`);

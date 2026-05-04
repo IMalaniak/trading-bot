@@ -1,0 +1,167 @@
+{
+  "name": "execution-engine",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/execution-engine/src",
+  "projectType": "application",
+  "tags": [],
+  "targets": {
+    "build": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "webpack-cli build",
+        "args": ["--node-env=production"],
+        "cwd": "apps/execution-engine"
+      },
+      "configurations": {
+        "development": {
+          "args": ["--node-env=development"]
+        }
+      }
+    },
+    "prune-lockfile": {
+      "dependsOn": ["build"],
+      "cache": true,
+      "executor": "@nx/js:prune-lockfile",
+      "outputs": [
+        "{workspaceRoot}/dist/apps/execution-engine/package.json",
+        "{workspaceRoot}/dist/apps/execution-engine/package-lock.json"
+      ],
+      "options": {
+        "buildTarget": "build"
+      }
+    },
+    "copy-workspace-modules": {
+      "dependsOn": ["build"],
+      "cache": true,
+      "outputs": [
+        "{workspaceRoot}/dist/apps/execution-engine/workspace_modules"
+      ],
+      "executor": "@nx/js:copy-workspace-modules",
+      "options": {
+        "buildTarget": "build"
+      }
+    },
+    "prune": {
+      "dependsOn": ["prune-lockfile", "copy-workspace-modules"],
+      "executor": "nx:noop"
+    },
+    "serve": {
+      "continuous": true,
+      "executor": "@nx/js:node",
+      "defaultConfiguration": "development",
+      "dependsOn": ["build"],
+      "options": {
+        "buildTarget": "execution-engine:build",
+        "runBuildTargetDependencies": false
+      },
+      "configurations": {
+        "development": {
+          "buildTarget": "execution-engine:build:development"
+        },
+        "production": {
+          "buildTarget": "execution-engine:build:production"
+        }
+      }
+    },
+    "test": {
+      "options": {
+        "passWithNoTests": true
+      }
+    },
+    "integration-infra-up": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "defaultConfiguration": "test-integration",
+      "options": {
+        "cwd": "{workspaceRoot}",
+        "parallel": false,
+        "commands": [
+          {
+            "command": "docker compose -f infra/docker-compose.test.yml up -d --wait postgres redpanda"
+          },
+          {
+            "command": "docker compose -f infra/docker-compose.test.yml run --rm redpanda-init"
+          }
+        ]
+      },
+      "configurations": {
+        "test-integration": {}
+      }
+    },
+    "integration-infra-down": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "defaultConfiguration": "test-integration",
+      "options": {
+        "cwd": "{workspaceRoot}",
+        "command": "docker compose -f infra/docker-compose.test.yml down --remove-orphans"
+      },
+      "configurations": {
+        "test-integration": {}
+      }
+    },
+    "test-integration": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "dependsOn": ["integration-infra-up"],
+      "options": {
+        "cwd": "{workspaceRoot}",
+        "parallel": false,
+        "env": {
+          "NODE_OPTIONS": "--experimental-vm-modules"
+        },
+        "commands": [
+          {
+            "command": "npx nx run execution-engine:migrate:test-integration"
+          },
+          {
+            "command": "jest --config apps/execution-engine/jest.integration.config.ts --runInBand"
+          }
+        ]
+      }
+    },
+    "migrate": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "defaultConfiguration": "development",
+      "options": {
+        "cwd": "apps/execution-engine"
+      },
+      "configurations": {
+        "development": {
+          "command": "npx prisma migrate dev"
+        },
+        "production": {
+          "command": "npx prisma migrate deploy"
+        },
+        "test-integration": {
+          "command": "npx prisma migrate reset --force"
+        }
+      }
+    },
+    "prisma-generate": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/execution-engine",
+        "commands": [
+          {
+            "command": "rm -rf src/prisma/generated"
+          },
+          {
+            "command": "npx prisma generate"
+          },
+          {
+            "command": "npx nx run execution-engine:lint --fix"
+          }
+        ]
+      }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "{workspaceRoot}",
+        "command": "tsc -b apps/execution-engine/tsconfig.json --pretty false"
+      }
+    }
+  }
+}

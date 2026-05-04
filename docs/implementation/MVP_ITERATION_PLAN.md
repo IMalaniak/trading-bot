@@ -189,36 +189,52 @@ Introduce a minimal execution engine that simulates order placement and fills.
 - In scope:
   - New `execution-engine` service.
   - Consume `trades.approved`.
+  - Persist simulated orders, fills, idempotency identity, and execution outbox rows.
   - Emit `orders.placed`.
   - Emit `orders.fills` (simulated partial/full fill paths).
 - Out of scope:
   - Real exchange APIs.
   - Complex order types.
+  - Execution gRPC/API surface.
+  - Demo injection command.
 
 ### Detailed Tasks
 
 1. Scaffold service
    - Create new Nest app with Nx.
    - Add env validation and Kafka client setup.
+   - Run as an event-only worker, not an HTTP or gRPC service.
 2. Execution contracts
    - Define protobuf/event payloads for:
      - order placed
      - order update/fill
    - Ensure payloads include deterministic order IDs and references to approvals.
-3. Simulator core logic
+   - Add execution-engine producer and schema-version constants for `orders.placed` and `orders.fills`.
+3. Execution persistence and outbox
+   - Add an execution-owned Prisma schema using `EXECUTION_ENGINE_DATABASE_URL`.
+   - Store `ExecutionOrder`, `ExecutionFill`, and `OutboxEvent`.
+   - Enforce unique `approvalEventId`, unique `candidateIdempotencyKey`, and unique fill `(orderId, sequence)`.
+4. Simulator core logic
    - For each approved trade:
-     - emit placed event
-     - emit one or more fill events after deterministic delay/logic
-   - Add idempotency guard so same approved event does not create multiple order streams.
-4. Tests
+     - derive `orderId = ord_<sha256(candidate_idempotency_key)[0..32]>`
+     - enqueue placed event with event ID `<orderId>:placed`
+     - enqueue partial fill event with event ID `<orderId>:fill:1`
+     - enqueue final fill event with event ID `<orderId>:fill:2`
+   - Use logical timestamps from `TradeDecision.decided_at`: placed +1s, partial fill +2s, final fill +3s.
+   - Split first fill at 50% requested quantity/notional and make the second fill the exact remainder.
+   - Add idempotency guard so the same approved event does not create multiple order streams, including after restart.
+5. Tests
    - Unit tests for simulator logic.
+   - Unit tests for service idempotency, invalid decisions, outbox enqueueing, and dispatcher ordering/retry state.
    - Integration tests for consume -> emit chain.
-5. Local demo flow
-   - Script or documented steps to inject approved trade and observe placed/fills.
+   - Integration replay test after recreating the Nest testing module.
+6. Local demo flow
+   - Document steps to inject an approved trade and observe placed/fills.
 
 ### Suggested File Touchpoints
 
 - `apps/execution-engine/...` (new app)
+- `apps/execution-engine/prisma/schema.prisma` + migration
 - `libs/common/src/proto/...` (execution events)
 - `docs/architecture/ARCHITECTURE.md` (if event payload semantics are clarified)
 
@@ -227,11 +243,16 @@ Introduce a minimal execution engine that simulates order placement and fills.
 - Each approved trade produces deterministic simulated order lifecycle events.
 - Duplicate approved trade messages do not create duplicate orders.
 - Event keys match documented partition-key strategy.
+- `orders.placed` is dispatched before the two `orders.fills` events for a simulated order.
+- Restart/replay idempotency is backed by execution-owned persistence, not memory.
 
 ### Validation Commands
 
 ```bash
+npx nx run common:gen-proto
+npx nx run common:test
 npx nx run execution-engine:test
+npx nx run execution-engine:test-integration
 npx nx run-many -t test -p common,execution-engine
 ```
 

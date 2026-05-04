@@ -164,6 +164,13 @@
           }
         ]
       }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "{workspaceRoot}",
+        "command": "tsc -b apps/portfolio-manager/tsconfig.json --pretty false"
+      }
     }
   }
 }

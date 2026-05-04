@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "license": "MIT",
   "scripts": {
-    "postinstall": "npx nx run portfolio-manager:prisma-generate"
+    "postinstall": "npx nx run-many --target=prisma-generate --all --outputStyle=static"
   },
   "prisma": {
     "seed": "tsx apps/portfolio-manager/prisma/seed.ts"
