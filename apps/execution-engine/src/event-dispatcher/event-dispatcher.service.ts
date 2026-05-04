@@ -8,39 +8,36 @@ import {
 import type { ConfigType } from '@nestjs/config';
 import { ClientKafka } from '@nestjs/microservices';
 import type { OutboxMessageInput } from '@trading-bot/common';
-import { KAFKA_EVENT_HEADER_NAMES } from '@trading-bot/common';
-import { randomUUID } from 'crypto';
-import { lastValueFrom } from 'rxjs';
+import { KafkaOutboxDispatcher } from '@trading-bot/common';
 
 import { executionEngineRuntimeConfig } from '../config/runtime.config';
-import { OutboxEventStatus, Prisma } from '../prisma/generated/client';
-import { PrismaService } from '../prisma/prisma.service';
+import { Prisma } from '../prisma/generated/client';
 import { EXECUTION_ENGINE_KAFKA_CLIENT } from './const';
+import { OutboxRepository } from './outbox.repository';
 
 const OUTBOX_DISPATCH_INTERVAL_MS = 1000;
-const OUTBOX_BATCH_SIZE = 50;
-const OUTBOX_EMIT_ATTEMPTS = 3;
-const OUTBOX_RETRY_BASE_MS = 200;
-const OUTBOX_RETRY_MAX_MS = 30_000;
-const OUTBOX_RETRY_EXPONENT_CAP = 10;
-const EMIT_RETRY_BASE_MS = 50;
-const OUTBOX_IN_FLIGHT_TIMEOUT_MS = 30_000;
 
 @Injectable()
 export class EventDispatcherService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(EventDispatcherService.name);
+  private readonly dispatcher: KafkaOutboxDispatcher;
   private outboxDispatchInterval?: NodeJS.Timeout;
-  private outboxDispatchRunning = false;
 
   constructor(
-    private readonly prisma: PrismaService,
+    private readonly outboxRepository: OutboxRepository,
     @Inject(EXECUTION_ENGINE_KAFKA_CLIENT)
     private readonly kafkaClient: ClientKafka,
     @Inject(executionEngineRuntimeConfig.KEY)
     private readonly runtimeConfig: ConfigType<
       typeof executionEngineRuntimeConfig
     >,
-  ) {}
+  ) {
+    this.dispatcher = new KafkaOutboxDispatcher({
+      repository: outboxRepository,
+      kafkaEmitter: kafkaClient,
+      logger: this.logger,
+    });
+  }
 
   async onModuleInit(): Promise<void> {
     await this.kafkaClient.connect();
@@ -61,28 +58,7 @@ export class EventDispatcherService implements OnModuleInit, OnModuleDestroy {
     lifecycleSequence: number,
     message: OutboxMessageInput,
   ): Promise<string> {
-    const eventId =
-      message.eventId ??
-      message.headers?.[KAFKA_EVENT_HEADER_NAMES.EVENT_ID] ??
-      randomUUID();
-    const headers = {
-      ...(message.headers ?? {}),
-      [KAFKA_EVENT_HEADER_NAMES.EVENT_ID]: eventId,
-    };
-
-    await tx.outboxEvent.create({
-      data: {
-        id: eventId,
-        topic,
-        key: message.key,
-        value: Buffer.from(message.value),
-        headers,
-        lifecycleSequence,
-        status: OutboxEventStatus.PENDING,
-      },
-    });
-
-    return eventId;
+    return this.outboxRepository.enqueue(tx, topic, lifecycleSequence, message);
   }
 
   private startOutboxDispatcher(): void {
@@ -99,151 +75,6 @@ export class EventDispatcherService implements OnModuleInit, OnModuleDestroy {
   }
 
   async dispatchOutboxBatch(): Promise<void> {
-    if (this.outboxDispatchRunning) {
-      return;
-    }
-    this.outboxDispatchRunning = true;
-    try {
-      const claimedEvents = await this.prisma.$queryRaw<
-        Array<{
-          id: string;
-          topic: string;
-          key: string;
-          value: Buffer;
-          headers: Record<string, string> | null;
-          lifecycleSequence: number;
-          attempts: number;
-          createdAt: Date;
-        }>
-      >(Prisma.sql`
-        WITH cte AS (
-          SELECT "id"
-          FROM "execution_engine"."OutboxEvent"
-          WHERE (
-              "status" IN ('PENDING'::"execution_engine"."OutboxEventStatus", 'FAILED'::"execution_engine"."OutboxEventStatus")
-              AND "nextAttemptAt" <= NOW()
-            )
-            OR (
-              "status" = 'IN_FLIGHT'::"execution_engine"."OutboxEventStatus"
-              AND "updatedAt" < NOW() - INTERVAL '${Prisma.raw(`${OUTBOX_IN_FLIGHT_TIMEOUT_MS} milliseconds`)}'
-            )
-          ORDER BY "createdAt" ASC, "lifecycleSequence" ASC
-          LIMIT ${OUTBOX_BATCH_SIZE}
-          FOR UPDATE SKIP LOCKED
-        )
-        UPDATE "execution_engine"."OutboxEvent"
-        SET "status" = 'IN_FLIGHT'::"execution_engine"."OutboxEventStatus",
-            "updatedAt" = NOW()
-        WHERE "id" IN (SELECT "id" FROM cte)
-        RETURNING "id", "topic", "key", "value", "headers", "lifecycleSequence", "attempts", "createdAt"
-      `);
-
-      claimedEvents.sort((left, right) => {
-        const createdAtDelta =
-          left.createdAt.getTime() - right.createdAt.getTime();
-
-        return (
-          createdAtDelta || left.lifecycleSequence - right.lifecycleSequence
-        );
-      });
-
-      for (const event of claimedEvents) {
-        this.logger.debug(
-          `Dispatching outbox event ${event.id} to topic '${event.topic}'`,
-        );
-        const error = await this.emitEvent(
-          event.topic,
-          {
-            key: event.key,
-            value: event.value,
-            headers: event.headers ?? undefined,
-          },
-          OUTBOX_EMIT_ATTEMPTS,
-        );
-
-        if (!error) {
-          this.logger.debug(`Outbox event ${event.id} dispatched successfully`);
-          await this.prisma.outboxEvent.update({
-            where: { id: event.id },
-            data: {
-              status: OutboxEventStatus.DISPATCHED,
-              dispatchedAt: new Date(),
-              lastError: null,
-            },
-          });
-        } else {
-          this.logger.warn(
-            `Outbox event ${event.id} failed to dispatch: ${error}`,
-          );
-          const attempts = event.attempts + 1;
-          const backoffMs = Math.min(
-            OUTBOX_RETRY_MAX_MS,
-            OUTBOX_RETRY_BASE_MS *
-              2 ** Math.min(attempts, OUTBOX_RETRY_EXPONENT_CAP),
-          );
-          const nextAttemptAt = new Date(Date.now() + backoffMs);
-          await this.prisma.outboxEvent.update({
-            where: { id: event.id },
-            data: {
-              status: OutboxEventStatus.FAILED,
-              attempts,
-              nextAttemptAt,
-              lastError: error,
-            },
-          });
-        }
-      }
-    } catch (err) {
-      const error = err as Error;
-      this.logger.error(
-        `Outbox dispatch failed: ${error?.message ?? String(err)}`,
-        error?.stack ?? String(err),
-      );
-    } finally {
-      this.outboxDispatchRunning = false;
-    }
-  }
-
-  private async emitEvent(
-    topic: string,
-    message: OutboxMessageInput,
-    attempts = 3,
-  ): Promise<string | null> {
-    let lastError: unknown;
-
-    for (let attempt = 1; attempt <= attempts; attempt++) {
-      try {
-        await lastValueFrom(
-          this.kafkaClient.emit(topic, {
-            ...message,
-            value: Buffer.isBuffer(message.value)
-              ? message.value
-              : Buffer.from(message.value),
-          }),
-        );
-        return null;
-      } catch (err: unknown) {
-        lastError = err;
-        this.logger.warn(
-          `Failed to emit Kafka event '${topic}' (attempt ${attempt}/${attempts})`,
-          (err as Error)?.message ?? err,
-        );
-        if (attempt < attempts) {
-          await new Promise((res) =>
-            setTimeout(res, EMIT_RETRY_BASE_MS * attempt),
-          );
-        }
-      }
-    }
-
-    if (lastError) {
-      this.logger.error(
-        `Giving up emitting Kafka event '${topic}' after ${attempts} attempts`,
-        lastError as Error,
-      );
-      return (lastError as Error)?.message ?? JSON.stringify(lastError);
-    }
-
-    return 'unknown error';
+    await this.dispatcher.dispatchBatch();
   }
 }

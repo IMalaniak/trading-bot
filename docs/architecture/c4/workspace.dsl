@@ -100,7 +100,7 @@ workspace "Trading Bot System" {
                     riskStateRepository = component "Risk State Repository" "Persists instruments, outbox rows, signal receipts, candidate audit rows, risk decisions, and exposure reservations into PostgreSQL." "TypeScript" {
                         tags "Implemented"
                     }
-                    outboxDispatcher = component "Outbox Dispatcher" "Claims committed outbox rows and publishes Kafka events asynchronously." "TypeScript" {
+                    outboxDispatcher = component "Outbox Dispatcher" "Uses the shared Kafka outbox dispatcher core with a portfolio-owned Prisma repository adapter." "TypeScript" {
                         tags "Implemented"
                     }
                     instrumentStageConsumer = component "Instrument Stage Consumer" "Consumes trading.signals keyed by instrument_key." "TypeScript" {
@@ -161,7 +161,7 @@ workspace "Trading Bot System" {
                     executionStateRepository = component "Execution State Repository" "Persists simulated orders, fills, and idempotency identities into the execution-owned PostgreSQL schema." "TypeScript" {
                         tags "Implemented"
                     }
-                    outboxDispatcher = component "Outbox Dispatcher" "Claims execution outbox rows and publishes lifecycle events in sequence." "TypeScript" {
+                    outboxDispatcher = component "Outbox Dispatcher" "Uses the shared Kafka outbox dispatcher core with an execution-owned Prisma repository adapter and lifecycle ordering." "TypeScript" {
                         tags "Implemented"
                     }
                     kafkaPublisher = component "Kafka Publisher" "Publishes orders.placed and orders.fills execution updates to Kafka." "TypeScript" {

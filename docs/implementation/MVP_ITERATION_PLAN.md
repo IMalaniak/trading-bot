@@ -214,6 +214,7 @@ Introduce a minimal execution engine that simulates order placement and fills.
    - Add an execution-owned Prisma schema using `EXECUTION_ENGINE_DATABASE_URL`.
    - Store `ExecutionOrder`, `ExecutionFill`, and `OutboxEvent`.
    - Enforce unique `approvalEventId`, unique `candidateIdempotencyKey`, and unique fill `(orderId, sequence)`.
+   - Reuse the shared `common` Kafka outbox dispatcher core; keep execution-specific enqueueing and lifecycle ordering in an execution-owned repository adapter.
 4. Simulator core logic
    - For each approved trade:
      - derive `orderId = ord_<sha256(candidate_idempotency_key)[0..32]>`
@@ -235,6 +236,7 @@ Introduce a minimal execution engine that simulates order placement and fills.
 
 - `apps/execution-engine/...` (new app)
 - `apps/execution-engine/prisma/schema.prisma` + migration
+- `libs/common/src/lib/kafka/outbox-dispatcher.ts` (shared outbox dispatcher mechanics)
 - `libs/common/src/proto/...` (execution events)
 - `docs/architecture/ARCHITECTURE.md` (if event payload semantics are clarified)
 

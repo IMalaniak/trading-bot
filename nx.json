@@ -40,6 +40,12 @@
     }
   ],
   "targetDefaults": {
+    "test-integration": {
+      "parallelism": false
+    },
+    "integration-infra-up": {
+      "parallelism": false
+    },
     "typecheck": {
       "dependsOn": ["^typecheck"],
       "inputs": ["default", "^default"],

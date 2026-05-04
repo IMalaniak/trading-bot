@@ -6,6 +6,7 @@ import { Partitioners } from 'kafkajs';
 import { PrismaModule } from '../prisma/prisma.module';
 import { EXECUTION_ENGINE_KAFKA_CLIENT } from './const';
 import { EventDispatcherService } from './event-dispatcher.service';
+import { OutboxRepository } from './outbox.repository';
 
 export const createEventDispatcherKafkaClientOptions = (
   configService: ConfigService,
@@ -45,7 +46,7 @@ export const createEventDispatcherKafkaClientOptions = (
       },
     ]),
   ],
-  providers: [EventDispatcherService],
+  providers: [EventDispatcherService, OutboxRepository],
   exports: [EventDispatcherService],
 })
 export class EventDispatcherModule {}

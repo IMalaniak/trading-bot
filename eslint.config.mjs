@@ -16,7 +16,7 @@ export default defineConfig(
   eslintPluginPrettierRecommended,
 
   {
-    ignores: ['**/dist', 'eslint.config.mjs'],
+    ignores: ['**/dist', '**/src/prisma/generated/**', 'eslint.config.mjs'],
   },
   {
     files: ['**/*.ts', '**/*.tsx', '**/*.js', '**/*.jsx'],

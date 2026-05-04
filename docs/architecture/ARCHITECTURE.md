@@ -49,8 +49,8 @@ Everything else in this document should be read as either:
 | -------------------------------- | -------------------- | ------------------------------------------------------------------------------------------------------ |
 | API Gateway                      | Implemented          | REST entrypoint forwards registration to `portfolio-manager` over gRPC.                                |
 | Risk & Portfolio Manager         | Implemented          | Instrument registration plus the Iteration 2 risk pipeline are implemented in `portfolio-manager`.     |
-| Outbox Dispatcher                | Implemented          | Kafka publish happens from the outbox, not inline with the DB write, for registration and risk events. |
-| Shared Contracts (`common`)      | Implemented          | Proto types, topic constants, key builders, and Kafka header helpers live here.                        |
+| Outbox Dispatcher                | Implemented          | Kafka publish happens from the outbox, not inline with the DB write; shared dispatch mechanics live in `common`. |
+| Shared Contracts (`common`)      | Implemented          | Proto types, topic constants, key builders, Kafka header helpers, and reusable outbox dispatch ports live here. |
 | Message Bus (Redpanda/Kafka API) | Implemented          | Local development uses Redpanda.                                                                       |
 | Portfolio DB (Postgres)          | Implemented          | Source of truth for instruments, outbox rows, portfolios, risk decisions, and exposure reservations.   |
 | Market Data Store (TimescaleDB)  | Implemented in infra | Provisioned locally, but not yet exercised by application code in this repo.                           |
@@ -175,6 +175,11 @@ This is the main currently implemented reliability mechanism and remains true fo
 
 - `orders.placed`
 - `orders.fills`
+
+The reusable dispatcher core lives in `common` as a repository/emitter driven
+Kafka outbox dispatcher. Service apps keep their own outbox repositories because
+each service owns its Prisma client, database schema, enqueue shape, and any
+service-specific ordering column such as execution lifecycle sequence.
 
 ## Kafka Topics and Partition Keys
 
