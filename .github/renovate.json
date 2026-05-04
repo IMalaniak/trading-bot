@@ -28,6 +28,7 @@
         "^@nrwl",
         "^@nx/",
         "^@eslint$",
+        "^eslint",
         "^eslint-",
         "^eslint-plugin-",
         "^eslint-config-",
