@@ -22,8 +22,18 @@
       "automergeType": "branch"
     },
     {
-      "matchPackagePatterns": ["^@nrwl/", "^nx", "^@nrwl"],
-      "groupName": "nx & nrwl",
+      "matchPackagePatterns": [
+        "^@nrwl/",
+        "^nx",
+        "^@nrwl",
+        "^@nx/",
+        "^@eslint$",
+        "^eslint-",
+        "^eslint-plugin-",
+        "^eslint-config-",
+        "^typescript-eslint"
+      ],
+      "groupName": "nx monorepo packages",
       "automerge": true,
       "automergeType": "branch"
     },
@@ -42,19 +52,6 @@
     {
       "matchPackageNames": ["prisma", "@prisma/client", "@prisma/adapter-pg"],
       "groupName": "prisma packages",
-      "automerge": true,
-      "automergeType": "branch"
-    },
-    {
-      "matchPackagePatterns": [
-        "^@eslint$",
-        "^@nx/eslint",
-        "^eslint-",
-        "^eslint-plugin-",
-        "^eslint-config-",
-        "^typescript-eslint"
-      ],
-      "groupName": "eslint packages",
       "automerge": true,
       "automergeType": "branch"
     }
