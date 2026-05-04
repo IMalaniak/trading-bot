@@ -18,6 +18,7 @@
   - [Workflows](#workflows)
     - [Current: Instrument Registration](#current-instrument-registration)
     - [Current: Risk Pipeline](#current-risk-pipeline)
+    - [Current: Execution Simulator](#current-execution-simulator)
     - [Planned: End-to-End Trading Flow](#planned-end-to-end-trading-flow)
 
 ## Architecture Summary
@@ -33,6 +34,7 @@ The current implementation is still intentionally narrow:
 
 - `api-gateway` exposes the registration REST path.
 - `portfolio-manager` stores instruments, runs the current two-stage risk pipeline, writes outbox records, and dispatches Kafka events.
+- `execution-engine` consumes approved trades, persists deterministic simulated order lifecycles, writes outbox records, and dispatches order events.
 - `common` owns shared proto contracts and Kafka contract helpers.
 - Local infra provides Redpanda, Postgres, and TimescaleDB.
 
@@ -47,15 +49,16 @@ Everything else in this document should be read as either:
 | -------------------------------- | -------------------- | ------------------------------------------------------------------------------------------------------ |
 | API Gateway                      | Implemented          | REST entrypoint forwards registration to `portfolio-manager` over gRPC.                                |
 | Risk & Portfolio Manager         | Implemented          | Instrument registration plus the Iteration 2 risk pipeline are implemented in `portfolio-manager`.     |
-| Outbox Dispatcher                | Implemented          | Kafka publish happens from the outbox, not inline with the DB write, for registration and risk events. |
-| Shared Contracts (`common`)      | Implemented          | Proto types, topic constants, key builders, and Kafka header helpers live here.                        |
+| Outbox Dispatcher                | Implemented          | Kafka publish happens from the outbox, not inline with the DB write; shared dispatch mechanics live in `common`. |
+| Shared Contracts (`common`)      | Implemented          | Proto types, topic constants, key builders, Kafka header helpers, and reusable outbox dispatch ports live here. |
 | Message Bus (Redpanda/Kafka API) | Implemented          | Local development uses Redpanda.                                                                       |
 | Portfolio DB (Postgres)          | Implemented          | Source of truth for instruments, outbox rows, portfolios, risk decisions, and exposure reservations.   |
 | Market Data Store (TimescaleDB)  | Implemented in infra | Provisioned locally, but not yet exercised by application code in this repo.                           |
 | Data Ingestion Service           | Planned              | Not implemented in this repo yet.                                                                      |
 | Feature Engineering Service      | Planned              | Not implemented in this repo yet.                                                                      |
 | Prediction Engine                | Planned              | Not implemented in this repo yet.                                                                      |
-| Execution Engine                 | Planned              | Not implemented in this repo yet.                                                                      |
+| Execution Engine                 | Implemented          | Event-only simulator consumes approved trades and emits deterministic placed/fill lifecycle events.    |
+| Execution DB (Postgres schema)   | Implemented          | Source of truth for simulated orders, fills, and execution outbox rows.                                |
 | External API Facade              | Planned              | Not implemented in this repo yet.                                                                      |
 | Dashboard                        | Planned              | Not implemented in this repo yet.                                                                      |
 | Schema Registry                  | Planned              | Documented as a future capability; not provisioned in local infra.                                     |
@@ -71,7 +74,9 @@ The intended MVP direction remains:
 - `orders.placed` and `orders.fills` come from the execution engine.
 - `portfolio.updated` is emitted by the risk and portfolio manager after reconciliation.
 
-That target architecture is still valid. Today the repo implements registration and the current two-stage risk pipeline, while prediction, execution, and reconciliation remain planned.
+That target architecture is still valid. Today the repo implements registration,
+the current two-stage risk pipeline, and a durable execution simulator. Prediction,
+real exchange execution, and fill reconciliation remain planned.
 
 ## Eventing, Ordering, and Consistency
 
@@ -98,14 +103,17 @@ Current payload boundaries:
 - `trading.signals` reuses `common.Signal` from the prediction domain.
 - `trading.signals.portfolio` uses `PortfolioSignalCandidate`.
 - `trades.approved` and `trades.rejected` both use `TradeDecision`.
+- `orders.placed` uses `OrderPlaced`.
+- `orders.fills` uses `OrderFill`.
 
 The risk pipeline intentionally does not reuse `common.Signal` for downstream portfolio-scoped or decision-scoped topics. Those topics carry lifecycle-specific fields such as `source_event_id`, `portfolio_id`, decision kind, and reason codes.
 
-For Iteration 1 and Iteration 2:
+For Iteration 1 through Iteration 3:
 
 - `event-type` is the topic name
 - `schema-version` starts at `"1"` per topic
 - `event-id` is generated before the outbox row is written; for events published by `portfolio-manager`, that same value is stored as the outbox row ID and stays stable across retries
+- execution simulator event IDs are deterministic: `<order_id>:placed`, `<order_id>:fill:1`, and `<order_id>:fill:2`
 - `content-type` is `application/x-protobuf`
 
 Risk pipeline payload notes:
@@ -115,6 +123,15 @@ Risk pipeline payload notes:
 - `PortfolioSignalCandidate.candidate_idempotency_key = <source_event_id>:<portfolio_id>`.
 - `TradeDecision` is published to either `trades.approved` or `trades.rejected`; the topic name and embedded `decision` enum must agree.
 - Risk limits, prices, notionals, and quantities are stored in Postgres `NUMERIC` columns and compared with Prisma `Decimal` values; binary floating-point is not used for approval decisions.
+
+Execution simulator payload notes:
+
+- `OrderPlaced.order_id = ord_<sha256(candidate_idempotency_key)[0..32]>`.
+- `OrderPlaced.approval_event_id` is the inbound `trades.approved` Kafka header `event-id`.
+- `OrderFill.fill_id` is the same value as its Kafka `event-id`.
+- The default simulator emits one partial fill and one final fill. The first fill is 50% of the requested quantity/notional; the final fill is the exact remainder.
+- Execution timestamps are logical offsets from `TradeDecision.decided_at`: placed at +1s, partial fill at +2s, final fill at +3s.
+- Execution quantities, notionals, and prices are stored and transported as decimal strings.
 
 ### Ordering and idempotency rules
 
@@ -129,6 +146,9 @@ Risk pipeline payload notes:
 - `PortfolioSignalCandidate.candidate_idempotency_key = <source_event_id>:<portfolio_id>`; exactly one candidate audit row can exist for a given source event and portfolio.
 - `RiskDecision.candidateIdempotencyKey` is unique; exactly one final decision can exist for a given candidate and at most one reservation can be attached to it.
 - For events emitted by `portfolio-manager`, the Kafka header `event-id` and the outbox row `id` are the same stable identity.
+- `execution-engine` consumes `trades.approved` in portfolio order using the `portfolio_key`.
+- `ExecutionOrder.approvalEventId` and `ExecutionOrder.candidateIdempotencyKey` are unique, so replaying the same approved trade does not create another order stream.
+- `orders.placed` and `orders.fills` use `portfolio_key` and are enqueued with lifecycle sequence `1`, `2`, `3` so placed is dispatched before fills for a given simulated order.
 
 ### Versioning rules
 
@@ -151,6 +171,16 @@ This is the main currently implemented reliability mechanism and remains true fo
 - `trades.approved`
 - `trades.rejected`
 
+`execution-engine` uses the same reliability shape for:
+
+- `orders.placed`
+- `orders.fills`
+
+The reusable dispatcher core lives in `common` as a repository/emitter driven
+Kafka outbox dispatcher. Service apps keep their own outbox repositories because
+each service owns its Prisma client, database schema, enqueue shape, and any
+service-specific ordering column such as execution lifecycle sequence.
+
 ## Kafka Topics and Partition Keys
 
 Local development bootstraps all documented topics explicitly and disables broker auto-creation so topic-name mistakes fail fast.
@@ -162,10 +192,10 @@ Local development bootstraps all documented topics explicitly and disables broke
 | `features.indicators`       | Planned               | Planned Feature Engineering                              | Planned Prediction Engine, Data Ingestion               | `instrument_key` | Per instrument     |
 | `trading.signals`           | Partially implemented | Planned Prediction Engine                                | Implemented Risk & Portfolio Manager (instrument stage) | `instrument_key` | Per instrument     |
 | `trading.signals.portfolio` | Implemented           | Implemented Risk & Portfolio Manager (repartition stage) | Implemented Risk & Portfolio Manager (portfolio stage)  | `portfolio_key`  | Per portfolio      |
-| `trades.approved`           | Implemented           | Implemented Risk & Portfolio Manager                     | Planned Execution Engine                                | `portfolio_key`  | Per portfolio      |
+| `trades.approved`           | Implemented           | Implemented Risk & Portfolio Manager                     | Implemented Execution Engine                            | `portfolio_key`  | Per portfolio      |
 | `trades.rejected`           | Implemented           | Implemented Risk & Portfolio Manager                     | Planned downstream adapters                             | `portfolio_key`  | Per portfolio      |
-| `orders.placed`             | Planned               | Planned Execution Engine                                 | Planned Risk & Portfolio Manager                        | `portfolio_key`  | Per portfolio      |
-| `orders.fills`              | Planned               | Planned Execution Engine                                 | Planned Risk & Portfolio Manager                        | `portfolio_key`  | Per portfolio      |
+| `orders.placed`             | Implemented           | Implemented Execution Engine simulator                   | Planned Risk & Portfolio Manager                        | `portfolio_key`  | Per portfolio      |
+| `orders.fills`              | Implemented           | Implemented Execution Engine simulator                   | Planned Risk & Portfolio Manager                        | `portfolio_key`  | Per portfolio      |
 | `portfolio.updated`         | Planned               | Planned Risk & Portfolio Manager                         | Planned downstream adapters and analytics               | `portfolio_key`  | Per portfolio      |
 
 Local bootstrap defaults:
@@ -189,6 +219,11 @@ Expected env files:
 - `apps/portfolio-manager/.env.test-integration`
   - isolated integration-test `DATABASE_URL`
   - isolated integration-test `KAFKA_BROKERS`
+- `apps/execution-engine/.env`
+  - `EXECUTION_ENGINE_DATABASE_URL`
+- `apps/execution-engine/.env.test-integration`
+  - isolated integration-test `EXECUTION_ENGINE_DATABASE_URL`
+  - isolated integration-test `KAFKA_BROKERS`
 - `infra/.env`
   - Postgres and Timescale credentials for Docker Compose
 
@@ -197,8 +232,10 @@ Suggested local run order:
 ```bash
 docker compose -f infra/docker-compose.yml up -d
 npx nx run portfolio-manager:migrate
+npx nx run execution-engine:migrate
 npx nx run portfolio-manager:seed
 npx nx serve portfolio-manager
+npx nx serve execution-engine
 npx nx serve api-gateway
 ```
 
@@ -212,13 +249,14 @@ Useful validation commands:
 
 ```bash
 npx nx run portfolio-manager:test-integration
+npx nx run execution-engine:test-integration
 ```
 
-`portfolio-manager:test-integration` uses the isolated
+`portfolio-manager:test-integration` and `execution-engine:test-integration` use the isolated
 `infra/docker-compose.test.yml` stack, bootstraps topics via `redpanda-init`,
-runs `portfolio-manager:migrate:test-integration`, and then executes the
-integration Jest suite. It does not require the shared local development stack
-to be running first.
+runs the owning service's `migrate:test-integration` target, and then executes
+the integration Jest suite. They do not require the shared local development
+stack to be running first.
 
 Manual registration smoke:
 
@@ -234,6 +272,14 @@ Manual risk-pipeline smoke:
 3. Publish a `common.Signal` to `trading.signals` with Kafka header `event-id`.
 4. Consume from `trading.signals.portfolio`, `trades.approved`, and `trades.rejected`.
 5. Verify `SignalReceipt`, `PortfolioSignalCandidateRecord`, `RiskDecision`, and `ExposureReservation` rows in Postgres.
+
+Manual execution-simulator smoke:
+
+1. Start infra and `execution-engine`.
+2. Publish an approved `TradeDecision` protobuf message to `trades.approved` with Kafka header `event-id`.
+3. Consume from `orders.placed` and `orders.fills`.
+4. Verify the Kafka key is `<portfolio_id>`, the placed event appears before fill events, and event IDs follow `<order_id>:placed`, `<order_id>:fill:1`, `<order_id>:fill:2`.
+5. Verify `ExecutionOrder`, `ExecutionFill`, and execution `OutboxEvent` rows in the `execution_engine` Postgres schema.
 
 ## C4 Model Diagrams
 
@@ -320,6 +366,37 @@ Current reservation semantics:
 - Instrument stage fans out all active portfolio-instrument configs, including disabled ones, so portfolio stage can emit explicit `SUBSCRIPTION_DISABLED` rejections.
 - If a config is deleted or the portfolio becomes inactive after fan-out, portfolio stage rejects the candidate deterministically as `SUBSCRIPTION_DISABLED` using the snapshotted target notional.
 
+### Current: Execution Simulator
+
+This is implemented in `execution-engine` today. It is a deterministic simulator,
+not a real exchange adapter.
+
+```mermaid
+sequenceDiagram
+    participant RiskManager as Risk & Portfolio Manager
+    participant Kafka as Message Bus
+    participant ExecutionConsumer as Approved Trades Consumer
+    participant Simulator as Execution Simulator
+    participant DB as Execution DB
+    participant Outbox as Outbox Dispatcher
+
+    RiskManager->>Kafka: Publish TradeDecision to trades.approved\nHeaders include event-id
+    Kafka-->>ExecutionConsumer: Consume trades.approved in portfolio order
+    ExecutionConsumer->>Simulator: Build deterministic order lifecycle
+    Simulator->>DB: Insert ExecutionOrder, two ExecutionFill rows, and three outbox rows
+    Outbox->>DB: Claim outbox rows in lifecycle order
+    Outbox->>Kafka: Publish OrderPlaced to orders.placed
+    Outbox->>Kafka: Publish partial OrderFill to orders.fills
+    Outbox->>Kafka: Publish final OrderFill to orders.fills
+```
+
+Current simulator semantics:
+
+- Only `TradeDecisionKind.APPROVED` is accepted.
+- Duplicate `approval_event_id` or `candidate_idempotency_key` messages are absorbed without creating another order lifecycle.
+- The simulator persists the final order status as `FILLED` because both fills are generated in the same deterministic lifecycle.
+- Real exchange placement, timers, cancellations, and order amendments are planned future work.
+
 ### Planned: End-to-End Trading Flow
 
 The flow below is the intended target architecture, not the current repo state.
@@ -369,7 +446,7 @@ sequenceDiagram
     alt Signal approved
         RiskManager->>Kafka: Publish trades.approved
         Kafka-->>ExecutionEngine: Consume trades.approved
-        ExecutionEngine->>ExternalAPI: Place order
+        ExecutionEngine->>ExternalAPI: Place order (planned real execution)
         ExternalAPI->>Binance: Submit exchange order
         ExecutionEngine->>Kafka: Publish orders.placed
         ExecutionEngine->>Kafka: Publish orders.fills

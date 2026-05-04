@@ -16,7 +16,7 @@ export default defineConfig(
   eslintPluginPrettierRecommended,
 
   {
-    ignores: ['**/dist', 'eslint.config.mjs'],
+    ignores: ['**/dist', '**/src/prisma/generated/**', 'eslint.config.mjs'],
   },
   {
     files: ['**/*.ts', '**/*.tsx', '**/*.js', '**/*.jsx'],
@@ -73,6 +73,12 @@ export default defineConfig(
       ],
       'simple-import-sort/imports': 'error',
       'simple-import-sort/exports': 'error',
+    },
+  },
+  {
+    files: ['**/*.spec.ts', '**/*.test.ts', '**/*.e2e-spec.ts', '**/*.integration.ts'],
+    rules: {
+      '@typescript-eslint/no-unsafe-assignment': 'off',
     },
   },
 );

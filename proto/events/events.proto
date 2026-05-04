@@ -44,3 +44,42 @@ message TradeDecision {
   string reference_price = 9;
   string decided_at = 10;
 }
+
+enum OrderStatus {
+  ORDER_STATUS_UNSPECIFIED = 0;
+  PLACED = 1;
+  PARTIALLY_FILLED = 2;
+  FILLED = 3;
+}
+
+message OrderPlaced {
+  string order_id = 1;
+  string approval_event_id = 2;
+  string source_event_id = 3;
+  string candidate_idempotency_key = 4;
+  string portfolio_id = 5;
+  tradingbot.common.Signal signal = 6;
+  string requested_notional = 7;
+  string requested_quantity = 8;
+  string reference_price = 9;
+  OrderStatus status = 10;
+  string placed_at = 11;
+}
+
+message OrderFill {
+  string fill_id = 1;
+  string order_id = 2;
+  string approval_event_id = 3;
+  string source_event_id = 4;
+  string candidate_idempotency_key = 5;
+  string portfolio_id = 6;
+  tradingbot.common.Signal signal = 7;
+  int32 sequence = 8;
+  string fill_notional = 9;
+  string fill_quantity = 10;
+  string fill_price = 11;
+  string cumulative_filled_notional = 12;
+  string cumulative_filled_quantity = 13;
+  OrderStatus order_status = 14;
+  string filled_at = 15;
+}

@@ -7,14 +7,18 @@ import {
 } from '@nestjs/common';
 import type { ConfigType } from '@nestjs/config';
 import { ConfigService } from '@nestjs/config';
-import { KAFKA_EVENT_HEADER_NAMES, KAFKA_TOPICS } from '@trading-bot/common';
+import {
+  KAFKA_EVENT_HEADER_NAMES,
+  KAFKA_TOPICS,
+  nextKafkaOffset,
+  readRequiredKafkaHeader,
+} from '@trading-bot/common';
 import { Signal } from '@trading-bot/common/proto';
 import { Consumer, Kafka, logLevel } from 'kafkajs';
 
 import { portfolioManagerRuntimeConfig } from '../config/runtime.config';
 import { KAFKA_CONSUMER_GROUPS } from './const/kafka-consumer-groups';
 import { InstrumentStageService } from './services/instrument-stage.service';
-import { nextKafkaOffset, readRequiredKafkaHeader } from './utils/kafka-header';
 
 @Injectable()
 export class SignalTopicConsumer implements OnModuleInit, OnModuleDestroy {

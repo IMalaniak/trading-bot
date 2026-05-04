@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import type { OutboxMessageInput } from '@trading-bot/common';
 import {
   buildEventMetadataHeaders,
   KAFKA_EVENT_PRODUCERS,
@@ -9,7 +10,6 @@ import {
 import { PortfolioSignalCandidate, Signal } from '@trading-bot/common/proto';
 import { randomUUID } from 'crypto';
 
-import { OutboxMessageInput } from '../../event-dispatcher/types/outbox-message';
 import { CandidateRecord } from '../types/risk-types';
 
 interface PortfolioSignalCandidateEvent {

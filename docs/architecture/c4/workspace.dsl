@@ -100,7 +100,7 @@ workspace "Trading Bot System" {
                     riskStateRepository = component "Risk State Repository" "Persists instruments, outbox rows, signal receipts, candidate audit rows, risk decisions, and exposure reservations into PostgreSQL." "TypeScript" {
                         tags "Implemented"
                     }
-                    outboxDispatcher = component "Outbox Dispatcher" "Claims committed outbox rows and publishes Kafka events asynchronously." "TypeScript" {
+                    outboxDispatcher = component "Outbox Dispatcher" "Uses the shared Kafka outbox dispatcher core with a portfolio-owned Prisma repository adapter." "TypeScript" {
                         tags "Implemented"
                     }
                     instrumentStageConsumer = component "Instrument Stage Consumer" "Consumes trading.signals keyed by instrument_key." "TypeScript" {
@@ -143,22 +143,43 @@ workspace "Trading Bot System" {
             }
 
             group "Execution Engine Service" {
-                executionEngine = container "Execution Engine" "Places and manages orders on exchanges." "Nest.js" {
-                    tags "Planned"
-                    gRPC = component "Trades API" "Exposes execution/order lifecycle gRPC API for internal consumers." "gRPC" "API"
-                    gRPC_Client = component "gRPC Client" "Handles internal service-to-service communication." "gRPC"
+                executionEngine = container "Execution Engine" "Consumes approved trades today and simulates deterministic order placement/fills; real exchange execution remains planned." "Nest.js" {
+                    tags "Implemented"
+                    gRPC = component "Trades API" "Planned gRPC API for execution/order lifecycle queries and internal consumers." "gRPC" "API" {
+                        tags "Planned"
+                    }
+                    gRPC_Client = component "gRPC Client" "Planned internal communication with External API Facade for real order placement." "gRPC" {
+                        tags "Planned"
+                    }
 
-                    core = component "Execution Core" "Main logic for order management and execution." "TypeScript"
-                    tradeExecutor = component "Trade Executor" "Sends orders to exchanges via APIs, manages order lifecycle." "TypeScript"
+                    approvedTradesConsumer = component "Approved Trades Consumer" "Consumes trades.approved keyed by portfolio_key and reads approval event-id headers." "TypeScript" {
+                        tags "Implemented"
+                    }
+                    simulatorCore = component "Execution Simulator Core" "Builds deterministic order IDs, placed events, one partial fill, and one final fill from approved trades." "TypeScript" {
+                        tags "Implemented"
+                    }
+                    executionStateRepository = component "Execution State Repository" "Persists simulated orders, fills, and idempotency identities into the execution-owned PostgreSQL schema." "TypeScript" {
+                        tags "Implemented"
+                    }
+                    outboxDispatcher = component "Outbox Dispatcher" "Uses the shared Kafka outbox dispatcher core with an execution-owned Prisma repository adapter and lifecycle ordering." "TypeScript" {
+                        tags "Implemented"
+                    }
+                    kafkaPublisher = component "Kafka Publisher" "Publishes orders.placed and orders.fills execution updates to Kafka." "TypeScript" {
+                        tags "Implemented"
+                    }
+                    tradeExecutor = component "Trade Executor" "Planned real exchange order executor." "TypeScript" {
+                        tags "Planned"
+                    }
 
-                    kafkaPublisher = component "Kafka Publisher" "Publishes orders.placed and orders.fills execution updates to Kafka." "TypeScript"
-                    kafkaConsumer = component "Kafka Consumer" "Consumes approved trades from Kafka." "TypeScript"
+                    approvedTradesConsumer -> simulatorCore "Feeds approved trade decisions to"
+                    simulatorCore -> executionStateRepository "Writes orders, fills, and outbox rows via"
+                    outboxDispatcher -> executionStateRepository "Claims outbox rows from"
+                    outboxDispatcher -> kafkaPublisher "Publishes claimed lifecycle events via"
+                    tradeExecutor -> gRPC_Client "Will communicate with External API Facade over"
+                }
 
-                    gRPC -> core "Handles trade requests via"
-                    core -> tradeExecutor "Sends trade orders via"
-                    tradeExecutor -> kafkaPublisher "Publishes orders.placed and orders.fills updates to"
-                    kafkaConsumer -> tradeExecutor "Delivers approved trades to"
-                    tradeExecutor -> gRPC_Client "Communicates with External API Facade over"
+                executionPostgres = container "Execution DB" "Owned by Execution Engine. Stores simulated orders, fills, and execution outbox rows in an execution-owned PostgreSQL schema." "PostgreSQL" "Datastore" {
+                    tags "Implemented"
                 }
             }
 
@@ -277,14 +298,15 @@ workspace "Trading Bot System" {
         tradingBot.portfolioManager.instrumentStageConsumer -> tradingBot.messageBus "Consumes trading.signals from"
         tradingBot.portfolioManager.portfolioStageConsumer -> tradingBot.messageBus "Consumes trading.signals.portfolio from"
         tradingBot.portfolioManager.executionUpdatesConsumer -> tradingBot.messageBus "Consumes orders.placed and orders.fills from"
-        tradingBot.executionEngine.kafkaConsumer -> tradingBot.messageBus "Consumes trades.approved from"
+        tradingBot.executionEngine.approvedTradesConsumer -> tradingBot.messageBus "Consumes trades.approved from"
 
         tradingBot.predictionEngine.signalCacheManager -> tradingBot.redis "Writes recent signals to"
 
         tradingBot.portfolioManager.riskConfigRepository -> tradingBot.postgres "Reads portfolio subscriptions and caps from"
         tradingBot.portfolioManager.riskStateRepository -> tradingBot.postgres "Writes instruments, audit state, decisions, reservations, and outbox rows to"
 
-        tradingBot.executionEngine.gRPC_Client -> tradingBot.externalAPIFacade.gRPC "Places orders on"
+        tradingBot.executionEngine.executionStateRepository -> tradingBot.executionPostgres "Writes simulated orders, fills, and outbox rows to"
+        tradingBot.executionEngine.gRPC_Client -> tradingBot.externalAPIFacade.gRPC "Will place real orders on"
         tradingBot.dataIngestion.gRPC_Client -> tradingBot.externalAPIFacade.gRPC "Asks to start/stop fetching market data"
         tradingBot.externalAPIFacade.binanceClient -> binance "Places orders on"
         tradingBot.externalAPIFacade.binanceClient -> binance "Fetches market data from"
@@ -372,13 +394,15 @@ workspace "Trading Bot System" {
         }
 
         component tradingBot.executionEngine "ExecutionEngine-Components" {
-            include tradingBot.apiGateway.gRPC_Client
-            include tradingBot.executionEngine.core
-            include tradingBot.executionEngine.kafkaConsumer
+            include tradingBot.executionEngine.approvedTradesConsumer
+            include tradingBot.executionEngine.simulatorCore
+            include tradingBot.executionEngine.executionStateRepository
+            include tradingBot.executionEngine.outboxDispatcher
             include tradingBot.executionEngine.kafkaPublisher
             include tradingBot.executionEngine.tradeExecutor
             include tradingBot.executionEngine.gRPC
             include tradingBot.executionEngine.gRPC_Client
+            include tradingBot.executionPostgres
             include tradingBot.messageBus
             include tradingBot.externalAPIFacade.gRPC
             autolayout lr

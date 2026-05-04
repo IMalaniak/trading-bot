@@ -65,6 +65,13 @@
       "options": {
         "passWithNoTests": true
       }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "{workspaceRoot}",
+        "command": "tsc -b apps/api-gateway/tsconfig.json --pretty false"
+      }
     }
   }
 }

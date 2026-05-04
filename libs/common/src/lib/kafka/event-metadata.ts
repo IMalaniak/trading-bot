@@ -16,6 +16,7 @@ export const KAFKA_EVENT_CONTENT_TYPES = {
 export const KAFKA_EVENT_PRODUCERS = {
   PORTFOLIO_MANAGER: 'portfolio-manager',
   PREDICTION_ENGINE: 'prediction-engine',
+  EXECUTION_ENGINE: 'execution-engine',
 } as const;
 
 export const KAFKA_EVENT_SCHEMA_VERSIONS = {
@@ -24,6 +25,8 @@ export const KAFKA_EVENT_SCHEMA_VERSIONS = {
   TRADING_SIGNALS_PORTFOLIO: '1',
   TRADES_APPROVED: '1',
   TRADES_REJECTED: '1',
+  ORDERS_PLACED: '1',
+  ORDERS_FILLS: '1',
 } as const;
 
 export type KafkaEventProducer =

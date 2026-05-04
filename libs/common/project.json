@@ -34,6 +34,13 @@
       "options": {
         "passWithNoTests": true
       }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "{workspaceRoot}",
+        "command": "tsc -b libs/common/tsconfig.json --pretty false"
+      }
     }
   }
 }
