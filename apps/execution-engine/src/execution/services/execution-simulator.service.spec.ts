@@ -9,6 +9,7 @@ import { ExecutionOrderStatus } from '../../prisma/generated/client';
 import {
   deriveOrderId,
   ExecutionSimulatorService,
+  InvalidTradeDecisionError,
 } from './execution-simulator.service';
 
 describe('ExecutionSimulatorService', () => {
@@ -103,6 +104,6 @@ describe('ExecutionSimulatorService', () => {
           decision: TradeDecisionKind.REJECTED,
         }),
       ),
-    ).toThrow('Execution simulator only accepts approved trades');
+    ).toThrow(InvalidTradeDecisionError);
   });
 });

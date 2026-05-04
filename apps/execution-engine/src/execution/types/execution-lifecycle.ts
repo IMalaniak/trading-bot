@@ -1,6 +1,6 @@
-import { Signal } from '@trading-bot/common/proto';
+import { Signal, SignalSide } from '@trading-bot/common/proto';
 
-import { ExecutionOrderStatus, Prisma } from '../../prisma/generated/client';
+import { ExecutionOrderStatus } from '../../prisma/generated/client';
 import { PrismaDecimal } from '../../prisma/prisma-decimal';
 
 export interface SimulatedOrder {
@@ -11,7 +11,7 @@ export interface SimulatedOrder {
   portfolioId: string;
   instrumentId: string;
   signalId: string;
-  side: number;
+  side: SignalSide;
   requestedNotional: PrismaDecimal;
   requestedQuantity: PrismaDecimal;
   referencePrice: PrismaDecimal;
@@ -40,26 +40,3 @@ export interface SimulatedOrderLifecycle {
   order: SimulatedOrder;
   fills: [SimulatedFill, SimulatedFill];
 }
-
-export const isUniqueConstraintViolation = (
-  error: unknown,
-  target?: string,
-): boolean => {
-  if (!(error instanceof Prisma.PrismaClientKnownRequestError)) {
-    return false;
-  }
-
-  if (error.code !== 'P2002') {
-    return false;
-  }
-
-  if (!target) {
-    return true;
-  }
-
-  const targetFields = Array.isArray(error.meta?.['target'])
-    ? error.meta?.['target'].map(String)
-    : [];
-
-  return targetFields.includes(target);
-};

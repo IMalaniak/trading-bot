@@ -16,7 +16,7 @@ import {
   SimulatedOrderLifecycle,
 } from '../types/execution-lifecycle';
 
-interface LifecycleEvent {
+export interface LifecycleEvent {
   topic: typeof KAFKA_TOPICS.ORDERS_PLACED | typeof KAFKA_TOPICS.ORDERS_FILLS;
   lifecycleSequence: number;
   message: OutboxMessageInput;
@@ -30,6 +30,10 @@ const toOrderStatus = (status: ExecutionOrderStatus): OrderStatus => {
       return OrderStatus.PARTIALLY_FILLED;
     case ExecutionOrderStatus.FILLED:
       return OrderStatus.FILLED;
+    default: {
+      const unreachable: never = status;
+      throw new Error(`Unhandled ExecutionOrderStatus: ${String(unreachable)}`);
+    }
   }
 };
 

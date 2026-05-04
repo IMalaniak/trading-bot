@@ -10,7 +10,10 @@ import { EventDispatcherService } from '../../event-dispatcher/event-dispatcher.
 import { PrismaService } from '../../prisma/prisma.service';
 import { OrderLifecycleEventFactory } from '../events/order-lifecycle-event.factory';
 import { ExecutionOrderService } from './execution-order.service';
-import { ExecutionSimulatorService } from './execution-simulator.service';
+import {
+  ExecutionSimulatorService,
+  InvalidTradeDecisionError,
+} from './execution-simulator.service';
 
 type TransactionMethod = (
   callback: (tx: typeof txMock) => Promise<unknown>,
@@ -129,7 +132,7 @@ describe('ExecutionOrderService', () => {
           decision: TradeDecisionKind.REJECTED,
         }),
       ),
-    ).rejects.toThrow('Execution simulator only accepts approved trades');
+    ).rejects.toThrow(InvalidTradeDecisionError);
 
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });

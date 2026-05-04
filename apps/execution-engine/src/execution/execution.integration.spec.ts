@@ -340,8 +340,15 @@ describe('Execution engine integration', () => {
     await moduleRef.close();
     await createModule();
     await publishApprovedTrade('approval-event-1');
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    await eventDispatcher.dispatchOutboxBatch();
+
+    await waitForCondition(
+      async () => {
+        await eventDispatcher.dispatchOutboxBatch();
+        return (await prisma.executionOrder.count()) === 1;
+      },
+      10000,
+      'Timed out waiting for replay idempotency check.',
+    );
 
     expect(await prisma.executionOrder.count()).toBe(1);
     expect(await prisma.executionFill.count()).toBe(2);

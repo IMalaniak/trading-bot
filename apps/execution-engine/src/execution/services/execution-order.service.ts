@@ -4,11 +4,9 @@ import { TradeDecision } from '@trading-bot/common/proto';
 import { EventDispatcherService } from '../../event-dispatcher/event-dispatcher.service';
 import { Prisma } from '../../prisma/generated/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { isUniqueConstraintViolation } from '../../prisma/prisma.utils';
 import { OrderLifecycleEventFactory } from '../events/order-lifecycle-event.factory';
-import {
-  isUniqueConstraintViolation,
-  SimulatedOrderLifecycle,
-} from '../types/execution-lifecycle';
+import { SimulatedOrderLifecycle } from '../types/execution-lifecycle';
 import { ExecutionSimulatorService } from './execution-simulator.service';
 
 @Injectable()

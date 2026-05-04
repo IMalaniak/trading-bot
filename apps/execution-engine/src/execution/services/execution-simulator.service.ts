@@ -6,6 +6,13 @@ import { ExecutionOrderStatus } from '../../prisma/generated/client';
 import { toPrismaDecimal } from '../../prisma/prisma-decimal';
 import { SimulatedOrderLifecycle } from '../types/execution-lifecycle';
 
+export class InvalidTradeDecisionError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'InvalidTradeDecisionError';
+  }
+}
+
 const ORDER_ID_HASH_LENGTH = 32;
 const PLACED_OFFSET_MS = 1000;
 const PARTIAL_FILL_OFFSET_MS = 2000;
@@ -36,19 +43,27 @@ export class ExecutionSimulatorService {
     decision: TradeDecision,
   ): SimulatedOrderLifecycle {
     if (decision.decision !== TradeDecisionKind.APPROVED) {
-      throw new Error('Execution simulator only accepts approved trades');
+      throw new InvalidTradeDecisionError(
+        'Execution simulator only accepts approved trades',
+      );
     }
 
     if (!decision.signal) {
-      throw new Error('Approved trade is missing signal payload');
+      throw new InvalidTradeDecisionError(
+        'Approved trade is missing signal payload',
+      );
     }
 
     if (!decision.candidateIdempotencyKey) {
-      throw new Error('Approved trade is missing candidate idempotency key');
+      throw new InvalidTradeDecisionError(
+        'Approved trade is missing candidate idempotency key',
+      );
     }
 
     if (!decision.portfolioId) {
-      throw new Error('Approved trade is missing portfolio id');
+      throw new InvalidTradeDecisionError(
+        'Approved trade is missing portfolio id',
+      );
     }
 
     const orderId = deriveOrderId(decision.candidateIdempotencyKey);
