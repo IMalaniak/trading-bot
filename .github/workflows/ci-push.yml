@@ -131,8 +131,6 @@ jobs:
             nx-${{ runner.os }}-
 
       - name: Install dependencies
-        env:
-          DATABASE_URL: "test"
         run: npm ci
 
       - name: "Full Run: Lint"
@@ -185,8 +183,6 @@ jobs:
             nx-${{ runner.os }}-
 
       - name: Install dependencies
-        env:
-          DATABASE_URL: "test"
         run: npm ci
 
       - name: "Full Run: Typecheck"
@@ -237,8 +233,6 @@ jobs:
             nx-${{ runner.os }}-
 
       - name: Install dependencies
-        env:
-          DATABASE_URL: "test"
         run: npm ci
 
       - name: "Full Run: Test"
@@ -291,8 +285,6 @@ jobs:
             nx-${{ runner.os }}-
 
       - name: Install dependencies
-        env:
-          DATABASE_URL: "test"
         run: npm ci
 
       - name: "Full Run: Integration Test"
@@ -349,8 +341,6 @@ jobs:
             nx-${{ runner.os }}-
 
       - name: Install dependencies
-        env:
-          DATABASE_URL: "test"
         run: npm ci
 
       - name: "Full Run: Build"
