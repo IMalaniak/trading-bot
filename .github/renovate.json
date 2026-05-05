@@ -22,27 +22,27 @@
       "automergeType": "branch"
     },
     {
-      "matchPackagePatterns": [
-        "^@nrwl/",
-        "^nx",
-        "^@nrwl",
-        "^@nx/",
-        "^@eslint$",
-        "^eslint",
-        "^eslint-",
-        "^eslint-plugin-",
-        "^eslint-config-",
-        "^typescript-eslint"
-      ],
       "groupName": "nx monorepo packages",
       "automerge": true,
-      "automergeType": "branch"
+      "automergeType": "branch",
+      "matchPackageNames": [
+        "/^@nrwl//",
+        "/^nx/",
+        "/^@nrwl/",
+        "/^@nx//",
+        "/^@eslint$/",
+        "/^eslint/",
+        "/^eslint-/",
+        "/^eslint-plugin-/",
+        "/^eslint-config-/",
+        "/^typescript-eslint/"
+      ]
     },
     {
-      "matchPackagePrefixes": ["@nestjs/"],
       "groupName": "nestjs packages",
       "automerge": true,
-      "automergeType": "branch"
+      "automergeType": "branch",
+      "matchPackageNames": ["@nestjs/{/,}**"]
     },
     {
       "matchManagers": ["github-actions"],
