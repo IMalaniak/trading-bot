@@ -83,3 +83,16 @@ message OrderFill {
   OrderStatus order_status = 14;
   string filled_at = 15;
 }
+
+message PortfolioUpdated {
+  string portfolio_id = 1;
+  string source_fill_id = 2;
+  string order_id = 3;
+  string instrument_id = 4;
+  string aggregate_exposure_notional = 5;
+  int32 open_position_count = 6;
+  string changed_position_quantity = 7;
+  string changed_position_average_entry_price = 8;
+  string changed_position_exposure_notional = 9;
+  string updated_at = 10;
+}

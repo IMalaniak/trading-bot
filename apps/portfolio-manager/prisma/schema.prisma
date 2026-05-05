@@ -23,6 +23,9 @@ model Instrument {
   venue          String
   externalSymbol String?
   portfolioInstrumentConfigs PortfolioInstrumentConfig[]
+  portfolioOrders PortfolioOrder[]
+  portfolioFills PortfolioFill[]
+  portfolioPositions PortfolioPosition[]
 
   @@unique([symbol, venue])
 }
@@ -38,6 +41,10 @@ model Portfolio {
   candidateRecords    PortfolioSignalCandidateRecord[]
   decisions           RiskDecision[]
   reservations        ExposureReservation[]
+  portfolioOrders     PortfolioOrder[]
+  portfolioFills      PortfolioFill[]
+  positions           PortfolioPosition[]
+  summarySnapshots    PortfolioSummarySnapshot[]
 }
 
 model PortfolioInstrumentConfig {
@@ -165,6 +172,101 @@ model ExposureReservation {
 
   @@index([portfolioId, status])
   @@index([portfolioId, instrumentId, status])
+}
+
+enum PortfolioOrderStatus {
+  PLACED
+  PARTIALLY_FILLED
+  FILLED
+}
+
+model PortfolioOrder {
+  id                      String               @id
+  approvalEventId         String               @unique
+  candidateIdempotencyKey String               @unique
+  sourceEventId           String
+  portfolioId             String
+  instrumentId            String
+  signalId                String
+  side                    Int
+  status                  PortfolioOrderStatus
+  finalSequence           Int?
+  firstFilledAt           DateTime
+  lastFilledAt            DateTime
+  createdAt               DateTime             @default(now())
+  updatedAt               DateTime             @updatedAt
+  portfolio               Portfolio            @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  instrument              Instrument           @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
+  fills                   PortfolioFill[]
+
+  @@index([portfolioId, status])
+  @@index([portfolioId, instrumentId])
+}
+
+model PortfolioFill {
+  id                       String               @id
+  kafkaEventId             String               @unique
+  orderId                  String
+  approvalEventId          String
+  sourceEventId            String
+  candidateIdempotencyKey  String
+  portfolioId              String
+  instrumentId             String
+  signalId                 String
+  side                     Int
+  sequence                 Int
+  fillNotional             Decimal              @db.Decimal(36, 18)
+  fillQuantity             Decimal              @db.Decimal(36, 18)
+  fillPrice                Decimal              @db.Decimal(36, 18)
+  cumulativeFilledNotional Decimal              @db.Decimal(36, 18)
+  cumulativeFilledQuantity Decimal              @db.Decimal(36, 18)
+  orderStatus              PortfolioOrderStatus
+  filledAt                 DateTime
+  receivedAt               DateTime
+  createdAt                DateTime             @default(now())
+  updatedAt                DateTime             @updatedAt
+  order                    PortfolioOrder       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  portfolio                Portfolio            @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  instrument               Instrument           @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
+
+  @@unique([orderId, sequence])
+  @@index([portfolioId, instrumentId, filledAt])
+  @@index([candidateIdempotencyKey])
+}
+
+model PortfolioPosition {
+  id                String    @id @default(uuid())
+  portfolioId       String
+  instrumentId      String
+  quantity          Decimal   @db.Decimal(36, 18)
+  averageEntryPrice Decimal   @db.Decimal(36, 18)
+  exposureNotional  Decimal   @db.Decimal(36, 18)
+  lastFillId        String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  portfolio         Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  instrument        Instrument @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
+
+  @@unique([portfolioId, instrumentId])
+  @@index([portfolioId, exposureNotional])
+}
+
+model PortfolioSummarySnapshot {
+  id                                    String    @id @default(uuid())
+  portfolioId                           String
+  sourceFillId                          String    @unique
+  orderId                               String
+  instrumentId                          String
+  aggregateExposureNotional             Decimal   @db.Decimal(36, 18)
+  openPositionCount                     Int
+  changedPositionQuantity               Decimal   @db.Decimal(36, 18)
+  changedPositionAverageEntryPrice      Decimal   @db.Decimal(36, 18)
+  changedPositionExposureNotional       Decimal   @db.Decimal(36, 18)
+  updatedAt                             DateTime
+  createdAt                             DateTime  @default(now())
+  portfolio                             Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+
+  @@index([portfolioId, updatedAt])
 }
 
 enum OutboxEventStatus {

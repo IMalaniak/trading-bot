@@ -14,6 +14,7 @@ export {
   OrderPlaced,
   OrderStatus,
   PortfolioSignalCandidate,
+  PortfolioUpdated,
   protobufPackage as PROTOBUF_EVENTS_PACKAGE,
   TradeDecision,
   TradeDecisionKind,

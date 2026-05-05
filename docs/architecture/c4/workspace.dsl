@@ -72,7 +72,7 @@ workspace "Trading Bot System" {
             }
 
             group "Risk & Portfolio Manager Service" {
-                portfolioManager = container "Risk & Portfolio Manager" "Implements instrument registration and the current two-stage risk pipeline today; it remains the planned home for broader risk, exposure, and reconciliation workflows." "Nest.js" {
+                portfolioManager = container "Risk & Portfolio Manager" "Implements instrument registration, the current two-stage risk pipeline, fill reconciliation, exposure state, and portfolio update publishing today." "Nest.js" {
                     tags "Implemented"
                     gRPC = component "Risk & Portfolio API" "Exposes instrument registration today and remains the planned gRPC surface for broader risk/strategy configuration and portfolio workflows." "gRPC" "API"
 
@@ -100,6 +100,9 @@ workspace "Trading Bot System" {
                     riskStateRepository = component "Risk State Repository" "Persists instruments, outbox rows, signal receipts, candidate audit rows, risk decisions, and exposure reservations into PostgreSQL." "TypeScript" {
                         tags "Implemented"
                     }
+                    portfolioStateRepository = component "Portfolio State Repository" "Persists reconciled orders, fills, signed net positions, and portfolio summary snapshots into PostgreSQL." "TypeScript" {
+                        tags "Implemented"
+                    }
                     outboxDispatcher = component "Outbox Dispatcher" "Uses the shared Kafka outbox dispatcher core with a portfolio-owned Prisma repository adapter." "TypeScript" {
                         tags "Implemented"
                     }
@@ -109,10 +112,16 @@ workspace "Trading Bot System" {
                     portfolioStageConsumer = component "Portfolio Stage Consumer" "Consumes trading.signals.portfolio keyed by portfolio_key." "TypeScript" {
                         tags "Implemented"
                     }
-                    executionUpdatesConsumer = component "Execution Updates Consumer" "Consumes planned orders.placed and orders.fills reconciliation events from Kafka." "TypeScript" {
+                    fillReconciliationConsumer = component "Fill Reconciliation Consumer" "Consumes orders.fills keyed by portfolio_key and reads fill event-id headers." "TypeScript" {
+                        tags "Implemented"
+                    }
+                    fillReconciliationService = component "Fill Reconciliation Service" "Deduplicates fills, upserts portfolio-owned order/fill state, recalculates signed net positions and aggregate exposure, releases completed reservations, and enqueues portfolio.updated." "TypeScript" {
+                        tags "Implemented"
+                    }
+                    executionUpdatesConsumer = component "Orders Placed Consumer" "Planned consumer for orders.placed lifecycle updates; orders.placed is not consumed in Iteration 4." "TypeScript" {
                         tags "Planned"
                     }
-                    kafkaPublisher = component "Kafka Publisher" "Publishes instrument.registered, trading.signals.portfolio, and trades.approved/trades.rejected today; later it will also publish portfolio.updated." "TypeScript" {
+                    kafkaPublisher = component "Kafka Publisher" "Publishes instrument.registered, trading.signals.portfolio, trades.approved/trades.rejected, and portfolio.updated today." "TypeScript" {
                         tags "Implemented"
                     }
 
@@ -128,7 +137,10 @@ workspace "Trading Bot System" {
                     portfolioStageService -> riskConfigRepository "Loads portfolio caps from"
                     portfolioStageService -> riskStateRepository "Writes decisions, reservations, and outbox rows via"
                     portfolioStageService -> kafkaPublisher "Publishes trades.approved and trades.rejected via outbox"
-                    executionUpdatesConsumer -> portfolioManager "Feeds orders.placed/orders.fills updates into"
+                    fillReconciliationConsumer -> fillReconciliationService "Feeds orders.fills into"
+                    fillReconciliationService -> portfolioStateRepository "Writes orders, fills, positions, snapshots, and reservation releases via"
+                    fillReconciliationService -> kafkaPublisher "Publishes portfolio.updated via outbox"
+                    executionUpdatesConsumer -> portfolioManager "Will feed orders.placed updates into"
                     strategyConfigManager -> riskRules "Provides rule updates to"
                     riskRules -> riskStateRepository "Logs risk decisions via"
                     portfolioManager -> riskStateRepository "Persists instrument state and outbox rows via"
@@ -136,7 +148,7 @@ workspace "Trading Bot System" {
                     outboxDispatcher -> kafkaPublisher "Publishes claimed outbox rows via"
                 }
 
-                postgres = container "Portfolio DB" "Stores instruments, outbox rows, portfolios, signal receipts, candidate audit rows, risk decisions, and exposure reservations today; later it can also store positions, users, and trade history." "PostgreSQL" "Datastore" {
+                postgres = container "Portfolio DB" "Stores instruments, outbox rows, portfolios, signal receipts, candidate audit rows, risk decisions, exposure reservations, reconciled orders/fills, signed positions, and summary snapshots today; later it can also store users and trade history." "PostgreSQL" "Datastore" {
                     tags "Implemented"
                 }
 
@@ -289,7 +301,7 @@ workspace "Trading Bot System" {
         tradingBot.portfolioManager.kafkaPublisher -> tradingBot.messageBus "Publishes instrument.registered to"
         tradingBot.portfolioManager.kafkaPublisher -> tradingBot.messageBus "Publishes trading.signals.portfolio to"
         tradingBot.portfolioManager.kafkaPublisher -> tradingBot.messageBus "Publishes trades.approved and trades.rejected to"
-        tradingBot.portfolioManager.kafkaPublisher -> tradingBot.messageBus "Will publish portfolio.updated to"
+        tradingBot.portfolioManager.kafkaPublisher -> tradingBot.messageBus "Publishes portfolio.updated to"
         tradingBot.executionEngine.kafkaPublisher -> tradingBot.messageBus "Publishes orders.placed and orders.fills to"
 
         tradingBot.dataIngestion.kafkaConsumer -> tradingBot.messageBus "Consumes instrument.registered, market.raw.data, and features.indicators from"
@@ -297,13 +309,15 @@ workspace "Trading Bot System" {
         tradingBot.predictionEngine.kafkaConsumer -> tradingBot.messageBus "Consumes features.indicators from"
         tradingBot.portfolioManager.instrumentStageConsumer -> tradingBot.messageBus "Consumes trading.signals from"
         tradingBot.portfolioManager.portfolioStageConsumer -> tradingBot.messageBus "Consumes trading.signals.portfolio from"
-        tradingBot.portfolioManager.executionUpdatesConsumer -> tradingBot.messageBus "Consumes orders.placed and orders.fills from"
+        tradingBot.portfolioManager.fillReconciliationConsumer -> tradingBot.messageBus "Consumes orders.fills from"
+        tradingBot.portfolioManager.executionUpdatesConsumer -> tradingBot.messageBus "Will consume orders.placed from"
         tradingBot.executionEngine.approvedTradesConsumer -> tradingBot.messageBus "Consumes trades.approved from"
 
         tradingBot.predictionEngine.signalCacheManager -> tradingBot.redis "Writes recent signals to"
 
         tradingBot.portfolioManager.riskConfigRepository -> tradingBot.postgres "Reads portfolio subscriptions and caps from"
         tradingBot.portfolioManager.riskStateRepository -> tradingBot.postgres "Writes instruments, audit state, decisions, reservations, and outbox rows to"
+        tradingBot.portfolioManager.portfolioStateRepository -> tradingBot.postgres "Writes reconciled order, fill, position, and summary state to"
 
         tradingBot.executionEngine.executionStateRepository -> tradingBot.executionPostgres "Writes simulated orders, fills, and outbox rows to"
         tradingBot.executionEngine.gRPC_Client -> tradingBot.externalAPIFacade.gRPC "Will place real orders on"
@@ -373,6 +387,8 @@ workspace "Trading Bot System" {
             include tradingBot.portfolioManager.instrumentStageService
             include tradingBot.portfolioManager.portfolioStageConsumer
             include tradingBot.portfolioManager.portfolioStageService
+            include tradingBot.portfolioManager.fillReconciliationConsumer
+            include tradingBot.portfolioManager.fillReconciliationService
             include tradingBot.portfolioManager.executionUpdatesConsumer
             include tradingBot.portfolioManager.riskRules
             include tradingBot.portfolioManager.tradeSizingService
@@ -382,6 +398,7 @@ workspace "Trading Bot System" {
             include tradingBot.portfolioManager.portfolioManager
             include tradingBot.portfolioManager.riskConfigRepository
             include tradingBot.portfolioManager.riskStateRepository
+            include tradingBot.portfolioManager.portfolioStateRepository
             include tradingBot.postgres
             include tradingBot.messageBus
             autolayout lr

@@ -93,6 +93,19 @@ export interface OrderFill {
   filledAt: string;
 }
 
+export interface PortfolioUpdated {
+  portfolioId: string;
+  sourceFillId: string;
+  orderId: string;
+  instrumentId: string;
+  aggregateExposureNotional: string;
+  openPositionCount: number;
+  changedPositionQuantity: string;
+  changedPositionAverageEntryPrice: string;
+  changedPositionExposureNotional: string;
+  updatedAt: string;
+}
+
 function createBaseInstrumentRegistered(): InstrumentRegistered {
   return { instrument: undefined, registeredAt: "" };
 }
@@ -836,6 +849,171 @@ export const OrderFill: MessageFns<OrderFill> = {
     message.cumulativeFilledQuantity = object.cumulativeFilledQuantity ?? "";
     message.orderStatus = object.orderStatus ?? 0;
     message.filledAt = object.filledAt ?? "";
+    return message;
+  },
+};
+
+function createBasePortfolioUpdated(): PortfolioUpdated {
+  return {
+    portfolioId: "",
+    sourceFillId: "",
+    orderId: "",
+    instrumentId: "",
+    aggregateExposureNotional: "",
+    openPositionCount: 0,
+    changedPositionQuantity: "",
+    changedPositionAverageEntryPrice: "",
+    changedPositionExposureNotional: "",
+    updatedAt: "",
+  };
+}
+
+export const PortfolioUpdated: MessageFns<PortfolioUpdated> = {
+  encode(message: PortfolioUpdated, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.portfolioId !== "") {
+      writer.uint32(10).string(message.portfolioId);
+    }
+    if (message.sourceFillId !== "") {
+      writer.uint32(18).string(message.sourceFillId);
+    }
+    if (message.orderId !== "") {
+      writer.uint32(26).string(message.orderId);
+    }
+    if (message.instrumentId !== "") {
+      writer.uint32(34).string(message.instrumentId);
+    }
+    if (message.aggregateExposureNotional !== "") {
+      writer.uint32(42).string(message.aggregateExposureNotional);
+    }
+    if (message.openPositionCount !== 0) {
+      writer.uint32(48).int32(message.openPositionCount);
+    }
+    if (message.changedPositionQuantity !== "") {
+      writer.uint32(58).string(message.changedPositionQuantity);
+    }
+    if (message.changedPositionAverageEntryPrice !== "") {
+      writer.uint32(66).string(message.changedPositionAverageEntryPrice);
+    }
+    if (message.changedPositionExposureNotional !== "") {
+      writer.uint32(74).string(message.changedPositionExposureNotional);
+    }
+    if (message.updatedAt !== "") {
+      writer.uint32(82).string(message.updatedAt);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): PortfolioUpdated {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBasePortfolioUpdated();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.portfolioId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.sourceFillId = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.orderId = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.instrumentId = reader.string();
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.aggregateExposureNotional = reader.string();
+          continue;
+        }
+        case 6: {
+          if (tag !== 48) {
+            break;
+          }
+
+          message.openPositionCount = reader.int32();
+          continue;
+        }
+        case 7: {
+          if (tag !== 58) {
+            break;
+          }
+
+          message.changedPositionQuantity = reader.string();
+          continue;
+        }
+        case 8: {
+          if (tag !== 66) {
+            break;
+          }
+
+          message.changedPositionAverageEntryPrice = reader.string();
+          continue;
+        }
+        case 9: {
+          if (tag !== 74) {
+            break;
+          }
+
+          message.changedPositionExposureNotional = reader.string();
+          continue;
+        }
+        case 10: {
+          if (tag !== 82) {
+            break;
+          }
+
+          message.updatedAt = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  create<I extends Exact<DeepPartial<PortfolioUpdated>, I>>(base?: I): PortfolioUpdated {
+    return PortfolioUpdated.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<PortfolioUpdated>, I>>(object: I): PortfolioUpdated {
+    const message = createBasePortfolioUpdated();
+    message.portfolioId = object.portfolioId ?? "";
+    message.sourceFillId = object.sourceFillId ?? "";
+    message.orderId = object.orderId ?? "";
+    message.instrumentId = object.instrumentId ?? "";
+    message.aggregateExposureNotional = object.aggregateExposureNotional ?? "";
+    message.openPositionCount = object.openPositionCount ?? 0;
+    message.changedPositionQuantity = object.changedPositionQuantity ?? "";
+    message.changedPositionAverageEntryPrice = object.changedPositionAverageEntryPrice ?? "";
+    message.changedPositionExposureNotional = object.changedPositionExposureNotional ?? "";
+    message.updatedAt = object.updatedAt ?? "";
     return message;
   },
 };

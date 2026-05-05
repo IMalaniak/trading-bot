@@ -9,6 +9,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { TradeDecisionEventFactory } from '../events/trade-decision-event.factory';
 import { CandidateRepository } from '../repositories/candidate.repository';
 import { DecisionRepository } from '../repositories/decision.repository';
+import { PositionExposureRepository } from '../repositories/position-exposure.repository';
 import { ReservationRepository } from '../repositories/reservation.repository';
 import { RiskConfigRepository } from '../repositories/risk-config.repository';
 import { RiskRuleEngine } from './risk-rule-engine.service';
@@ -43,6 +44,7 @@ export class PortfolioStageService {
     private readonly prisma: PrismaService,
     private readonly candidateRepository: CandidateRepository,
     private readonly decisionRepository: DecisionRepository,
+    private readonly positionExposureRepository: PositionExposureRepository,
     private readonly reservationRepository: ReservationRepository,
     private readonly riskConfigRepository: RiskConfigRepository,
     private readonly tradeSizingService: TradeSizingService,
@@ -95,12 +97,25 @@ export class PortfolioStageService {
             candidate.portfolioId,
             tx,
           );
+        const filledInstrumentExposure =
+          await this.positionExposureRepository.sumInstrumentPositionExposure(
+            candidate.portfolioId,
+            candidate.instrumentId,
+            tx,
+          );
+        const filledPortfolioExposure =
+          await this.positionExposureRepository.sumPortfolioPositionExposure(
+            candidate.portfolioId,
+            tx,
+          );
         const evaluation = config
           ? this.riskRuleEngine.evaluate({
               config,
               trade: sizedTrade,
-              activeInstrumentReservedNotional,
-              activePortfolioReservedNotional,
+              activeInstrumentReservedNotional:
+                activeInstrumentReservedNotional.plus(filledInstrumentExposure),
+              activePortfolioReservedNotional:
+                activePortfolioReservedNotional.plus(filledPortfolioExposure),
             })
           : {
               ...sizedTrade,

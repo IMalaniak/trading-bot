@@ -15,6 +15,7 @@ import { toPrismaDecimal } from '../../prisma/prisma-decimal';
 import { TradeDecisionEventFactory } from '../events/trade-decision-event.factory';
 import { CandidateRepository } from '../repositories/candidate.repository';
 import { DecisionRepository } from '../repositories/decision.repository';
+import { PositionExposureRepository } from '../repositories/position-exposure.repository';
 import { ReservationRepository } from '../repositories/reservation.repository';
 import { RiskConfigRepository } from '../repositories/risk-config.repository';
 import { PortfolioStageService } from './portfolio-stage.service';
@@ -46,6 +47,14 @@ type MockReservationRepository = {
   >;
   create: jest.MockedFunction<ReservationRepository['create']>;
 };
+type MockPositionExposureRepository = {
+  sumPortfolioPositionExposure: jest.MockedFunction<
+    PositionExposureRepository['sumPortfolioPositionExposure']
+  >;
+  sumInstrumentPositionExposure: jest.MockedFunction<
+    PositionExposureRepository['sumInstrumentPositionExposure']
+  >;
+};
 type MockRiskConfigRepository = {
   instrumentExists: jest.MockedFunction<
     RiskConfigRepository['instrumentExists']
@@ -76,6 +85,7 @@ describe('PortfolioStageService', () => {
   >;
   let candidateRepository: MockCandidateRepository;
   let decisionRepository: MockDecisionRepository;
+  let positionExposureRepository: MockPositionExposureRepository;
   let reservationRepository: MockReservationRepository;
   let riskConfigRepository: MockRiskConfigRepository;
   let tradeSizingService: MockTradeSizingService;
@@ -133,6 +143,10 @@ describe('PortfolioStageService', () => {
       findByCandidateIdempotencyKey: jest.fn(),
       create: jest.fn(),
     };
+    positionExposureRepository = {
+      sumPortfolioPositionExposure: jest.fn(),
+      sumInstrumentPositionExposure: jest.fn(),
+    };
     reservationRepository = {
       sumActivePortfolioReservedNotional: jest.fn(),
       sumActiveInstrumentReservedNotional: jest.fn(),
@@ -155,11 +169,18 @@ describe('PortfolioStageService', () => {
     eventDispatcher = {
       enqueueEvent: jest.fn(),
     };
+    positionExposureRepository.sumInstrumentPositionExposure.mockResolvedValue(
+      toPrismaDecimal('0'),
+    );
+    positionExposureRepository.sumPortfolioPositionExposure.mockResolvedValue(
+      toPrismaDecimal('0'),
+    );
 
     service = new PortfolioStageService(
       prisma as unknown as PrismaService,
       candidateRepository as unknown as CandidateRepository,
       decisionRepository as unknown as DecisionRepository,
+      positionExposureRepository as unknown as PositionExposureRepository,
       reservationRepository as unknown as ReservationRepository,
       riskConfigRepository as unknown as RiskConfigRepository,
       tradeSizingService,
@@ -200,10 +221,16 @@ describe('PortfolioStageService', () => {
       referencePrice: toPrismaDecimal('100'),
     });
     reservationRepository.sumActiveInstrumentReservedNotional.mockResolvedValue(
-      toPrismaDecimal('0'),
+      toPrismaDecimal('10'),
     );
     reservationRepository.sumActivePortfolioReservedNotional.mockResolvedValue(
-      toPrismaDecimal('0'),
+      toPrismaDecimal('20'),
+    );
+    positionExposureRepository.sumInstrumentPositionExposure.mockResolvedValue(
+      toPrismaDecimal('30'),
+    );
+    positionExposureRepository.sumPortfolioPositionExposure.mockResolvedValue(
+      toPrismaDecimal('40'),
     );
     riskRuleEngine.evaluate.mockReturnValue({
       decision: RiskDecisionStatus.APPROVED,
@@ -237,6 +264,13 @@ describe('PortfolioStageService', () => {
 
     await service.handleCandidate(candidateMessage);
 
+    const [evaluationInput] = riskRuleEngine.evaluate.mock.calls[0] ?? [];
+    expect(evaluationInput?.activeInstrumentReservedNotional.toString()).toBe(
+      '40',
+    );
+    expect(evaluationInput?.activePortfolioReservedNotional.toString()).toBe(
+      '60',
+    );
     const [reservationInput] = reservationRepository.create.mock.calls[0] ?? [];
     expect(reservationInput?.portfolioId).toBe('portfolio-1');
     expect(reservationInput?.instrumentId).toBe('instrument-1');

@@ -7,6 +7,7 @@ import { TradeDecisionEventFactory } from './events/trade-decision-event.factory
 import { PortfolioTopicConsumer } from './portfolio-topic.consumer';
 import { CandidateRepository } from './repositories/candidate.repository';
 import { DecisionRepository } from './repositories/decision.repository';
+import { PositionExposureRepository } from './repositories/position-exposure.repository';
 import { ReservationRepository } from './repositories/reservation.repository';
 import { RiskConfigRepository } from './repositories/risk-config.repository';
 import { SignalReceiptRepository } from './repositories/signal-receipt.repository';
@@ -21,6 +22,7 @@ import { SignalTopicConsumer } from './signal-topic.consumer';
   providers: [
     CandidateRepository,
     DecisionRepository,
+    PositionExposureRepository,
     ReservationRepository,
     RiskConfigRepository,
     SignalReceiptRepository,
