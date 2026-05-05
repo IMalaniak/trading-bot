@@ -416,6 +416,45 @@ describe('Fill reconciliation integration', () => {
 
   it('uses filled position exposure when evaluating later risk candidates', async () => {
     await createPortfolioAndInstrument();
+    await prisma.portfolioOrder.create({
+      data: {
+        id: 'settled-order-1',
+        approvalEventId: 'settled-approval-1',
+        candidateIdempotencyKey: 'settled-source:portfolio-alpha',
+        sourceEventId: 'settled-source',
+        portfolioId: 'portfolio-alpha',
+        instrumentId: 'instrument-1',
+        signalId: 'settled-signal',
+        side: SignalSide.BUY,
+        status: 'FILLED',
+        finalSequence: 1,
+        firstFilledAt: new Date('2026-03-25T12:00:03.000Z'),
+        lastFilledAt: new Date('2026-03-25T12:00:03.000Z'),
+      },
+    });
+    await prisma.portfolioFill.create({
+      data: {
+        id: 'settled-order-1:fill:1',
+        kafkaEventId: 'settled-order-1:fill:1',
+        orderId: 'settled-order-1',
+        approvalEventId: 'settled-approval-1',
+        sourceEventId: 'settled-source',
+        candidateIdempotencyKey: 'settled-source:portfolio-alpha',
+        portfolioId: 'portfolio-alpha',
+        instrumentId: 'instrument-1',
+        signalId: 'settled-signal',
+        side: SignalSide.BUY,
+        sequence: 1,
+        fillNotional: 100,
+        fillQuantity: 1,
+        fillPrice: 100,
+        cumulativeFilledNotional: 100,
+        cumulativeFilledQuantity: 1,
+        orderStatus: 'FILLED',
+        filledAt: new Date('2026-03-25T12:00:03.000Z'),
+        receivedAt: new Date('2026-03-25T12:00:04.000Z'),
+      },
+    });
     await prisma.portfolioPosition.create({
       data: {
         portfolioId: 'portfolio-alpha',
@@ -486,5 +525,158 @@ describe('Fill reconciliation integration', () => {
     expect(decision.reasonCodes).toEqual([
       RiskDecisionReasonCode.INSTRUMENT_EXPOSURE_CAP_EXCEEDED,
     ]);
+  });
+
+  it('does not double-count fills that are still covered by active reservations', async () => {
+    await createPortfolioAndInstrument();
+    await prisma.portfolioInstrumentConfig.create({
+      data: {
+        portfolioId: 'portfolio-alpha',
+        instrumentId: 'instrument-1',
+        enabled: true,
+        targetNotional: 40,
+        maxTradeNotional: 100,
+        maxPositionNotional: 150,
+      },
+    });
+    const activeReceipt = await prisma.signalReceipt.create({
+      data: {
+        sourceEventId: 'active-source',
+        signalId: 'active-signal',
+        instrumentId: 'instrument-1',
+        kafkaKey: 'BINANCE:instrument-1',
+        receivedAt: new Date('2026-03-25T12:00:01.000Z'),
+        status: SignalReceiptStatus.FANNED_OUT,
+        eligiblePortfolioCount: 1,
+      },
+    });
+    const activeCandidate = await prisma.portfolioSignalCandidateRecord.create({
+      data: {
+        candidateIdempotencyKey: 'active-source:portfolio-alpha',
+        signalReceiptId: activeReceipt.id,
+        sourceEventId: 'active-source',
+        portfolioId: 'portfolio-alpha',
+        instrumentId: 'instrument-1',
+        signalId: 'active-signal',
+        side: SignalSide.BUY,
+        referencePrice: 100,
+        targetNotionalSnapshot: 100,
+        signalTimestamp: new Date('2026-03-25T12:00:00.000Z'),
+        receivedAt: new Date('2026-03-25T12:00:01.000Z'),
+      },
+    });
+    const activeDecision = await prisma.riskDecision.create({
+      data: {
+        candidateRecordId: activeCandidate.id,
+        candidateIdempotencyKey: activeCandidate.candidateIdempotencyKey,
+        sourceEventId: activeCandidate.sourceEventId,
+        portfolioId: activeCandidate.portfolioId,
+        instrumentId: activeCandidate.instrumentId,
+        decision: RiskDecisionStatus.APPROVED,
+        reasonCodes: [],
+        requestedNotional: 100,
+        requestedQuantity: 1,
+        referencePrice: 100,
+        emittedTopic: KAFKA_TOPICS.TRADES_APPROVED,
+        decidedAt: new Date('2026-03-25T12:00:02.000Z'),
+      },
+    });
+    await prisma.exposureReservation.create({
+      data: {
+        riskDecisionId: activeDecision.id,
+        candidateIdempotencyKey: activeDecision.candidateIdempotencyKey,
+        portfolioId: activeDecision.portfolioId,
+        instrumentId: activeDecision.instrumentId,
+        reservedNotional: 100,
+        reservedQuantity: 1,
+        status: ExposureReservationStatus.ACTIVE,
+      },
+    });
+    await prisma.portfolioOrder.create({
+      data: {
+        id: 'active-order-1',
+        approvalEventId: 'active-approval-1',
+        candidateIdempotencyKey: activeDecision.candidateIdempotencyKey,
+        sourceEventId: activeDecision.sourceEventId,
+        portfolioId: activeDecision.portfolioId,
+        instrumentId: activeDecision.instrumentId,
+        signalId: 'active-signal',
+        side: SignalSide.BUY,
+        status: 'PARTIALLY_FILLED',
+        firstFilledAt: new Date('2026-03-25T12:00:03.000Z'),
+        lastFilledAt: new Date('2026-03-25T12:00:03.000Z'),
+      },
+    });
+    await prisma.portfolioFill.create({
+      data: {
+        id: 'active-order-1:fill:1',
+        kafkaEventId: 'active-order-1:fill:1',
+        orderId: 'active-order-1',
+        approvalEventId: 'active-approval-1',
+        sourceEventId: activeDecision.sourceEventId,
+        candidateIdempotencyKey: activeDecision.candidateIdempotencyKey,
+        portfolioId: activeDecision.portfolioId,
+        instrumentId: activeDecision.instrumentId,
+        signalId: 'active-signal',
+        side: SignalSide.BUY,
+        sequence: 1,
+        fillNotional: 50,
+        fillQuantity: 0.5,
+        fillPrice: 100,
+        cumulativeFilledNotional: 50,
+        cumulativeFilledQuantity: 0.5,
+        orderStatus: 'PARTIALLY_FILLED',
+        filledAt: new Date('2026-03-25T12:00:03.000Z'),
+        receivedAt: new Date('2026-03-25T12:00:04.000Z'),
+      },
+    });
+    const nextReceipt = await prisma.signalReceipt.create({
+      data: {
+        sourceEventId: 'source-3',
+        signalId: 'signal-3',
+        instrumentId: 'instrument-1',
+        kafkaKey: 'BINANCE:instrument-1',
+        receivedAt: new Date('2026-03-25T12:01:01.000Z'),
+        status: SignalReceiptStatus.FANNED_OUT,
+        eligiblePortfolioCount: 1,
+      },
+    });
+    await prisma.portfolioSignalCandidateRecord.create({
+      data: {
+        candidateIdempotencyKey: 'source-3:portfolio-alpha',
+        signalReceiptId: nextReceipt.id,
+        sourceEventId: 'source-3',
+        portfolioId: 'portfolio-alpha',
+        instrumentId: 'instrument-1',
+        signalId: 'signal-3',
+        side: SignalSide.BUY,
+        referencePrice: 100,
+        targetNotionalSnapshot: 40,
+        signalTimestamp: new Date('2026-03-25T12:01:00.000Z'),
+        receivedAt: new Date('2026-03-25T12:01:01.000Z'),
+      },
+    });
+
+    await portfolioStageService.handleCandidate(
+      PortfolioSignalCandidate.fromPartial({
+        signal: {
+          id: 'signal-3',
+          instrumentId: 'instrument-1',
+          side: SignalSide.BUY,
+          price: 100,
+          timestamp: new Date('2026-03-25T12:01:00.000Z').getTime(),
+        },
+        sourceEventId: 'source-3',
+        portfolioId: 'portfolio-alpha',
+        candidateIdempotencyKey: 'source-3:portfolio-alpha',
+        signalReceivedAt: '2026-03-25T12:01:01.000Z',
+      }),
+    );
+
+    const decision = await prisma.riskDecision.findFirstOrThrow({
+      where: { candidateIdempotencyKey: 'source-3:portfolio-alpha' },
+    });
+
+    expect(decision.decision).toBe(RiskDecisionStatus.APPROVED);
   });
 });

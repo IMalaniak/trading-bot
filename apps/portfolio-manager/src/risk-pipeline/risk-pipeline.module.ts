@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 
 import { EventDispatcherModule } from '../event-dispatcher/event-dispatcher.module';
+import { PositionAccountingService } from '../fill-reconciliation/services/position-accounting.service';
 import { PrismaModule } from '../prisma/prisma.module';
 import { PortfolioSignalCandidateEventFactory } from './events/portfolio-signal-candidate-event.factory';
 import { TradeDecisionEventFactory } from './events/trade-decision-event.factory';
@@ -22,6 +23,7 @@ import { SignalTopicConsumer } from './signal-topic.consumer';
   providers: [
     CandidateRepository,
     DecisionRepository,
+    PositionAccountingService,
     PositionExposureRepository,
     ReservationRepository,
     RiskConfigRepository,
