@@ -10,9 +10,7 @@ export default [
         ...globals.jest,
       },
       parserOptions: {
-        projectService: {
-          allowDefaultProject: ['webpack.config.js'],
-        },
+        projectService: true,
       },
     },
   },

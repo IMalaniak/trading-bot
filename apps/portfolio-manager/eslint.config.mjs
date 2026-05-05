@@ -11,7 +11,7 @@ export default [
       },
       parserOptions: {
         projectService: {
-          allowDefaultProject: ['webpack.config.js', 'apps/portfolio-manager/prisma/seed.ts'],
+          allowDefaultProject: ['apps/portfolio-manager/webpack.config.js', 'apps/portfolio-manager/prisma/seed.ts'],
         },
       },
     },
