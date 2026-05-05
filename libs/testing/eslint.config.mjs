@@ -10,9 +10,7 @@ export default [
         ...globals.jest,
       },
       parserOptions: {
-        projectService: {
-          allowDefaultProject: ['jest.config.ts'],
-        },
+        projectService: true,
       },
     },
   },

@@ -11,7 +11,7 @@ export default [
       },
       parserOptions: {
         projectService: {
-          allowDefaultProject: ['webpack.config.js'],
+          allowDefaultProject: ['apps/execution-engine/webpack.config.js'],
         },
       },
     },

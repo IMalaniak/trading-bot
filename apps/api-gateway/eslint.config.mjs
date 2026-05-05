@@ -11,7 +11,7 @@ export default [
       },
       parserOptions: {
         projectService: {
-          allowDefaultProject: ['webpack.config.js'],
+          allowDefaultProject: ['apps/api-gateway/webpack.config.js'],
         },
       },
     },
