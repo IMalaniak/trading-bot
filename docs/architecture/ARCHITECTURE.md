@@ -19,6 +19,7 @@
     - [Current: Instrument Registration](#current-instrument-registration)
     - [Current: Risk Pipeline](#current-risk-pipeline)
     - [Current: Execution Simulator](#current-execution-simulator)
+    - [Current: Fill Reconciliation](#current-fill-reconciliation)
     - [Planned: End-to-End Trading Flow](#planned-end-to-end-trading-flow)
 
 ## Architecture Summary
@@ -48,11 +49,11 @@ Everything else in this document should be read as either:
 | Area                             | Status               | Notes                                                                                                  |
 | -------------------------------- | -------------------- | ------------------------------------------------------------------------------------------------------ |
 | API Gateway                      | Implemented          | REST entrypoint forwards registration to `portfolio-manager` over gRPC.                                |
-| Risk & Portfolio Manager         | Implemented          | Instrument registration plus the Iteration 2 risk pipeline are implemented in `portfolio-manager`.     |
+| Risk & Portfolio Manager         | Implemented          | Instrument registration, the two-stage risk pipeline, and fill reconciliation are implemented in `portfolio-manager`. |
 | Outbox Dispatcher                | Implemented          | Kafka publish happens from the outbox, not inline with the DB write; shared dispatch mechanics live in `common`. |
 | Shared Contracts (`common`)      | Implemented          | Proto types, topic constants, key builders, Kafka header helpers, and reusable outbox dispatch ports live here. |
 | Message Bus (Redpanda/Kafka API) | Implemented          | Local development uses Redpanda.                                                                       |
-| Portfolio DB (Postgres)          | Implemented          | Source of truth for instruments, outbox rows, portfolios, risk decisions, and exposure reservations.   |
+| Portfolio DB (Postgres)          | Implemented          | Source of truth for instruments, outbox rows, portfolios, risk decisions, exposure reservations, reconciled orders/fills, positions, and portfolio summary snapshots. |
 | Market Data Store (TimescaleDB)  | Implemented in infra | Provisioned locally, but not yet exercised by application code in this repo.                           |
 | Data Ingestion Service           | Planned              | Not implemented in this repo yet.                                                                      |
 | Feature Engineering Service      | Planned              | Not implemented in this repo yet.                                                                      |
@@ -75,8 +76,8 @@ The intended MVP direction remains:
 - `portfolio.updated` is emitted by the risk and portfolio manager after reconciliation.
 
 That target architecture is still valid. Today the repo implements registration,
-the current two-stage risk pipeline, and a durable execution simulator. Prediction,
-real exchange execution, and fill reconciliation remain planned.
+the current two-stage risk pipeline, a durable execution simulator, and fill
+reconciliation. Prediction and real exchange execution remain planned.
 
 ## Eventing, Ordering, and Consistency
 
@@ -105,6 +106,7 @@ Current payload boundaries:
 - `trades.approved` and `trades.rejected` both use `TradeDecision`.
 - `orders.placed` uses `OrderPlaced`.
 - `orders.fills` uses `OrderFill`.
+- `portfolio.updated` uses `PortfolioUpdated`.
 
 The risk pipeline intentionally does not reuse `common.Signal` for downstream portfolio-scoped or decision-scoped topics. Those topics carry lifecycle-specific fields such as `source_event_id`, `portfolio_id`, decision kind, and reason codes.
 
@@ -133,6 +135,13 @@ Execution simulator payload notes:
 - Execution timestamps are logical offsets from `TradeDecision.decided_at`: placed at +1s, partial fill at +2s, final fill at +3s.
 - Execution quantities, notionals, and prices are stored and transported as decimal strings.
 
+Fill reconciliation payload notes:
+
+- `portfolio-manager` consumes `orders.fills`; it does not consume `orders.placed` in the current implementation.
+- `PortfolioUpdated` is emitted once for every accepted unique fill and carries a changed snapshot: portfolio ID, source fill ID, order ID, instrument ID, aggregate exposure notional, open position count, changed position quantity, changed position average entry price, changed position exposure notional, and update timestamp.
+- Reconciled position quantities, average prices, exposures, fill quantities, and fill notionals are stored as Postgres `NUMERIC` values and transported as decimal strings.
+- Signed net accounting is used: BUY fills increase quantity and SELL fills decrease quantity. Short positions are allowed in the MVP.
+
 ### Ordering and idempotency rules
 
 - `instrument_key = <VENUE>:<instrument_id>`
@@ -149,6 +158,11 @@ Execution simulator payload notes:
 - `execution-engine` consumes `trades.approved` in portfolio order using the `portfolio_key`.
 - `ExecutionOrder.approvalEventId` and `ExecutionOrder.candidateIdempotencyKey` are unique, so replaying the same approved trade does not create another order stream.
 - `orders.placed` and `orders.fills` use `portfolio_key` and are enqueued with lifecycle sequence `1`, `2`, `3` so placed is dispatched before fills for a given simulated order.
+- `portfolio-manager` consumes `orders.fills` in portfolio order using `portfolio_key`.
+- `PortfolioFill.id` and `(orderId, sequence)` are unique, so replaying the same fill does not mutate portfolio state or emit another `portfolio.updated`.
+- Position state is reproducible from persisted fills ordered by `filledAt`, fill sequence, and fill ID.
+- Risk cap checks use filled position exposure plus active exposure reservations.
+- A matching exposure reservation is released only after the order has a final fill and all fill sequences from `1..finalSequence` are present.
 
 ### Versioning rules
 
@@ -170,6 +184,7 @@ This is the main currently implemented reliability mechanism and remains true fo
 - `trading.signals.portfolio`
 - `trades.approved`
 - `trades.rejected`
+- `portfolio.updated`
 
 `execution-engine` uses the same reliability shape for:
 
@@ -195,8 +210,8 @@ Local development bootstraps all documented topics explicitly and disables broke
 | `trades.approved`           | Implemented           | Implemented Risk & Portfolio Manager                     | Implemented Execution Engine                            | `portfolio_key`  | Per portfolio      |
 | `trades.rejected`           | Implemented           | Implemented Risk & Portfolio Manager                     | Planned downstream adapters                             | `portfolio_key`  | Per portfolio      |
 | `orders.placed`             | Implemented           | Implemented Execution Engine simulator                   | Planned Risk & Portfolio Manager                        | `portfolio_key`  | Per portfolio      |
-| `orders.fills`              | Implemented           | Implemented Execution Engine simulator                   | Planned Risk & Portfolio Manager                        | `portfolio_key`  | Per portfolio      |
-| `portfolio.updated`         | Planned               | Planned Risk & Portfolio Manager                         | Planned downstream adapters and analytics               | `portfolio_key`  | Per portfolio      |
+| `orders.fills`              | Implemented           | Implemented Execution Engine simulator                   | Implemented Risk & Portfolio Manager                    | `portfolio_key`  | Per portfolio      |
+| `portfolio.updated`         | Implemented           | Implemented Risk & Portfolio Manager                     | Planned downstream adapters and analytics               | `portfolio_key`  | Per portfolio      |
 
 Local bootstrap defaults:
 
@@ -281,6 +296,14 @@ Manual execution-simulator smoke:
 4. Verify the Kafka key is `<portfolio_id>`, the placed event appears before fill events, and event IDs follow `<order_id>:placed`, `<order_id>:fill:1`, `<order_id>:fill:2`.
 5. Verify `ExecutionOrder`, `ExecutionFill`, and execution `OutboxEvent` rows in the `execution_engine` Postgres schema.
 
+Manual fill-reconciliation smoke:
+
+1. Start infra and `portfolio-manager`.
+2. Publish an `OrderFill` protobuf message to `orders.fills` with Kafka header `event-id` equal to the fill ID and key `<portfolio_id>`.
+3. Consume from `portfolio.updated`.
+4. Verify `PortfolioOrder`, `PortfolioFill`, `PortfolioPosition`, and `PortfolioSummarySnapshot` rows in the portfolio Postgres database.
+5. Replay the same fill and verify no additional snapshot or `portfolio.updated` event is created.
+
 ## C4 Model Diagrams
 
 The C4 model diagrams live in `docs/architecture/c4`.
@@ -361,7 +384,8 @@ Current rule evaluation order in the portfolio stage:
 Current reservation semantics:
 
 - Approved decisions create sticky exposure reservations.
-- Reservations are the source of truth for cap checks until execution/fill reconciliation exists.
+- Reservations plus filled position exposure are the source of truth for cap checks.
+- Reservations are released after a matching order reaches complete contiguous fill state.
 - No global rejection event is emitted when no eligible portfolios exist; that case is audit-only.
 - Instrument stage fans out all active portfolio-instrument configs, including disabled ones, so portfolio stage can emit explicit `SUBSCRIPTION_DISABLED` rejections.
 - If a config is deleted or the portfolio becomes inactive after fan-out, portfolio stage rejects the candidate deterministically as `SUBSCRIPTION_DISABLED` using the snapshotted target notional.
@@ -396,6 +420,40 @@ Current simulator semantics:
 - Duplicate `approval_event_id` or `candidate_idempotency_key` messages are absorbed without creating another order lifecycle.
 - The simulator persists the final order status as `FILLED` because both fills are generated in the same deterministic lifecycle.
 - Real exchange placement, timers, cancellations, and order amendments are planned future work.
+
+### Current: Fill Reconciliation
+
+This is implemented in `portfolio-manager` today. The service consumes fills only;
+`orders.placed` remains a planned input.
+
+```mermaid
+sequenceDiagram
+    participant ExecutionEngine as Execution Engine
+    participant Kafka as Message Bus
+    participant FillConsumer as Order Fills Consumer
+    participant Reconciler as Fill Reconciliation Service
+    participant DB as Portfolio DB
+    participant Outbox as Outbox Dispatcher
+
+    ExecutionEngine->>Kafka: Publish OrderFill to orders.fills\nHeaders include event-id
+    Kafka-->>FillConsumer: Consume orders.fills in portfolio order
+    FillConsumer->>Reconciler: Decode fill and metadata
+    Reconciler->>DB: Upsert order, insert unique fill, recalculate position
+    Reconciler->>DB: Update aggregate exposure snapshot
+    alt Complete final fill sequence exists
+        Reconciler->>DB: Release matching exposure reservation
+    end
+    Reconciler->>DB: Insert outbox row for portfolio.updated
+    Outbox->>Kafka: Publish PortfolioUpdated
+```
+
+Current reconciliation semantics:
+
+- Duplicate identical fills are absorbed without writing another snapshot or event.
+- Divergent duplicates fail instead of overwriting portfolio state.
+- Position quantities are signed net quantities; average entry price follows weighted average for same-direction fills, stays unchanged when reducing, uses the crossing fill price when reversing, and resets to zero when flat.
+- `portfolio.updated` carries only the changed snapshot for the triggering fill, not the full portfolio.
+- Bounded replay/backfill is documented as an operator workflow for a later iteration; there is no dedicated replay command yet.
 
 ### Planned: End-to-End Trading Flow
 

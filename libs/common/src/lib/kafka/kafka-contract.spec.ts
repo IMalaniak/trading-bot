@@ -2,6 +2,7 @@ import {
   OrderFill,
   OrderPlaced,
   OrderStatus,
+  PortfolioUpdated,
   Signal,
   SignalSide,
   TradeDecision,
@@ -145,5 +146,33 @@ describe('Kafka contract', () => {
     expect(decodedPlaced.status).toBe(OrderStatus.PLACED);
     expect(decodedFill.fillQuantity).toBe('0.166666666666666667');
     expect(decodedFill.orderStatus).toBe(OrderStatus.PARTIALLY_FILLED);
+  });
+
+  it('round-trips portfolio update decimal fields as strings', () => {
+    const update = PortfolioUpdated.fromPartial({
+      portfolioId: 'portfolio-1',
+      sourceFillId: 'ord_abc:fill:1',
+      orderId: 'ord_abc',
+      instrumentId: 'instrument-1',
+      aggregateExposureNotional: '150.000000000000000001',
+      openPositionCount: 1,
+      changedPositionQuantity: '0.500000000000000001',
+      changedPositionAverageEntryPrice: '300.000000000000000003',
+      changedPositionExposureNotional: '150.000000000000000004',
+      updatedAt: '2026-03-22T12:34:58.789Z',
+    });
+
+    const decoded = PortfolioUpdated.decode(
+      PortfolioUpdated.encode(update).finish(),
+    );
+
+    expect(decoded.aggregateExposureNotional).toBe('150.000000000000000001');
+    expect(decoded.changedPositionQuantity).toBe('0.500000000000000001');
+    expect(decoded.changedPositionAverageEntryPrice).toBe(
+      '300.000000000000000003',
+    );
+    expect(decoded.changedPositionExposureNotional).toBe(
+      '150.000000000000000004',
+    );
   });
 });

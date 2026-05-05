@@ -5,5 +5,6 @@ export const portfolioManagerRuntimeConfig = registerAs(
   () => ({
     enableOutboxInterval: true,
     enableRiskPipelineConsumers: true,
+    enableFillReconciliationConsumer: true,
   }),
 );

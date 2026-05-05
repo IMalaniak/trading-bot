@@ -12,7 +12,11 @@ import {
   InstrumentRegistered,
   RegisterInstrumentRequest,
 } from '@trading-bot/common/proto';
-import { randomUUID } from 'crypto';
+import {
+  startKafkaMessageCollector,
+  truncateTopic,
+  waitForCondition,
+} from '@trading-bot/testing';
 import { Admin, Kafka, logLevel } from 'kafkajs';
 
 import { AppModule } from '../app.module';
@@ -20,38 +24,6 @@ import { portfolioManagerRuntimeConfig } from '../config/runtime.config';
 import { EventDispatcherService } from '../event-dispatcher/event-dispatcher.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { PortfolioService } from './portfolio.service';
-
-const headerValueToString = (
-  value: Buffer | string | readonly (Buffer | string)[] | undefined,
-): string | undefined => {
-  if (value === undefined) {
-    return undefined;
-  }
-  if (Array.isArray(value)) {
-    return value
-      .map((item) =>
-        Buffer.isBuffer(item) ? item.toString('utf8') : String(item),
-      )
-      .join(',');
-  }
-  return Buffer.isBuffer(value) ? value.toString('utf8') : String(value);
-};
-
-const truncateTopic = async (admin: Admin, topic: string): Promise<void> => {
-  const offsets = await admin.fetchTopicOffsets(topic);
-
-  if (offsets.length === 0) {
-    return;
-  }
-
-  await admin.deleteTopicRecords({
-    topic,
-    partitions: offsets.map(({ partition, high }) => ({
-      partition,
-      offset: high,
-    })),
-  });
-};
 
 describe('PortfolioService integration', () => {
   let moduleRef: TestingModule;
@@ -71,6 +43,7 @@ describe('PortfolioService integration', () => {
         // This spec validates registration only, so skip the risk Kafka
         // consumers to reduce startup cost and avoid unrelated handles.
         enableRiskPipelineConsumers: false,
+        enableFillReconciliationConsumer: false,
       })
       .compile();
 
@@ -144,70 +117,34 @@ describe('PortfolioService integration', () => {
         .filter(Boolean),
       logLevel: logLevel.NOTHING,
     });
-    const consumer = kafka.consumer({
-      groupId: `portfolio-manager-integration-${randomUUID()}`,
-      maxWaitTimeInMs: 100,
-    });
-
-    let resolveMessage:
-      | ((value: {
-          key: string | undefined;
-          headers: Record<string, string | undefined>;
-          payload: InstrumentRegistered;
-        }) => void)
-      | undefined;
-    let timeout: NodeJS.Timeout | undefined;
-    const receivedMessage = new Promise<{
-      key: string | undefined;
-      headers: Record<string, string | undefined>;
-      payload: InstrumentRegistered;
-    }>((resolve, reject) => {
-      resolveMessage = resolve;
-      timeout = setTimeout(() => {
-        reject(
-          new Error(
-            'Timed out waiting for the instrument.registered event to be consumed.',
-          ),
-        );
-      }, 10000);
-    });
-
-    await consumer.connect();
-    await consumer.subscribe({
-      topic: KAFKA_TOPICS.INSTRUMENT_REGISTERED,
-      fromBeginning: true,
-    });
-    void consumer.run({
-      autoCommit: false,
-      eachMessage: async ({ message }) => {
-        if (timeout) {
-          clearTimeout(timeout);
-        }
-        resolveMessage?.({
-          key: message.key?.toString('utf8'),
-          headers: Object.fromEntries(
-            Object.entries(message.headers ?? {}).map(([headerName, value]) => [
-              headerName,
-              headerValueToString(value),
-            ]),
-          ),
-          payload: InstrumentRegistered.decode(
-            message.value ?? new Uint8Array(),
-          ),
-        });
-
-        return Promise.resolve();
-      },
+    const collector = await startKafkaMessageCollector({
+      kafka,
+      topics: [KAFKA_TOPICS.INSTRUMENT_REGISTERED],
+      groupIdPrefix: 'portfolio-manager-integration',
+      mapMessage: ({ key, headers, value }) => ({
+        key,
+        headers,
+        payload: InstrumentRegistered.decode(value ?? new Uint8Array()),
+      }),
     });
 
     try {
       const result = await portfolioService.registerInstrument(request);
 
       await eventDispatcher.dispatchOutboxBatch();
+      await waitForCondition(
+        () => collector.messages.length === 1,
+        10000,
+        'Timed out waiting for the instrument.registered event to be consumed.',
+      );
 
       const instruments = await prisma.instrument.findMany();
       const outboxEvents = await prisma.outboxEvent.findMany();
-      const consumed = await receivedMessage;
+      const consumed = collector.messages[0];
+
+      if (!consumed) {
+        throw new Error('Expected one consumed instrument registration event.');
+      }
 
       expect(instruments).toHaveLength(1);
       expect(outboxEvents).toHaveLength(1);
@@ -243,11 +180,8 @@ describe('PortfolioService integration', () => {
         consumed.headers[KAFKA_EVENT_HEADER_NAMES.OCCURRED_AT],
       );
     } finally {
-      if (timeout) {
-        clearTimeout(timeout);
-      }
-      await consumer.stop();
-      await consumer.disconnect();
+      await collector.consumer.stop();
+      await collector.consumer.disconnect();
     }
   }, 15000);
 });

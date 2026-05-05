@@ -15,47 +15,18 @@ import {
   TradeDecisionKind,
   TradeDecisionReason,
 } from '@trading-bot/common/proto';
-import { randomUUID } from 'crypto';
-import { Admin, Consumer, Kafka, logLevel, Producer } from 'kafkajs';
+import {
+  KafkaMessageCollector,
+  startKafkaMessageCollector,
+  truncateTopic,
+  waitForCondition,
+} from '@trading-bot/testing';
+import { Admin, Kafka, logLevel, Producer } from 'kafkajs';
 
 import { AppModule } from '../app.module';
 import { portfolioManagerRuntimeConfig } from '../config/runtime.config';
 import { EventDispatcherService } from '../event-dispatcher/event-dispatcher.service';
 import { PrismaService } from '../prisma/prisma.service';
-
-const truncateTopic = async (admin: Admin, topic: string): Promise<void> => {
-  const offsets = await admin.fetchTopicOffsets(topic);
-
-  if (offsets.length === 0) {
-    return;
-  }
-
-  await admin.deleteTopicRecords({
-    topic,
-    partitions: offsets.map(({ partition, high }) => ({
-      partition,
-      offset: high,
-    })),
-  });
-};
-
-const waitForCondition = async (
-  condition: () => Promise<boolean> | boolean,
-  timeoutMs: number,
-  errorMessage: string,
-): Promise<void> => {
-  const startedAt = Date.now();
-
-  while (Date.now() - startedAt < timeoutMs) {
-    if (await condition()) {
-      return;
-    }
-
-    await new Promise((resolve) => setTimeout(resolve, 100));
-  }
-
-  throw new Error(errorMessage);
-};
 
 type CollectedMessage =
   | {
@@ -89,32 +60,18 @@ const decodeTopicMessage = (
 const startCollector = async (
   kafka: Kafka,
   topics: string[],
-): Promise<{ consumer: Consumer; messages: CollectedMessage[] }> => {
-  const consumer = kafka.consumer({
-    groupId: `risk-pipeline-integration-${randomUUID()}`,
-    maxWaitTimeInMs: 100,
-  });
-  const messages: CollectedMessage[] = [];
-
-  await consumer.connect();
-  for (const topic of topics) {
-    await consumer.subscribe({ topic, fromBeginning: true });
-  }
-
-  await consumer.run({
-    eachMessage: ({ topic, message }) => {
-      messages.push({
+): Promise<KafkaMessageCollector<CollectedMessage>> =>
+  startKafkaMessageCollector({
+    kafka,
+    topics,
+    groupIdPrefix: 'risk-pipeline-integration',
+    mapMessage: ({ topic, key, value }) =>
+      ({
         topic: topic as CollectedMessage['topic'],
-        key: message.key?.toString('utf8'),
-        payload: decodeTopicMessage(topic, message.value),
-      } as CollectedMessage);
-
-      return Promise.resolve();
-    },
+        key,
+        payload: decodeTopicMessage(topic, value),
+      }) as CollectedMessage,
   });
-
-  return { consumer, messages };
-};
 
 describe('Risk pipeline integration', () => {
   let moduleRef: TestingModule;
@@ -133,6 +90,7 @@ describe('Risk pipeline integration', () => {
       .useValue({
         enableOutboxInterval: false,
         enableRiskPipelineConsumers: true,
+        enableFillReconciliationConsumer: false,
       })
       .compile();
 
