@@ -7,3 +7,6 @@ export type PrismaDecimalInput = PrismaDecimal | number | string;
 
 export const toPrismaDecimal = (value: PrismaDecimalInput): PrismaDecimal =>
   new Prisma.Decimal(value);
+
+export const prismaDecimalToString = (value: PrismaDecimalInput): string =>
+  toPrismaDecimal(value).toString();

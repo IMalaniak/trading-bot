@@ -10,3 +10,6 @@ export const zeroPrismaDecimal = (): PrismaDecimal => new Prisma.Decimal(0);
 
 export const prismaDecimalToNumber = (value: PrismaDecimal): number =>
   value.toNumber();
+
+export const prismaDecimalToString = (value: PrismaDecimalInput): string =>
+  toPrismaDecimal(value).toString();

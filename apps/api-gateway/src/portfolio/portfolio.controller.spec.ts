@@ -20,6 +20,7 @@ describe('PortfolioController', () => {
         {
           provide: PortfolioService,
           useValue: {
+            getPortfolio: jest.fn(),
             registerInstrument: jest.fn(),
           },
         },

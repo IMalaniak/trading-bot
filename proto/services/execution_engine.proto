@@ -1,0 +1,53 @@
+syntax = "proto3";
+
+package tradingbot.execution_engine;
+
+import "common/signal.proto";
+import "events/events.proto";
+
+service ExecutionEngine {
+  rpc ListPortfolioExecutionOrders(ListPortfolioExecutionOrdersRequest) returns (ListPortfolioExecutionOrdersResponse);
+}
+
+message ListPortfolioExecutionOrdersRequest {
+  string portfolio_id = 1;
+  int32 limit = 2;
+}
+
+message ListPortfolioExecutionOrdersResponse {
+  repeated ExecutionOrder orders = 1;
+}
+
+message ExecutionOrder {
+  string order_id = 1;
+  string approval_event_id = 2;
+  string candidate_idempotency_key = 3;
+  string source_event_id = 4;
+  string portfolio_id = 5;
+  string instrument_id = 6;
+  string signal_id = 7;
+  tradingbot.common.SignalSide side = 8;
+  string requested_notional = 9;
+  string requested_quantity = 10;
+  string reference_price = 11;
+  tradingbot.events.OrderStatus status = 12;
+  string approved_at = 13;
+  string placed_at = 14;
+  string last_activity_at = 15;
+  repeated ExecutionFill fills = 16;
+}
+
+message ExecutionFill {
+  string fill_id = 1;
+  string order_id = 2;
+  string portfolio_id = 3;
+  string instrument_id = 4;
+  int32 sequence = 5;
+  string fill_notional = 6;
+  string fill_quantity = 7;
+  string fill_price = 8;
+  string cumulative_filled_notional = 9;
+  string cumulative_filled_quantity = 10;
+  tradingbot.events.OrderStatus order_status = 11;
+  string filled_at = 12;
+}

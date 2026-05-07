@@ -32,11 +32,13 @@ model ExecutionOrder {
   status                  ExecutionOrderStatus @default(PLACED)
   approvedAt              DateTime
   placedAt                DateTime
+  lastActivityAt          DateTime
   createdAt               DateTime             @default(now())
   updatedAt               DateTime             @updatedAt
   fills                   ExecutionFill[]
 
   @@index([portfolioId, status])
+  @@index([portfolioId, lastActivityAt])
   @@index([portfolioId, instrumentId])
   @@schema("execution_engine")
 }
