@@ -24,6 +24,11 @@ export interface PortfolioReadModel {
   positions: PortfolioPositionReadModel[];
 }
 
+const maxDate = (dates: Date[]): Date =>
+  dates.reduce((latest, current) =>
+    current.getTime() > latest.getTime() ? current : latest,
+  );
+
 @Injectable()
 export class PortfolioQueryRepository {
   constructor(private readonly prisma: PrismaService) {}
@@ -73,10 +78,11 @@ export class PortfolioQueryRepository {
         ? toPrismaDecimal(exposureAggregate._sum.exposureNotional)
         : zeroPrismaDecimal(),
       openPositionCount: positions.length,
-      updatedAt:
-        latestSnapshot?.updatedAt ??
-        latestPosition?.updatedAt ??
+      updatedAt: maxDate([
         portfolio.updatedAt,
+        ...(latestSnapshot ? [latestSnapshot.updatedAt] : []),
+        ...(latestPosition ? [latestPosition.updatedAt] : []),
+      ]),
       positions,
     };
   }
