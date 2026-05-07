@@ -6,7 +6,7 @@ export {
   Instrument,
   protobufPackage as PROTOBUF_COMMON_PACKAGE,
 } from './common/instrument';
-export { PortfolioSummary, Position, Trade } from './common/portfolio';
+export { PortfolioSummary, Position } from './common/portfolio';
 export { Signal, SignalSide } from './common/signal';
 export {
   InstrumentRegistered,
@@ -21,8 +21,17 @@ export {
   TradeDecisionReason,
 } from './events/events';
 export {
+  ExecutionFill,
+  ExecutionOrder,
+  ListPortfolioExecutionOrdersRequest,
+  ListPortfolioExecutionOrdersResponse,
+  protobufPackage as PROTOBUF_SERVICES_EXECUTION_ENGINE_PACKAGE,
+} from './services/execution_engine';
+export {
   GetPortfolioRequest,
   GetPortfolioResponse,
+  ListInstrumentsRequest,
+  ListInstrumentsResponse,
   protobufPackage as PROTOBUF_SERVICES_PORTFOLIO_MANAGER_PACKAGE,
   RegisterInstrumentRequest,
   RegisterInstrumentResponse,
@@ -43,6 +52,9 @@ export const COMMON_PORTFOLIO_PROTO = 'proto/common/portfolio.proto';
 export const COMMON_SIGNAL_PROTO = 'proto/common/signal.proto';
 
 export const EVENTS_EVENTS_PROTO = 'proto/events/events.proto';
+
+export const EXECUTION_ENGINE_PROTO = 'proto/services/execution_engine.proto';
+export const EXECUTION_ENGINE_CLIENT = 'EXECUTION_ENGINE_CLIENT';
 
 export const PORTFOLIO_MANAGER_PROTO = 'proto/services/portfolio_manager.proto';
 export const PORTFOLIO_MANAGER_CLIENT = 'PORTFOLIO_MANAGER_CLIENT';

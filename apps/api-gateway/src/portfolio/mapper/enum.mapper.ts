@@ -1,6 +1,8 @@
-import { AssetClass } from '@trading-bot/common/proto';
+import { AssetClass, OrderStatus, SignalSide } from '@trading-bot/common/proto';
 
 import { AssetClassName } from '../dto/asset-class-name.enum';
+import { OrderStatusName } from '../dto/order-status-name.enum';
+import { SignalSideName } from '../dto/signal-side-name.enum';
 
 export const assetClassNameToAssetClass: (
   name: AssetClassName,
@@ -27,5 +29,37 @@ export const assetClassToAssetClassName = (assetClass: AssetClass) => {
       return AssetClassName.STOCK;
     default:
       return AssetClassName.ASSET_CLASS_UNSPECIFIED;
+  }
+};
+
+export const signalSideToSignalSideName = (
+  signalSide: SignalSide,
+): SignalSideName => {
+  switch (signalSide) {
+    case SignalSide.BUY:
+      return SignalSideName.BUY;
+    case SignalSide.SELL:
+      return SignalSideName.SELL;
+    case SignalSide.SIGNAL_SIDE_UNSPECIFIED:
+      return SignalSideName.SIGNAL_SIDE_UNSPECIFIED;
+    default:
+      return SignalSideName.SIGNAL_SIDE_UNSPECIFIED;
+  }
+};
+
+export const orderStatusToOrderStatusName = (
+  orderStatus: OrderStatus,
+): OrderStatusName => {
+  switch (orderStatus) {
+    case OrderStatus.PLACED:
+      return OrderStatusName.PLACED;
+    case OrderStatus.PARTIALLY_FILLED:
+      return OrderStatusName.PARTIALLY_FILLED;
+    case OrderStatus.FILLED:
+      return OrderStatusName.FILLED;
+    case OrderStatus.ORDER_STATUS_UNSPECIFIED:
+      return OrderStatusName.ORDER_STATUS_UNSPECIFIED;
+    default:
+      return OrderStatusName.ORDER_STATUS_UNSPECIFIED;
   }
 };

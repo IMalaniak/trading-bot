@@ -74,7 +74,7 @@ workspace "Trading Bot System" {
             group "Risk & Portfolio Manager Service" {
                 portfolioManager = container "Risk & Portfolio Manager" "Implements instrument registration, the current two-stage risk pipeline, fill reconciliation, exposure state, and portfolio update publishing today." "Nest.js" {
                     tags "Implemented"
-                    gRPC = component "Risk & Portfolio API" "Exposes instrument registration today and remains the planned gRPC surface for broader risk/strategy configuration and portfolio workflows." "gRPC" "API"
+                    gRPC = component "Risk & Portfolio API" "Exposes instrument registration, portfolio read queries, and instrument resolution today; remains the planned gRPC surface for broader risk/strategy configuration workflows." "gRPC" "API"
 
                     riskRules = component "Risk Rules Engine" "Applies the current deterministic portfolio-stage checks in order, using exact decimals: subscription enabled, per-trade cap, per-instrument reserved exposure cap, then per-portfolio reserved exposure cap." "TypeScript" {
                         tags "Implemented"
@@ -83,6 +83,9 @@ workspace "Trading Bot System" {
                         tags "Planned"
                     }
                     portfolioManager = component "Portfolio Manager" "Handles instrument registration and portfolio-facing workflows inside the service." "TypeScript" {
+                        tags "Implemented"
+                    }
+                    portfolioQueryService = component "Portfolio Query Service" "Reads portfolio summary exposure state, open positions, and instrument summaries for API Gateway visibility requests." "TypeScript" {
                         tags "Implemented"
                     }
                     instrumentStageService = component "Instrument Stage Service" "Deduplicates source signals, validates instruments, loads active portfolio-instrument configs including disabled subscriptions, snapshots target notional, and fans one source signal out into portfolio candidates." "TypeScript" {
@@ -126,7 +129,9 @@ workspace "Trading Bot System" {
                     }
 
                     gRPC -> strategyConfigManager "Handles planned risk/strategy config updates via"
-                    gRPC -> portfolioManager "Handles instrument registration today and planned portfolio/trade requests via"
+                    gRPC -> portfolioManager "Handles instrument registration via"
+                    gRPC -> portfolioQueryService "Handles portfolio read and instrument resolution requests via"
+                    portfolioQueryService -> portfolioStateRepository "Reads summary, positions, orders/fills-derived state, and instruments via"
                     instrumentStageConsumer -> instrumentStageService "Feeds trading.signals into"
                     instrumentStageService -> riskConfigRepository "Loads active portfolio configs from"
                     instrumentStageService -> riskStateRepository "Writes signal receipts, candidate rows, and outbox rows via"
@@ -157,8 +162,8 @@ workspace "Trading Bot System" {
             group "Execution Engine Service" {
                 executionEngine = container "Execution Engine" "Consumes approved trades today and simulates deterministic order placement/fills; real exchange execution remains planned." "Nest.js" {
                     tags "Implemented"
-                    gRPC = component "Trades API" "Planned gRPC API for execution/order lifecycle queries and internal consumers." "gRPC" "API" {
-                        tags "Planned"
+                    gRPC = component "Execution Read API" "Exposes execution-owned recent order/fill read queries for API Gateway visibility requests." "gRPC" "API" {
+                        tags "Implemented"
                     }
                     gRPC_Client = component "gRPC Client" "Planned internal communication with External API Facade for real order placement." "gRPC" {
                         tags "Planned"
@@ -173,6 +178,9 @@ workspace "Trading Bot System" {
                     executionStateRepository = component "Execution State Repository" "Persists simulated orders, fills, and idempotency identities into the execution-owned PostgreSQL schema." "TypeScript" {
                         tags "Implemented"
                     }
+                    executionQueryService = component "Execution Query Service" "Reads recent portfolio execution orders with nested fills, ordered by latest lifecycle activity." "TypeScript" {
+                        tags "Implemented"
+                    }
                     outboxDispatcher = component "Outbox Dispatcher" "Uses the shared Kafka outbox dispatcher core with an execution-owned Prisma repository adapter and lifecycle ordering." "TypeScript" {
                         tags "Implemented"
                     }
@@ -185,6 +193,8 @@ workspace "Trading Bot System" {
 
                     approvedTradesConsumer -> simulatorCore "Feeds approved trade decisions to"
                     simulatorCore -> executionStateRepository "Writes orders, fills, and outbox rows via"
+                    gRPC -> executionQueryService "Handles recent execution order read requests via"
+                    executionQueryService -> executionStateRepository "Reads orders and fills from"
                     outboxDispatcher -> executionStateRepository "Claims outbox rows from"
                     outboxDispatcher -> kafkaPublisher "Publishes claimed lifecycle events via"
                     tradeExecutor -> gRPC_Client "Will communicate with External API Facade over"
@@ -201,20 +211,30 @@ workspace "Trading Bot System" {
                     REST = component "API" "Exposes instrument registration today and will later expand to strategy, portfolio, and market-data endpoints." "REST" "API"
                     gRPC_Client = component "gRPC Client" "Handles internal service-to-service communication." "gRPC"
 
-                    core = component "Core Orchestration" "Coordinates the current registration workflow and will later orchestrate broader cross-service flows." "TypeScript"
+                    core = component "Core Orchestration" "Coordinates the current registration workflow and portfolio visibility aggregation." "TypeScript"
 
                     marketDataProxy = component "Market Data Proxy" "Forwards dashboard queries to Data Ingestion (Market Data API)." "TypeScript"
-                    portfolioProxy = component "Portfolio Proxy" "Forwards instrument registration today and will later handle portfolio/trade read queries to Risk & Portfolio Manager." "TypeScript"
+                    portfolioProxy = component "Portfolio Proxy" "Forwards instrument registration, portfolio reads, and instrument resolution to Risk & Portfolio Manager." "TypeScript"
+                    executionProxy = component "Execution Proxy" "Fetches recent execution-owned orders and fills from Execution Engine." "TypeScript" {
+                        tags "Implemented"
+                    }
+                    portfolioReadAggregator = component "Portfolio Read Aggregator" "Combines portfolio state with recent execution orders into the REST portfolio visibility response." "TypeScript" {
+                        tags "Implemented"
+                    }
                     signalProxy = component "Signal Proxy" "Forwards dashboard queries to Prediction Engine (Signal API)." "TypeScript"
                     riskProxy = component "Risk Proxy" "Forwards strategy/risk config updates to Risk & Portfolio Manager (Risk API)." "TypeScript"
 
                     REST -> core "Handles API requests via"
                     core -> marketDataProxy "Sends market data requests to"
-                    core -> portfolioProxy "Sends instrument registration today and planned portfolio/trade requests to"
+                    core -> portfolioProxy "Sends instrument registration, portfolio reads, and instrument resolution requests to"
+                    core -> portfolioReadAggregator "Builds portfolio visibility responses via"
+                    portfolioReadAggregator -> portfolioProxy "Reads portfolio summary, positions, and instruments via"
+                    portfolioReadAggregator -> executionProxy "Reads recent execution orders via"
                     core -> signalProxy "Sends signal requests to"
                     core -> riskProxy "Forwards strategy/risk config updates AND start/stop trading commands to"
                     marketDataProxy -> gRPC_Client "Communicates with Data Ingestion over gRPC"
                     portfolioProxy -> gRPC_Client "Communicates with Risk & Portfolio Manager over gRPC"
+                    executionProxy -> gRPC_Client "Communicates with Execution Engine over gRPC"
                     signalProxy -> gRPC_Client "Communicates with Prediction Engine over gRPC"
                     riskProxy -> gRPC_Client "Communicates with Risk & Portfolio Manager over gRPC"
                 }
@@ -291,7 +311,8 @@ workspace "Trading Bot System" {
         tradingBot.dashboard.apiClient -> tradingBot.apiGateway.REST "Sends API requests (UI)"
         tradingBot.apiGateway.gRPC_Client -> tradingBot.dataIngestion.gRPC "Requests market data and subscription updates (Market Data API)"
         tradingBot.apiGateway.gRPC_Client -> tradingBot.predictionEngine.gRPC "Requests current signals / triggers (Signal API)"
-        tradingBot.apiGateway.gRPC_Client -> tradingBot.portfolioManager.gRPC "Registers instruments today; later requests portfolio/trade data and sends risk/strategy updates"
+        tradingBot.apiGateway.gRPC_Client -> tradingBot.portfolioManager.gRPC "Registers instruments, reads portfolio state, resolves instruments, and later sends risk/strategy updates"
+        tradingBot.apiGateway.gRPC_Client -> tradingBot.executionEngine.gRPC "Reads recent execution orders and fills"
         
         tradingBot.dataIngestion.repository -> tradingBot.timescale "Writes historical market data to"
 
@@ -318,8 +339,10 @@ workspace "Trading Bot System" {
         tradingBot.portfolioManager.riskConfigRepository -> tradingBot.postgres "Reads portfolio subscriptions and caps from"
         tradingBot.portfolioManager.riskStateRepository -> tradingBot.postgres "Writes instruments, audit state, decisions, reservations, and outbox rows to"
         tradingBot.portfolioManager.portfolioStateRepository -> tradingBot.postgres "Writes reconciled order, fill, position, and summary state to"
+        tradingBot.portfolioManager.portfolioQueryService -> tradingBot.postgres "Reads portfolio visibility state and instruments from"
 
         tradingBot.executionEngine.executionStateRepository -> tradingBot.executionPostgres "Writes simulated orders, fills, and outbox rows to"
+        tradingBot.executionEngine.executionQueryService -> tradingBot.executionPostgres "Reads recent execution orders and fills from"
         tradingBot.executionEngine.gRPC_Client -> tradingBot.externalAPIFacade.gRPC "Will place real orders on"
         tradingBot.dataIngestion.gRPC_Client -> tradingBot.externalAPIFacade.gRPC "Asks to start/stop fetching market data"
         tradingBot.externalAPIFacade.binanceClient -> binance "Places orders on"
@@ -396,6 +419,7 @@ workspace "Trading Bot System" {
             include tradingBot.portfolioManager.kafkaPublisher
             include tradingBot.portfolioManager.outboxDispatcher
             include tradingBot.portfolioManager.portfolioManager
+            include tradingBot.portfolioManager.portfolioQueryService
             include tradingBot.portfolioManager.riskConfigRepository
             include tradingBot.portfolioManager.riskStateRepository
             include tradingBot.portfolioManager.portfolioStateRepository
@@ -414,6 +438,7 @@ workspace "Trading Bot System" {
             include tradingBot.executionEngine.approvedTradesConsumer
             include tradingBot.executionEngine.simulatorCore
             include tradingBot.executionEngine.executionStateRepository
+            include tradingBot.executionEngine.executionQueryService
             include tradingBot.executionEngine.outboxDispatcher
             include tradingBot.executionEngine.kafkaPublisher
             include tradingBot.executionEngine.tradeExecutor
@@ -432,11 +457,14 @@ workspace "Trading Bot System" {
             include tradingBot.apiGateway.gRPC_Client
             include tradingBot.apiGateway.marketDataProxy
             include tradingBot.apiGateway.portfolioProxy
+            include tradingBot.apiGateway.executionProxy
+            include tradingBot.apiGateway.portfolioReadAggregator
             include tradingBot.apiGateway.signalProxy
             include tradingBot.apiGateway.riskProxy
             include tradingBot.dataIngestion.gRPC
             include tradingBot.predictionEngine.gRPC
             include tradingBot.portfolioManager.gRPC
+            include tradingBot.executionEngine.gRPC
             autolayout lr
         }
 

@@ -98,6 +98,11 @@ export class ExecutionOrderService {
         status: lifecycle.order.status,
         approvedAt: lifecycle.order.approvedAt,
         placedAt: lifecycle.order.placedAt,
+        lastActivityAt: lifecycle.fills.reduce(
+          (latest, fill) =>
+            fill.filledAt.getTime() > latest.getTime() ? fill.filledAt : latest,
+          lifecycle.order.placedAt,
+        ),
       },
     });
 

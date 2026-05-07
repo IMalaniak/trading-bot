@@ -20,6 +20,7 @@
     - [Current: Risk Pipeline](#current-risk-pipeline)
     - [Current: Execution Simulator](#current-execution-simulator)
     - [Current: Fill Reconciliation](#current-fill-reconciliation)
+    - [Current: Portfolio Read API and Execution Visibility](#current-portfolio-read-api-and-execution-visibility)
     - [Planned: End-to-End Trading Flow](#planned-end-to-end-trading-flow)
 
 ## Architecture Summary
@@ -48,8 +49,8 @@ Everything else in this document should be read as either:
 
 | Area                             | Status               | Notes                                                                                                  |
 | -------------------------------- | -------------------- | ------------------------------------------------------------------------------------------------------ |
-| API Gateway                      | Implemented          | REST entrypoint forwards registration to `portfolio-manager` over gRPC.                                |
-| Risk & Portfolio Manager         | Implemented          | Instrument registration, the two-stage risk pipeline, and fill reconciliation are implemented in `portfolio-manager`. |
+| API Gateway                      | Implemented          | REST entrypoint forwards registration to `portfolio-manager` and aggregates portfolio/execution visibility over gRPC. |
+| Risk & Portfolio Manager         | Implemented          | Instrument registration, the two-stage risk pipeline, fill reconciliation, portfolio read queries, and instrument resolution are implemented in `portfolio-manager`. |
 | Outbox Dispatcher                | Implemented          | Kafka publish happens from the outbox, not inline with the DB write; shared dispatch mechanics live in `common`. |
 | Shared Contracts (`common`)      | Implemented          | Proto types, topic constants, key builders, Kafka header helpers, and reusable outbox dispatch ports live here. |
 | Message Bus (Redpanda/Kafka API) | Implemented          | Local development uses Redpanda.                                                                       |
@@ -58,7 +59,7 @@ Everything else in this document should be read as either:
 | Data Ingestion Service           | Planned              | Not implemented in this repo yet.                                                                      |
 | Feature Engineering Service      | Planned              | Not implemented in this repo yet.                                                                      |
 | Prediction Engine                | Planned              | Not implemented in this repo yet.                                                                      |
-| Execution Engine                 | Implemented          | Event-only simulator consumes approved trades and emits deterministic placed/fill lifecycle events.    |
+| Execution Engine                 | Implemented          | Event simulator consumes approved trades, emits deterministic placed/fill lifecycle events, and exposes execution-owned order/fill read queries over gRPC. |
 | Execution DB (Postgres schema)   | Implemented          | Source of truth for simulated orders, fills, and execution outbox rows.                                |
 | External API Facade              | Planned              | Not implemented in this repo yet.                                                                      |
 | Dashboard                        | Planned              | Not implemented in this repo yet.                                                                      |
@@ -141,6 +142,16 @@ Fill reconciliation payload notes:
 - `PortfolioUpdated` is emitted once for every accepted unique fill and carries a changed snapshot: portfolio ID, source fill ID, order ID, instrument ID, aggregate exposure notional, open position count, changed position quantity, changed position average entry price, changed position exposure notional, and update timestamp.
 - Reconciled position quantities, average prices, exposures, fill quantities, and fill notionals are stored as Postgres `NUMERIC` values and transported as decimal strings.
 - Signed net accounting is used: BUY fills increase quantity and SELL fills decrease quantity. Short positions are allowed in the MVP.
+
+Current read API notes:
+
+- `api-gateway` exposes `GET /api/portfolio/:portfolioId?recentOrdersLimit=20`.
+- The endpoint aggregates portfolio state from `portfolio-manager` and recent execution order state from `execution-engine`; it does not read either service database directly.
+- Portfolio read responses use decimal strings for money and quantities. They intentionally do not expose cash balances, available balance, realized PnL, or unrealized PnL because those are not modeled in the current portfolio database.
+- Portfolio summary fields represent current exposure/read-model state: portfolio ID, name, active flag, exposure cap, aggregate exposure notional, open position count, and last read-model update time.
+- Positions include instrument summaries and exact decimal strings for quantity, average entry price, and exposure.
+- Recent execution orders include execution-owned order identity, requested size, reference price, lifecycle timestamps, and nested fills. API Gateway enriches order instrument IDs through `portfolio-manager` instrument resolution when possible.
+- The simulator still persists the immediate full placed/partial-fill/final-fill lifecycle. The read API can show execution-owned order/fill truth, but Iteration 5 does not introduce delayed placed-only state.
 
 ### Ordering and idempotency rules
 
@@ -227,6 +238,7 @@ Expected env files:
 
 - root `.env`
   - `PORTFOLIO_MANAGER_GRPC_URL`
+  - `EXECUTION_ENGINE_GRPC_URL`
   - `KAFKA_BROKERS`
   - optional `PORT` for `api-gateway`
 - `apps/portfolio-manager/.env`
@@ -236,6 +248,7 @@ Expected env files:
   - isolated integration-test `KAFKA_BROKERS`
 - `apps/execution-engine/.env`
   - `EXECUTION_ENGINE_DATABASE_URL`
+  - `EXECUTION_ENGINE_GRPC_URL`
 - `apps/execution-engine/.env.test-integration`
   - isolated integration-test `EXECUTION_ENGINE_DATABASE_URL`
   - isolated integration-test `KAFKA_BROKERS`
@@ -303,6 +316,14 @@ Manual fill-reconciliation smoke:
 3. Consume from `portfolio.updated`.
 4. Verify `PortfolioOrder`, `PortfolioFill`, `PortfolioPosition`, and `PortfolioSummarySnapshot` rows in the portfolio Postgres database.
 5. Replay the same fill and verify no additional snapshot or `portfolio.updated` event is created.
+
+Manual portfolio-read smoke:
+
+1. Start infra, `portfolio-manager`, `execution-engine`, and `api-gateway`.
+2. Run the manual risk, execution, and fill-reconciliation smoke flow for `portfolio-alpha`.
+3. Call `GET /api/portfolio/portfolio-alpha?recentOrdersLimit=20`.
+4. Verify the response includes summary exposure state, open positions with instrument summaries, and recent execution orders with nested fills.
+5. Verify all money and quantity values are JSON strings, not JSON numbers.
 
 ## C4 Model Diagrams
 
@@ -454,6 +475,41 @@ Current reconciliation semantics:
 - Position quantities are signed net quantities; average entry price follows weighted average for same-direction fills, stays unchanged when reducing, uses the crossing fill price when reversing, and resets to zero when flat.
 - `portfolio.updated` carries only the changed snapshot for the triggering fill, not the full portfolio.
 - Bounded replay/backfill is documented as an operator workflow for a later iteration; there is no dedicated replay command yet.
+
+### Current: Portfolio Read API and Execution Visibility
+
+This is implemented by API Gateway as an aggregation read path.
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant APIGateway as API Gateway
+    participant PortfolioManager as Risk & Portfolio Manager
+    participant ExecutionEngine as Execution Engine
+    participant PortfolioDB as Portfolio DB
+    participant ExecutionDB as Execution DB
+
+    Client->>APIGateway: GET /api/portfolio/{portfolioId}?recentOrdersLimit=20
+    APIGateway->>PortfolioManager: gRPC GetPortfolio(portfolio_id)
+    PortfolioManager->>PortfolioDB: Read portfolio, positions, exposure state, instruments
+    PortfolioManager-->>APIGateway: Summary + open positions
+    APIGateway->>ExecutionEngine: gRPC ListPortfolioExecutionOrders(portfolio_id, limit)
+    ExecutionEngine->>ExecutionDB: Read recent orders and nested fills
+    ExecutionEngine-->>APIGateway: Recent execution orders
+    opt Order instrument not already present in positions
+        APIGateway->>PortfolioManager: gRPC ListInstruments(instrument_ids)
+        PortfolioManager->>PortfolioDB: Resolve instruments
+        PortfolioManager-->>APIGateway: Instrument summaries
+    end
+    APIGateway-->>Client: Aggregated portfolio read response
+```
+
+Current read semantics:
+
+- Missing portfolios return gRPC `NOT_FOUND` from `portfolio-manager` and HTTP `404` from API Gateway.
+- Inactive portfolios are still readable.
+- `recentOrdersLimit` defaults to `20` and is capped at `100`.
+- API Gateway fails the whole request if either upstream read fails; partial portfolio/execution responses are intentionally not returned.
 
 ### Planned: End-to-End Trading Flow
 

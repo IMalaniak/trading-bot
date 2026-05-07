@@ -324,8 +324,9 @@ Expose portfolio and recent execution state via gRPC and REST so the MVP is obse
 
 - In scope:
   - Implement portfolio read query in portfolio-manager.
+  - Implement execution read query in execution-engine.
   - Expose REST endpoint in api-gateway.
-  - Basic response DTOs and mapping.
+  - Basic response DTOs, aggregation, and mapping.
 - Out of scope:
   - Full dashboard frontend.
   - Real-time websocket streaming.
@@ -333,27 +334,36 @@ Expose portfolio and recent execution state via gRPC and REST so the MVP is obse
 ### Detailed Tasks
 
 1. Contracts and service methods
-   - Finalize/implement `GetPortfolio` request/response behavior.
-   - Define pagination/limits for recent trades/fills.
+   - Finalize/implement `GetPortfolio` request/response behavior with explicit `portfolio_id`.
+   - Add `ListPortfolioExecutionOrders` in execution-engine.
+   - Define `recentOrdersLimit` default `20`, max `100`.
+   - Return money and quantities as decimal strings.
 2. Portfolio manager query path
    - Add gRPC handler with query + mapping from DB models.
-   - Include summary, open positions, and recent fills/trades.
-3. API gateway REST path
+   - Include summary and open positions with instrument summaries.
+   - Add instrument resolution support for API Gateway order enrichment.
+3. Execution engine query path
+   - Add gRPC handler with query + mapping from execution-owned DB models.
+   - Return recent orders with nested fills sorted by latest lifecycle activity.
+4. API gateway REST path
    - Add controller endpoint and mapping from gRPC to HTTP DTO.
+   - Aggregate portfolio-manager and execution-engine gRPC reads.
    - Keep consistent error mapping strategy.
-4. Tests and docs
+5. Tests and docs
    - Controller/service tests in both apps.
    - Swagger/OpenAPI updates and sample responses.
 
 ### Suggested File Touchpoints
 
 - `apps/portfolio-manager/src/portfolio/...`
+- `apps/execution-engine/src/execution/...`
 - `apps/api-gateway/src/portfolio/...`
 - `libs/common/src/proto/services/portfolio_manager.ts` (generated from proto changes)
+- `libs/common/src/proto/services/execution_engine.ts` (generated from proto changes)
 
 ### Acceptance Criteria
 
-- After a simulated trade lifecycle, one API call returns updated portfolio state.
+- After a simulated trade lifecycle, one API call returns updated portfolio state and recent execution orders/fills.
 - Error behavior and timeouts are mapped predictably in API gateway.
 - Query paths are test-covered.
 
@@ -361,8 +371,9 @@ Expose portfolio and recent execution state via gRPC and REST so the MVP is obse
 
 ```bash
 npx nx run portfolio-manager:test
+npx nx run execution-engine:test
 npx nx run api-gateway:test
-npx nx run-many -t test -p common,portfolio-manager,api-gateway
+npx nx run-many -t test -p common,portfolio-manager,execution-engine,api-gateway
 ```
 
 ---

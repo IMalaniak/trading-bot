@@ -8,6 +8,7 @@ import "common/portfolio.proto";
 service RiskAndPortfolioManager {
   rpc RegisterInstrument (RegisterInstrumentRequest) returns (RegisterInstrumentResponse);
   rpc GetPortfolio(GetPortfolioRequest) returns (GetPortfolioResponse);
+  rpc ListInstruments(ListInstrumentsRequest) returns (ListInstrumentsResponse);
 }
 
 message RegisterInstrumentRequest {
@@ -21,17 +22,19 @@ message RegisterInstrumentResponse {
   tradingbot.common.Instrument instrument = 1;  // includes instrument_id
 }
 
-// Request for portfolio retrieval
 message GetPortfolioRequest {
-  // Account or portfolio id; empty means default account for the caller.
-  string account_id = 1;
-  // Optional: how many recent trades to include
-  int32 recent_trades_limit = 2;
+  string portfolio_id = 1;
 }
 
-// Response containing portfolio state and recent trades
 message GetPortfolioResponse {
   tradingbot.common.PortfolioSummary summary = 1;
   repeated tradingbot.common.Position positions = 2;
-  repeated tradingbot.common.Trade recent_trades = 3;
+}
+
+message ListInstrumentsRequest {
+  repeated string instrument_ids = 1;
+}
+
+message ListInstrumentsResponse {
+  repeated tradingbot.common.Instrument instruments = 1;
 }

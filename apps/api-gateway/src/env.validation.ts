@@ -5,6 +5,7 @@ interface EnvConfig {
   NODE_ENV: NodeEnvironment;
   PORT: number;
   PORTFOLIO_MANAGER_GRPC_URL: string;
+  EXECUTION_ENGINE_GRPC_URL: string;
 }
 
 class EnvironmentVariables implements EnvConfig {
@@ -18,6 +19,9 @@ class EnvironmentVariables implements EnvConfig {
 
   @IsString()
   PORTFOLIO_MANAGER_GRPC_URL: string;
+
+  @IsString()
+  EXECUTION_ENGINE_GRPC_URL: string;
 }
 
 export const defaultEnv: Partial<EnvConfig> = {
