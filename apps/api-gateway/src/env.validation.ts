@@ -1,5 +1,5 @@
 import { createValidateFunction, NodeEnvironment } from '@trading-bot/common';
-import { IsEnum, IsNumber, IsString, Max, Min } from 'class-validator';
+import { IsEnum, IsInt, IsString, Matches, Max, Min } from 'class-validator';
 
 import { DEFAULT_API_GATEWAY_CORS_ORIGINS } from './cors.config';
 
@@ -15,15 +15,21 @@ class EnvironmentVariables implements EnvConfig {
   @IsEnum(NodeEnvironment)
   NODE_ENV: NodeEnvironment;
 
-  @IsNumber()
+  @IsInt()
   @Min(0)
   @Max(65535)
   PORT: number;
 
   @IsString()
+  @Matches(/^[\w.-]+(:\d+)?$/, {
+    message: 'PORTFOLIO_MANAGER_GRPC_URL must be a valid host:port string',
+  })
   PORTFOLIO_MANAGER_GRPC_URL: string;
 
   @IsString()
+  @Matches(/^[\w.-]+(:\d+)?$/, {
+    message: 'EXECUTION_ENGINE_GRPC_URL must be a valid host:port string',
+  })
   EXECUTION_ENGINE_GRPC_URL: string;
 
   @IsString()

@@ -123,6 +123,28 @@ export class PortfolioService implements OnModuleInit {
       }),
     }).pipe(
       switchMap(({ portfolio, execution }) => {
+        if (!Array.isArray(portfolio.positions)) {
+          throw new HttpException(
+            {
+              message:
+                'Risk service returned invalid portfolio payload: positions must be an array',
+              type: 'InvalidPortfolioPayload',
+            },
+            HttpStatus.BAD_GATEWAY,
+          );
+        }
+
+        if (!Array.isArray(execution.orders)) {
+          throw new HttpException(
+            {
+              message:
+                'Execution service returned invalid orders payload: orders must be an array',
+              type: 'InvalidExecutionPayload',
+            },
+            HttpStatus.BAD_GATEWAY,
+          );
+        }
+
         const portfolioSummary = portfolio.summary;
 
         if (!portfolioSummary) {
@@ -161,6 +183,17 @@ export class PortfolioService implements OnModuleInit {
 
         return instruments$.pipe(
           map(({ instruments }) => {
+            if (!Array.isArray(instruments)) {
+              throw new HttpException(
+                {
+                  message:
+                    'Risk service returned invalid instruments payload: instruments must be an array',
+                  type: 'InvalidInstrumentsPayload',
+                },
+                HttpStatus.BAD_GATEWAY,
+              );
+            }
+
             for (const instrument of instruments) {
               instrumentsById.set(
                 instrument.id,

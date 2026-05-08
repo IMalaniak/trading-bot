@@ -261,4 +261,66 @@ describe('PortfolioService', () => {
       status: HttpStatus.NOT_FOUND,
     });
   });
+
+  it('maps invalid portfolio positions payload to HTTP 502', async () => {
+    portfolioClient.getPortfolio.mockReturnValue(
+      of({
+        summary: {
+          portfolioId: 'portfolio-alpha',
+          name: 'Alpha Portfolio',
+          isActive: true,
+          exposureCapNotional: '1000',
+          aggregateExposureNotional: '0',
+          openPositionCount: 0,
+          updatedAt: '2026-03-25T12:00:00.000Z',
+        },
+        positions: null,
+      }) as never,
+    );
+    executionClient.listPortfolioExecutionOrders.mockReturnValue(
+      of({ orders: [] }),
+    );
+
+    await expect(
+      lastValueFrom(service.getPortfolio('portfolio-alpha', 10)),
+    ).rejects.toMatchObject({
+      response: {
+        message:
+          'Risk service returned invalid portfolio payload: positions must be an array',
+        type: 'InvalidPortfolioPayload',
+      },
+      status: HttpStatus.BAD_GATEWAY,
+    });
+  });
+
+  it('maps invalid execution orders payload to HTTP 502', async () => {
+    portfolioClient.getPortfolio.mockReturnValue(
+      of({
+        summary: {
+          portfolioId: 'portfolio-alpha',
+          name: 'Alpha Portfolio',
+          isActive: true,
+          exposureCapNotional: '1000',
+          aggregateExposureNotional: '0',
+          openPositionCount: 0,
+          updatedAt: '2026-03-25T12:00:00.000Z',
+        },
+        positions: [],
+      }),
+    );
+    executionClient.listPortfolioExecutionOrders.mockReturnValue(
+      of({ orders: null }) as never,
+    );
+
+    await expect(
+      lastValueFrom(service.getPortfolio('portfolio-alpha', 10)),
+    ).rejects.toMatchObject({
+      response: {
+        message:
+          'Execution service returned invalid orders payload: orders must be an array',
+        type: 'InvalidExecutionPayload',
+      },
+      status: HttpStatus.BAD_GATEWAY,
+    });
+  });
 });

@@ -12,7 +12,7 @@ import { validate } from '../env.validation';
 import { ExecutionModule } from '../execution/execution.module';
 
 const rootEnvPath = join(process.cwd(), '.env');
-const appEnvPath = join(__dirname, '../../.env');
+const appEnvPath = join(process.cwd(), 'apps/execution-engine/.env');
 
 @Module({
   imports: [
