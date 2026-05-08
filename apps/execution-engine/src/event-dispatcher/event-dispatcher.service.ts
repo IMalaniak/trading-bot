@@ -89,15 +89,13 @@ export class EventDispatcherService implements OnModuleInit, OnModuleDestroy {
   private async refreshOutboxMetrics(): Promise<void> {
     const backlog = await this.outboxRepository.getBacklogMetrics();
 
-    for (const row of backlog.rows) {
-      this.metrics.setOutboxBacklog(
-        {
-          topic: row.topic,
-          status: row.status,
-        },
-        row.count,
-      );
-    }
+    this.metrics.setOutboxBacklogSnapshot(
+      backlog.rows.map((row) => ({
+        topic: row.topic,
+        status: row.status,
+        value: row.count,
+      })),
+    );
 
     this.metrics.setOldestOutboxAgeSeconds(
       backlog.oldestPendingAt

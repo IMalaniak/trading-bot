@@ -1,3 +1,5 @@
+import { KAFKA_TOPICS } from '@trading-bot/common';
+
 import { EventDispatcherService } from './event-dispatcher.service';
 
 describe('EventDispatcherService', () => {
@@ -17,6 +19,7 @@ describe('EventDispatcherService', () => {
   let metrics: {
     recordOutboxDispatch: jest.Mock;
     setOutboxBacklog: jest.Mock;
+    setOutboxBacklogSnapshot: jest.Mock;
     setOldestOutboxAgeSeconds: jest.Mock;
   };
 
@@ -39,6 +42,7 @@ describe('EventDispatcherService', () => {
     metrics = {
       recordOutboxDispatch: jest.fn(),
       setOutboxBacklog: jest.fn(),
+      setOutboxBacklogSnapshot: jest.fn(),
       setOldestOutboxAgeSeconds: jest.fn(),
     };
     service = new EventDispatcherService(
@@ -109,6 +113,25 @@ describe('EventDispatcherService', () => {
       batchSize: 50,
       staleInFlightTimeoutMs: 30000,
     });
+    expect(metrics.setOutboxBacklogSnapshot).toHaveBeenCalledWith([]);
     expect(metrics.setOldestOutboxAgeSeconds).toHaveBeenCalledWith(0);
+  });
+
+  it('publishes outbox backlog metrics as a snapshot', async () => {
+    outboxRepository.claimBatch.mockResolvedValue([]);
+    outboxRepository.getBacklogMetrics.mockResolvedValue({
+      rows: [{ topic: KAFKA_TOPICS.ORDERS_FILLS, status: 'PENDING', count: 2 }],
+      oldestPendingAt: null,
+    });
+
+    await service.dispatchOutboxBatch();
+
+    expect(metrics.setOutboxBacklogSnapshot).toHaveBeenCalledWith([
+      {
+        topic: KAFKA_TOPICS.ORDERS_FILLS,
+        status: 'PENDING',
+        value: 2,
+      },
+    ]);
   });
 });

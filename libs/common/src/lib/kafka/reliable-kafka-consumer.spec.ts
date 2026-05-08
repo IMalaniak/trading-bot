@@ -213,4 +213,61 @@ describe('ReliableKafkaConsumer', () => {
 
     expect(commitOffset).not.toHaveBeenCalled();
   });
+
+  it('does not let error message serialization crash retry and DLQ handling', async () => {
+    const handle = jest.fn().mockRejectedValue(1n);
+
+    await createConsumer(handle).handleMessage(message);
+
+    const dlqSend = dlqProducer.send.mock.calls[0]?.[0];
+    const dlqMessage = dlqSend?.messages[0];
+
+    if (!dlqMessage) {
+      throw new Error('Expected a DLQ message to be published');
+    }
+
+    const deadLetter = DeadLetterEvent.decode(dlqMessage.value);
+
+    expect(deadLetter).toEqual(
+      expect.objectContaining({
+        failureClass: 'bigint',
+        errorMessage: '1',
+      }),
+    );
+    expect(commitOffset).toHaveBeenCalledWith({
+      topic: KAFKA_TOPICS.ORDERS_FILLS,
+      partition: 1,
+      offset: '42',
+    });
+  });
+
+  it('uses a terminal fallback when error string conversion also fails', async () => {
+    const unsafeError = {
+      toJSON() {
+        throw new Error('json failed');
+      },
+      [Symbol.toPrimitive]() {
+        throw new Error('string failed');
+      },
+    };
+    const handle = jest.fn().mockRejectedValue(unsafeError);
+
+    await createConsumer(handle).handleMessage(message);
+
+    const dlqSend = dlqProducer.send.mock.calls[0]?.[0];
+    const dlqMessage = dlqSend?.messages[0];
+
+    if (!dlqMessage) {
+      throw new Error('Expected a DLQ message to be published');
+    }
+
+    const deadLetter = DeadLetterEvent.decode(dlqMessage.value);
+
+    expect(deadLetter.errorMessage).toBe('[unserializable error]');
+    expect(commitOffset).toHaveBeenCalledWith({
+      topic: KAFKA_TOPICS.ORDERS_FILLS,
+      partition: 1,
+      offset: '42',
+    });
+  });
 });

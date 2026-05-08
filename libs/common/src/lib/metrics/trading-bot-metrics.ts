@@ -31,6 +31,10 @@ export interface OutboxBacklogMetricLabels {
   status: string;
 }
 
+export interface OutboxBacklogSnapshotRow extends OutboxBacklogMetricLabels {
+  value: number;
+}
+
 export interface TradingBotMetricsOptions {
   service: string;
   registry?: Registry;
@@ -47,6 +51,10 @@ export class TradingBotMetrics {
   private readonly outboxDispatches: Counter<string>;
   private readonly outboxBacklog: Gauge<string>;
   private readonly oldestOutboxAgeSeconds: Gauge<string>;
+  private readonly outboxBacklogLabels = new Map<
+    string,
+    OutboxBacklogMetricLabels
+  >();
 
   constructor(private readonly options: Required<TradingBotMetricsOptions>) {
     this.contentType = options.registry.contentType;
@@ -176,6 +184,7 @@ export class TradingBotMetrics {
   }
 
   setOutboxBacklog(labels: OutboxBacklogMetricLabels, value: number): void {
+    this.outboxBacklogLabels.set(this.outboxBacklogKey(labels), labels);
     this.outboxBacklog.set(
       {
         service: this.options.service,
@@ -184,6 +193,34 @@ export class TradingBotMetrics {
       },
       value,
     );
+  }
+
+  setOutboxBacklogSnapshot(rows: OutboxBacklogSnapshotRow[]): void {
+    const activeKeys = new Set(rows.map((row) => this.outboxBacklogKey(row)));
+
+    for (const [key, labels] of this.outboxBacklogLabels.entries()) {
+      if (!activeKeys.has(key)) {
+        this.outboxBacklog.set(
+          {
+            service: this.options.service,
+            topic: labels.topic,
+            status: labels.status,
+          },
+          0,
+        );
+        this.outboxBacklogLabels.delete(key);
+      }
+    }
+
+    for (const row of rows) {
+      this.setOutboxBacklog(
+        {
+          topic: row.topic,
+          status: row.status,
+        },
+        row.value,
+      );
+    }
   }
 
   setOldestOutboxAgeSeconds(value: number): void {
@@ -204,6 +241,10 @@ export class TradingBotMetrics {
       consumer_group: labels.consumerGroup,
       ...(outcome ? { outcome } : {}),
     };
+  }
+
+  private outboxBacklogKey(labels: OutboxBacklogMetricLabels): string {
+    return `${labels.topic}\u0000${labels.status}`;
   }
 }
 

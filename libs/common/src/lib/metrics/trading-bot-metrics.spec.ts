@@ -55,6 +55,31 @@ describe('TradingBotMetrics', () => {
     );
   });
 
+  it('zeroes missing outbox backlog labels between snapshots', async () => {
+    const metrics = createTradingBotMetrics({
+      service: 'portfolio-manager',
+      registry: new Registry(),
+      collectDefaultMetrics: false,
+    });
+
+    metrics.setOutboxBacklogSnapshot([
+      { topic: 'portfolio.updated', status: 'PENDING', value: 3 },
+      { topic: 'portfolio.updated', status: 'FAILED', value: 1 },
+    ]);
+    metrics.setOutboxBacklogSnapshot([
+      { topic: 'portfolio.updated', status: 'PENDING', value: 2 },
+    ]);
+
+    const output = await metrics.metrics();
+
+    expect(output).toContain(
+      'trading_bot_outbox_backlog{service="portfolio-manager",topic="portfolio.updated",status="PENDING"} 2',
+    );
+    expect(output).toContain(
+      'trading_bot_outbox_backlog{service="portfolio-manager",topic="portfolio.updated",status="FAILED"} 0',
+    );
+  });
+
   it('registers application metrics in the Nest Prometheus registry', async () => {
     register.clear();
 

@@ -126,7 +126,21 @@ const toErrorMessage = (error: unknown): string => {
     return error;
   }
 
-  return JSON.stringify(error) ?? String(error);
+  try {
+    const serialized = JSON.stringify(error);
+
+    return serialized || toFallbackErrorMessage(error);
+  } catch {
+    return toFallbackErrorMessage(error);
+  }
+};
+
+const toFallbackErrorMessage = (error: unknown): string => {
+  try {
+    return String(error);
+  } catch {
+    return '[unserializable error]';
+  }
 };
 
 const toFailureClass = (error: unknown): string => {
