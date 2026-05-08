@@ -5,11 +5,13 @@ import {
   Module,
   Provider,
 } from '@nestjs/common';
+import { PrometheusModule } from '@willsoto/nestjs-prometheus';
 import {
   collectDefaultMetrics,
   Counter,
   Gauge,
   Histogram,
+  register as defaultRegistry,
   Registry,
 } from 'prom-client';
 
@@ -57,49 +59,84 @@ export class TradingBotMetrics {
       });
     }
 
-    this.consumerMessages = new Counter({
-      name: 'trading_bot_kafka_consumer_messages_total',
-      help: 'Kafka consumer messages processed by outcome.',
-      labelNames: ['service', 'topic', 'consumer_group', 'outcome'],
-      registers: [options.registry],
-    });
-    this.consumerRetries = new Counter({
-      name: 'trading_bot_kafka_consumer_retries_total',
-      help: 'Kafka consumer retry attempts after processing failures.',
-      labelNames: ['service', 'topic', 'consumer_group'],
-      registers: [options.registry],
-    });
-    this.consumerProcessingSeconds = new Histogram({
-      name: 'trading_bot_kafka_consumer_processing_seconds',
-      help: 'Kafka consumer message processing duration in seconds.',
-      labelNames: ['service', 'topic', 'consumer_group', 'outcome'],
-      buckets: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5],
-      registers: [options.registry],
-    });
-    this.dlqMessages = new Counter({
-      name: 'trading_bot_kafka_consumer_dlq_messages_total',
-      help: 'Kafka consumer messages sent to dead-letter topics.',
-      labelNames: ['service', 'topic', 'consumer_group', 'dlq_topic'],
-      registers: [options.registry],
-    });
-    this.outboxDispatches = new Counter({
-      name: 'trading_bot_outbox_dispatch_total',
-      help: 'Outbox dispatch attempts by outcome.',
-      labelNames: ['service', 'topic', 'outcome'],
-      registers: [options.registry],
-    });
-    this.outboxBacklog = new Gauge({
-      name: 'trading_bot_outbox_backlog',
-      help: 'Outbox backlog rows by topic and status.',
-      labelNames: ['service', 'topic', 'status'],
-      registers: [options.registry],
-    });
-    this.oldestOutboxAgeSeconds = new Gauge({
-      name: 'trading_bot_outbox_oldest_pending_age_seconds',
-      help: 'Age of the oldest non-dispatched outbox row in seconds.',
-      labelNames: ['service'],
-      registers: [options.registry],
-    });
+    this.consumerMessages = getOrCreateMetric(
+      options.registry,
+      'trading_bot_kafka_consumer_messages_total',
+      () =>
+        new Counter({
+          name: 'trading_bot_kafka_consumer_messages_total',
+          help: 'Kafka consumer messages processed by outcome.',
+          labelNames: ['service', 'topic', 'consumer_group', 'outcome'],
+          registers: [options.registry],
+        }),
+    );
+    this.consumerRetries = getOrCreateMetric(
+      options.registry,
+      'trading_bot_kafka_consumer_retries_total',
+      () =>
+        new Counter({
+          name: 'trading_bot_kafka_consumer_retries_total',
+          help: 'Kafka consumer retry attempts after processing failures.',
+          labelNames: ['service', 'topic', 'consumer_group'],
+          registers: [options.registry],
+        }),
+    );
+    this.consumerProcessingSeconds = getOrCreateMetric(
+      options.registry,
+      'trading_bot_kafka_consumer_processing_seconds',
+      () =>
+        new Histogram({
+          name: 'trading_bot_kafka_consumer_processing_seconds',
+          help: 'Kafka consumer message processing duration in seconds.',
+          labelNames: ['service', 'topic', 'consumer_group', 'outcome'],
+          buckets: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5],
+          registers: [options.registry],
+        }),
+    );
+    this.dlqMessages = getOrCreateMetric(
+      options.registry,
+      'trading_bot_kafka_consumer_dlq_messages_total',
+      () =>
+        new Counter({
+          name: 'trading_bot_kafka_consumer_dlq_messages_total',
+          help: 'Kafka consumer messages sent to dead-letter topics.',
+          labelNames: ['service', 'topic', 'consumer_group', 'dlq_topic'],
+          registers: [options.registry],
+        }),
+    );
+    this.outboxDispatches = getOrCreateMetric(
+      options.registry,
+      'trading_bot_outbox_dispatch_total',
+      () =>
+        new Counter({
+          name: 'trading_bot_outbox_dispatch_total',
+          help: 'Outbox dispatch attempts by outcome.',
+          labelNames: ['service', 'topic', 'outcome'],
+          registers: [options.registry],
+        }),
+    );
+    this.outboxBacklog = getOrCreateMetric(
+      options.registry,
+      'trading_bot_outbox_backlog',
+      () =>
+        new Gauge({
+          name: 'trading_bot_outbox_backlog',
+          help: 'Outbox backlog rows by topic and status.',
+          labelNames: ['service', 'topic', 'status'],
+          registers: [options.registry],
+        }),
+    );
+    this.oldestOutboxAgeSeconds = getOrCreateMetric(
+      options.registry,
+      'trading_bot_outbox_oldest_pending_age_seconds',
+      () =>
+        new Gauge({
+          name: 'trading_bot_outbox_oldest_pending_age_seconds',
+          help: 'Age of the oldest non-dispatched outbox row in seconds.',
+          labelNames: ['service'],
+          registers: [options.registry],
+        }),
+    );
   }
 
   recordConsumerMessage(
@@ -181,7 +218,12 @@ export const createTradingBotMetrics = (
 
 export const createTradingBotMetricsProvider = (service: string): Provider => ({
   provide: TRADING_BOT_METRICS,
-  useFactory: () => createTradingBotMetrics({ service }),
+  useFactory: () =>
+    createTradingBotMetrics({
+      service,
+      registry: defaultRegistry,
+      collectDefaultMetrics: false,
+    }),
 });
 
 export const InjectTradingBotMetrics = () => Inject(TRADING_BOT_METRICS);
@@ -194,8 +236,26 @@ export class TradingBotMetricsModule {
 
     return {
       module: TradingBotMetricsModule,
+      imports: [
+        PrometheusModule.register({
+          path: '/metrics',
+          defaultMetrics: {
+            enabled: false,
+          },
+        }),
+      ],
       providers: [provider],
       exports: [TRADING_BOT_METRICS],
     };
   }
 }
+
+const getOrCreateMetric = <T>(
+  registry: Registry,
+  name: string,
+  factory: () => T,
+): T => {
+  const existing = registry.getSingleMetric(name);
+
+  return existing ? (existing as T) : factory();
+};

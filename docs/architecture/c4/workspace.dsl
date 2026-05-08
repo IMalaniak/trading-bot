@@ -113,7 +113,7 @@ workspace "Trading Bot System" {
                     outboxDispatcher = component "Outbox Dispatcher" "Uses the shared Kafka outbox dispatcher core with a portfolio-owned Prisma repository adapter." "TypeScript" {
                         tags "Implemented"
                     }
-                    metricsEndpoint = component "Metrics Endpoint" "Exposes Prometheus metrics for Kafka consumer outcomes, retries, DLQ writes, outbox dispatch outcomes, backlog, and oldest pending age." "HTTP /metrics" {
+                    metricsEndpoint = component "Metrics Endpoint" "Exposes Prometheus metrics for Kafka consumer outcomes, retries, DLQ writes, outbox dispatch outcomes, backlog, and oldest pending age." "Nest HTTP /metrics" {
                         tags "Implemented"
                     }
                     instrumentStageConsumer = component "Instrument Stage Consumer" "Consumes trading.signals keyed by instrument_key." "TypeScript" {
@@ -209,7 +209,7 @@ workspace "Trading Bot System" {
                     outboxDispatcher = component "Outbox Dispatcher" "Uses the shared Kafka outbox dispatcher core with an execution-owned Prisma repository adapter and lifecycle ordering." "TypeScript" {
                         tags "Implemented"
                     }
-                    metricsEndpoint = component "Metrics Endpoint" "Exposes Prometheus metrics for Kafka consumer outcomes, retries, DLQ writes, outbox dispatch outcomes, backlog, and oldest pending age." "HTTP /metrics" {
+                    metricsEndpoint = component "Metrics Endpoint" "Exposes Prometheus metrics for Kafka consumer outcomes, retries, DLQ writes, outbox dispatch outcomes, backlog, and oldest pending age." "Nest HTTP /metrics" {
                         tags "Implemented"
                     }
                     kafkaPublisher = component "Kafka Publisher" "Publishes orders.placed and orders.fills execution updates to Kafka." "TypeScript" {
@@ -253,7 +253,7 @@ workspace "Trading Bot System" {
                     portfolioReadAggregator = component "Portfolio Read Aggregator" "Combines portfolio state with recent execution orders into the REST portfolio visibility response." "TypeScript" {
                         tags "Implemented"
                     }
-                    metricsEndpoint = component "Metrics Endpoint" "Exposes API Gateway Prometheus metrics on GET /metrics outside the /api prefix." "HTTP /metrics" {
+                    metricsEndpoint = component "Metrics Endpoint" "Exposes API Gateway Prometheus metrics on GET /metrics outside the /api prefix." "Nest HTTP /metrics" {
                         tags "Implemented"
                     }
                     signalProxy = component "Signal Proxy" "Forwards dashboard queries to Prediction Engine (Signal API)." "TypeScript"

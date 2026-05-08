@@ -201,8 +201,12 @@ the owning service database until Kafka accepts it.
 Prometheus metrics endpoints:
 
 - API Gateway: `GET /metrics` on the existing HTTP app
-- Portfolio Manager: side HTTP listener on `PORTFOLIO_MANAGER_METRICS_PORT`, default `9101`
-- Execution Engine: side HTTP listener on `EXECUTION_ENGINE_METRICS_PORT`, default `9102`
+- Portfolio Manager: Nest hybrid HTTP listener on `PORTFOLIO_MANAGER_METRICS_PORT`, default `9101`
+- Execution Engine: Nest hybrid HTTP listener on `EXECUTION_ENGINE_METRICS_PORT`, default `9102`
+
+The `/metrics` route is provided by `@willsoto/nestjs-prometheus`; application
+metric updates still go through the shared `TradingBotMetrics` facade so unit
+tests can use isolated registries.
 
 Current metric families:
 

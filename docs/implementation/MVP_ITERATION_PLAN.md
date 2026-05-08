@@ -409,7 +409,7 @@ Ensure the MVP survives partial failures and is operable by one engineer.
      - outbox backlog
    - Standardize log fields:
      - `eventId`, `correlationId`, `topic`, `key`, `service`
-   - Expose Prometheus metrics at API Gateway `/metrics`, Portfolio Manager `:9101/metrics`, and Execution Engine `:9102/metrics`.
+   - Expose Prometheus metrics through `@willsoto/nestjs-prometheus` at API Gateway `/metrics`, Portfolio Manager `:9101/metrics`, and Execution Engine `:9102/metrics`.
 3. Failure scenario tests
    - Broker unavailable during emit.
    - Consumer crash/restart while in-flight.

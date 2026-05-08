@@ -5,6 +5,8 @@ per-topic DLQs, durable outbox retry, and Prometheus metrics endpoints.
 
 ## Metrics Endpoints
 
+The endpoints are served by Nest HTTP apps using `@willsoto/nestjs-prometheus`.
+
 - API Gateway: `GET http://localhost:3000/metrics`
 - Portfolio Manager: `GET http://localhost:9101/metrics`
 - Execution Engine: `GET http://localhost:9102/metrics`

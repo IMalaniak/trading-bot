@@ -2,56 +2,64 @@ import { Type } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { MicroserviceOptions, Transport } from '@nestjs/microservices';
+import {
+  FastifyAdapter,
+  NestFastifyApplication,
+} from '@nestjs/platform-fastify';
 import { join } from 'path';
 
 import { PROTO_FOLDER } from '../../proto/index';
 import { commonAppSetup } from './common-app-setup';
 import { createGrpcValidationPipe } from './create-grpc-validation-pipe';
 
-export interface BootstrapGrpcMicroserviceOptions {
+export interface BootstrapGrpcHybridApplicationOptions {
   module: Type<unknown>;
   packageName: string;
   protoPath: string;
   urlConfigKey: string;
+  httpPortConfigKey: string;
+  httpHost?: string;
   protoFolder?: string;
 }
 
-export async function bootstrapGrpcMicroservice({
+export async function bootstrapGrpcHybridApplication({
   module,
   packageName,
   protoPath,
   urlConfigKey,
+  httpPortConfigKey,
+  httpHost = '0.0.0.0',
   protoFolder = PROTO_FOLDER,
-}: BootstrapGrpcMicroserviceOptions): Promise<void> {
-  // Create a short-lived application context to read configuration
-  const appContext = await NestFactory.createApplicationContext(module);
+}: BootstrapGrpcHybridApplicationOptions): Promise<void> {
+  const app = await NestFactory.create<NestFastifyApplication>(
+    module,
+    new FastifyAdapter(),
+    { bufferLogs: true },
+  );
 
-  try {
-    const configService = appContext.get(ConfigService);
+  commonAppSetup(app);
+  app.useGlobalPipes(createGrpcValidationPipe());
 
-    const app = await NestFactory.createMicroservice<MicroserviceOptions>(
-      module,
-      {
-        bufferLogs: true,
-        transport: Transport.GRPC,
-        options: {
-          package: packageName,
-          protoPath: join(process.cwd(), protoPath),
-          url: configService.getOrThrow<string>(urlConfigKey),
-          loader: {
-            includeDirs: [join(process.cwd(), protoFolder)],
-          },
+  const configService = app.get(ConfigService);
+
+  app.connectMicroservice<MicroserviceOptions>(
+    {
+      transport: Transport.GRPC,
+      options: {
+        package: packageName,
+        protoPath: join(process.cwd(), protoPath),
+        url: configService.getOrThrow<string>(urlConfigKey),
+        loader: {
+          includeDirs: [join(process.cwd(), protoFolder)],
         },
       },
-    );
+    },
+    { inheritAppConfig: true },
+  );
 
-    commonAppSetup(app);
-    app.useGlobalPipes(createGrpcValidationPipe());
-
-    await app.listen();
-  } finally {
-    // Close the temporary app context (the microservice has its own module
-    // instance). Closing avoids leaking resources in some runtimes.
-    await appContext.close();
-  }
+  await app.startAllMicroservices();
+  await app.listen(
+    configService.getOrThrow<number>(httpPortConfigKey),
+    httpHost,
+  );
 }
