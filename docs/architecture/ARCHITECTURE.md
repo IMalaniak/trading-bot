@@ -6,6 +6,7 @@
   - [Table of Contents](#table-of-contents)
   - [Architecture Summary](#architecture-summary)
   - [Current Implementation Status](#current-implementation-status)
+  - [Remaining MVP Gaps](#remaining-mvp-gaps)
   - [Target Architecture](#target-architecture)
   - [Eventing, Ordering, and Consistency](#eventing-ordering-and-consistency)
     - [Current event transport contract](#current-event-transport-contract)
@@ -21,6 +22,7 @@
     - [Current: Execution Simulator](#current-execution-simulator)
     - [Current: Fill Reconciliation](#current-fill-reconciliation)
     - [Current: Portfolio Read API and Execution Visibility](#current-portfolio-read-api-and-execution-visibility)
+    - [Planned: MVP Demo Flow](#planned-mvp-demo-flow)
     - [Planned: End-to-End Trading Flow](#planned-end-to-end-trading-flow)
 
 ## Architecture Summary
@@ -67,6 +69,28 @@ Everything else in this document should be read as either:
 | Dashboard                        | Planned              | Not implemented in this repo yet.                                                                      |
 | Schema Registry                  | Planned              | Documented as a future capability; not provisioned in local infra.                                     |
 
+## Remaining MVP Gaps
+
+The backend event chain is implemented through portfolio read visibility. The
+remaining MVP work is about making that chain usable and reproducible:
+
+- Build a minimal React Dashboard demo console as a new Nx frontend app.
+- Use only existing API Gateway product endpoints from the MVP UI:
+  - `POST /api/portfolio/register-instrument`
+  - `GET /api/portfolio/:portfolioId?recentOrdersLimit=20`
+- Default the dashboard to seeded demo data, especially `portfolio-alpha`, while
+  still allowing the portfolio ID to be edited.
+- Add full demo-path e2e coverage that starts isolated local infrastructure,
+  runs migrations and seed data, starts services and dashboard, publishes a
+  synthetic `common.Signal` directly to `trading.signals` from the test harness,
+  waits for reconciliation, checks the REST response, and verifies browser UI
+  rendering.
+- Keep synthetic signal publishing out of product APIs. Until the Prediction
+  Engine exists, direct Kafka signal publishing is test/demo harness behavior,
+  not a Dashboard or API Gateway feature.
+- Polish local demo documentation and env examples so the MVP is reproducible
+  from a clean checkout.
+
 ## Target Architecture
 
 The intended MVP direction remains:
@@ -81,6 +105,12 @@ The intended MVP direction remains:
 That target architecture is still valid. Today the repo implements registration,
 the current two-stage risk pipeline, a durable execution simulator, and fill
 reconciliation. Prediction and real exchange execution remain planned.
+
+For the remaining MVP, the Dashboard should expose the implemented backend
+surface rather than introduce new trading control APIs. It should read portfolio
+visibility and submit instrument registration through API Gateway. Full-flow e2e
+tests may publish synthetic signals directly to Kafka, but that publisher is
+test tooling and is not part of the production container model.
 
 ## Eventing, Ordering, and Consistency
 
@@ -117,7 +147,7 @@ Current payload boundaries:
 
 The risk pipeline intentionally does not reuse `common.Signal` for downstream portfolio-scoped or decision-scoped topics. Those topics carry lifecycle-specific fields such as `source_event_id`, `portfolio_id`, decision kind, and reason codes.
 
-For Iteration 1 through Iteration 3:
+Current event metadata conventions:
 
 - `event-type` is the topic name
 - `schema-version` starts at `"1"` per topic
@@ -342,7 +372,7 @@ stack to be running first.
 Manual registration smoke:
 
 1. Start infra and both apps.
-2. Call `POST /portfolio/register-instrument` on `api-gateway`.
+2. Call `POST /api/portfolio/register-instrument` on `api-gateway`.
 3. Consume from `instrument.registered`.
 4. Verify key, headers, and decoded `InstrumentRegistered` payload.
 
@@ -403,7 +433,7 @@ sequenceDiagram
     participant Outbox as Outbox Dispatcher
     participant Kafka as Message Bus
 
-    Client->>APIGateway: POST /portfolio/register-instrument
+    Client->>APIGateway: POST /api/portfolio/register-instrument
     APIGateway->>PortfolioManager: gRPC RegisterInstrument()
     PortfolioManager->>DB: Insert instrument + outbox row (same transaction)
     DB-->>PortfolioManager: Commit successful
@@ -564,6 +594,54 @@ Current read semantics:
 - `recentOrdersLimit` defaults to `20` and is capped at `100`.
 - API Gateway fails the whole request if either upstream read fails; partial portfolio/execution responses are intentionally not returned.
 
+### Planned: MVP Demo Flow
+
+This is the remaining MVP demo shape. It uses the implemented backend path, adds
+a minimal Dashboard, and keeps synthetic signal publishing in the e2e/manual
+test harness rather than product APIs.
+
+```mermaid
+sequenceDiagram
+    participant Trader
+    participant Dashboard
+    participant APIGateway as API Gateway
+    participant RiskManager as Risk & Portfolio Manager
+    participant ExecutionEngine as Execution Engine
+    participant Kafka as Message Bus
+    participant TestHarness as E2E Test Harness
+
+    Trader->>Dashboard: Open demo console for portfolio-alpha
+    Dashboard->>APIGateway: GET /api/portfolio/portfolio-alpha?recentOrdersLimit=20
+    APIGateway->>RiskManager: gRPC GetPortfolio(portfolio_id)
+    APIGateway->>ExecutionEngine: gRPC ListPortfolioExecutionOrders(portfolio_id, limit)
+    APIGateway-->>Dashboard: Current portfolio summary, positions, and recent orders
+
+    opt Register or inspect demo instrument
+        Trader->>Dashboard: Submit instrument registration form
+        Dashboard->>APIGateway: POST /api/portfolio/register-instrument
+        APIGateway->>RiskManager: gRPC RegisterInstrument()
+        RiskManager->>Kafka: Publish instrument.registered via outbox
+        APIGateway-->>Dashboard: Registered instrument response
+    end
+
+    TestHarness->>Kafka: Publish synthetic common.Signal to trading.signals
+    Kafka-->>RiskManager: Consume signal and publish decision via outbox
+    Kafka-->>ExecutionEngine: Consume trades.approved and publish order/fills via outbox
+    Kafka-->>RiskManager: Consume orders.fills and reconcile portfolio state
+
+    Dashboard->>APIGateway: Refresh GET /api/portfolio/portfolio-alpha?recentOrdersLimit=20
+    APIGateway->>RiskManager: gRPC GetPortfolio(portfolio_id)
+    APIGateway->>ExecutionEngine: gRPC ListPortfolioExecutionOrders(portfolio_id, limit)
+    APIGateway-->>Dashboard: Updated summary, position, order, and fill state
+```
+
+MVP demo boundaries:
+
+- The Dashboard calls only existing API Gateway product endpoints.
+- Synthetic `trading.signals` publishing is owned by e2e/manual demo tooling.
+- The MVP Dashboard does not expose signal injection, strategy editing,
+  start/stop trading, market charts, websocket streaming, or auth.
+
 ### Planned: End-to-End Trading Flow
 
 The flow below is the intended target architecture, not the current repo state.
@@ -591,7 +669,7 @@ sequenceDiagram
     end
 
     Trader->>Dashboard: Register new instrument
-    Dashboard->>APIGateway: POST /portfolio/register-instrument
+    Dashboard->>APIGateway: POST /api/portfolio/register-instrument
     APIGateway->>RiskManager: gRPC RegisterInstrument()
     RiskManager->>DB: Store instrument config + outbox row
     Kafka-->>DataIngestion: Consume instrument.registered

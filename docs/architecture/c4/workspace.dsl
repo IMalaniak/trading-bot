@@ -289,28 +289,50 @@ workspace "Trading Bot System" {
                 core -> binanceClient "Sends requests to Binance via"
             }
 
-            dashboard = container "Dashboard" "React" "User interface for monitoring and controlling the bot." "Single Page Application" {
+            dashboard = container "Dashboard" "React" "Planned user interface. MVP scope is a demo console for portfolio visibility and instrument registration through existing API Gateway endpoints." "Single Page Application" {
                 tags "Planned"
-                router = component "Router" "Handles navigation and routing between UI components." "TypeScript/React"
-                strategyConfigUI = component "Strategy Config UI" "Lets user define/edit strategy preferences." "TypeScript/React"
-                portfolioUI = component "Portfolio View" "Displays portfolio balances, positions, trades." "TypeScript/React"
-                marketChartsUI = component "Market Charts" "Visualizes market data and indicators." "TypeScript/React"
-                signalMonitorUI = component "Signal Monitor" "Shows buy/sell signals and recommendations." "TypeScript/React"
-                controlPanelUI = component "Control Panel" "Allows toggling risk modes, start/stop trading." "TypeScript/React"
+                router = component "Router" "Routes the MVP demo console and later dashboard sections." "TypeScript/React" {
+                    tags "MVP Planned"
+                }
+                portfolioUI = component "MVP Portfolio Demo Console" "Displays the selected portfolio summary, open positions, recent simulated orders, and nested fills. Defaults to seeded portfolio-alpha with an editable portfolio ID." "TypeScript/React" {
+                    tags "MVP Planned"
+                }
+                instrumentRegistrationUI = component "MVP Instrument Registration Form" "Submits instrument registration through API Gateway and shows success, validation, loading, and upstream error states." "TypeScript/React" {
+                    tags "MVP Planned"
+                }
+                refreshStateUI = component "MVP Refresh and Empty States" "Handles refresh, loading, empty, and error states for the demo console." "TypeScript/React" {
+                    tags "MVP Planned"
+                }
+                strategyConfigUI = component "Future Strategy Config UI" "Lets users define and edit strategy preferences after MVP." "TypeScript/React" {
+                    tags "Planned"
+                }
+                marketChartsUI = component "Future Market Charts" "Visualizes market data and indicators after data ingestion and feature engineering exist." "TypeScript/React" {
+                    tags "Planned"
+                }
+                signalMonitorUI = component "Future Signal Monitor" "Shows buy/sell signals and recommendations after the Prediction Engine exists." "TypeScript/React" {
+                    tags "Planned"
+                }
+                controlPanelUI = component "Future Control Panel" "Allows toggling risk modes and start/stop trading after control APIs exist." "TypeScript/React" {
+                    tags "Planned"
+                }
 
                 apiClient = component "API Client" "REST client for communicating with API Gateway." "REST"
 
-                router -> controlPanelUI "Routes starts/stops trading actions via"
-                router -> strategyConfigUI "Routes strategy preferences configuration via"
-                router -> portfolioUI "Routes portfolio and trade history views via"
-                router -> marketChartsUI "Routes market data and indicators views via"
-                router -> signalMonitorUI "Routes buy/sell signals views via"
+                router -> portfolioUI "Routes MVP portfolio visibility via"
+                router -> instrumentRegistrationUI "Routes MVP instrument registration via"
+                router -> refreshStateUI "Routes MVP request states via"
+                router -> controlPanelUI "Will route start/stop trading actions via"
+                router -> strategyConfigUI "Will route strategy preferences configuration via"
+                router -> marketChartsUI "Will route market data and indicators via"
+                router -> signalMonitorUI "Will route buy/sell signals via"
 
-                controlPanelUI -> apiClient "Sends start/stop commands via"
-                strategyConfigUI -> apiClient "Sends strategy config updates via"
-                portfolioUI -> apiClient "Fetches portfolio and trade history via"
-                marketChartsUI -> apiClient "Fetches market data and indicators via"
-                signalMonitorUI -> apiClient "Fetches latest signals via"
+                portfolioUI -> apiClient "Fetches GET /api/portfolio/:portfolioId via"
+                instrumentRegistrationUI -> apiClient "Posts POST /api/portfolio/register-instrument via"
+                refreshStateUI -> portfolioUI "Displays request state for"
+                controlPanelUI -> apiClient "Will send start/stop commands via"
+                strategyConfigUI -> apiClient "Will send strategy config updates via"
+                marketChartsUI -> apiClient "Will fetch market data and indicators via"
+                signalMonitorUI -> apiClient "Will fetch latest signals via"
 
             }
 
@@ -342,7 +364,7 @@ workspace "Trading Bot System" {
         }
 
         // Container-level relationships
-        trader -> tradingBot.dashboard.router "Monitors portfolio and configures strategies"
+        trader -> tradingBot.dashboard.router "Monitors demo portfolio state and later configures strategies"
         operator -> tradingBot.messageBus "Inspects DLQ topics and replays repaired events"
         operator -> tradingBot.portfolioManager.metricsEndpoint "Inspects portfolio-manager metrics"
         operator -> tradingBot.executionEngine.metricsEndpoint "Inspects execution-engine metrics"
@@ -351,7 +373,7 @@ workspace "Trading Bot System" {
         prometheus -> tradingBot.executionEngine.metricsEndpoint "Will scrape metrics from"
         prometheus -> tradingBot.apiGateway.metricsEndpoint "Will scrape metrics from"
 
-        tradingBot.dashboard.apiClient -> tradingBot.apiGateway.REST "Sends API requests (UI)"
+        tradingBot.dashboard.apiClient -> tradingBot.apiGateway.REST "Uses existing portfolio read and instrument registration endpoints"
         tradingBot.apiGateway.gRPC_Client -> tradingBot.dataIngestion.gRPC "Requests market data and subscription updates (Market Data API)"
         tradingBot.apiGateway.gRPC_Client -> tradingBot.predictionEngine.gRPC "Requests current signals / triggers (Signal API)"
         tradingBot.apiGateway.gRPC_Client -> tradingBot.portfolioManager.gRPC "Registers instruments, reads portfolio state, resolves instruments, and later sends risk/strategy updates"
@@ -529,8 +551,10 @@ workspace "Trading Bot System" {
         component tradingBot.dashboard "Dashboard-Components" {
             include trader
             include tradingBot.dashboard.router
-            include tradingBot.dashboard.strategyConfigUI
             include tradingBot.dashboard.portfolioUI
+            include tradingBot.dashboard.instrumentRegistrationUI
+            include tradingBot.dashboard.refreshStateUI
+            include tradingBot.dashboard.strategyConfigUI
             include tradingBot.dashboard.marketChartsUI
             include tradingBot.dashboard.signalMonitorUI
             include tradingBot.dashboard.controlPanelUI
@@ -592,6 +616,10 @@ workspace "Trading Bot System" {
             element "Planned" {
                 background #b2b2b2
                 color #111111
+            }
+            element "MVP Planned" {
+                background #6c8ebf
+                color #ffffff
             }
         }
     }
