@@ -36,11 +36,14 @@ Two principles are already active in the current codebase and should remain stab
 
 The current implementation is still intentionally narrow:
 
-- `api-gateway` exposes the registration REST path.
+- `api-gateway` exposes the registration REST path, portfolio visibility read
+  path, and CORS for the local dashboard origin.
 - `portfolio-manager` stores instruments, runs the current two-stage risk pipeline, writes outbox records, and dispatches Kafka events.
 - `execution-engine` consumes approved trades, persists deterministic simulated order lifecycles, writes outbox records, and dispatches order events.
 - `common` owns shared proto contracts and Kafka contract helpers.
 - `common` also owns the reusable Kafka consumer retry/DLQ wrapper and Prometheus metric helpers used by implemented services.
+- `dashboard` provides the MVP React demo console for portfolio visibility and
+  instrument registration.
 - Local infra provides Redpanda, Postgres, and TimescaleDB.
 
 Everything else in this document should be read as either:
@@ -52,7 +55,7 @@ Everything else in this document should be read as either:
 
 | Area                             | Status               | Notes                                                                                                  |
 | -------------------------------- | -------------------- | ------------------------------------------------------------------------------------------------------ |
-| API Gateway                      | Implemented          | REST entrypoint forwards registration to `portfolio-manager` and aggregates portfolio/execution visibility over gRPC. |
+| API Gateway                      | Implemented          | REST entrypoint forwards registration to `portfolio-manager`, aggregates portfolio/execution visibility over gRPC, and allows configured dashboard CORS origins. |
 | Risk & Portfolio Manager         | Implemented          | Instrument registration, the two-stage risk pipeline, fill reconciliation, portfolio read queries, and instrument resolution are implemented in `portfolio-manager`. |
 | Outbox Dispatcher                | Implemented          | Kafka publish happens from the outbox, not inline with the DB write; shared dispatch mechanics live in `common`. |
 | Shared Contracts (`common`)      | Implemented          | Proto types, topic constants, key builders, Kafka header helpers, and reusable outbox dispatch ports live here. |
@@ -66,7 +69,7 @@ Everything else in this document should be read as either:
 | Execution DB (Postgres schema)   | Implemented          | Source of truth for simulated orders, fills, and execution outbox rows.                                |
 | Reliability & Operability        | Implemented          | Implemented consumers use bounded retry, per-topic DLQs, correlation/causation headers, structured logs, and Prometheus metrics endpoints. |
 | External API Facade              | Planned              | Not implemented in this repo yet.                                                                      |
-| Dashboard                        | Planned              | Not implemented in this repo yet.                                                                      |
+| Dashboard                        | Implemented          | Nx React/Vite/Tailwind MVP console reads portfolio state and registers instruments through API Gateway only. |
 | Schema Registry                  | Planned              | Documented as a future capability; not provisioned in local infra.                                     |
 
 ## Remaining MVP Gaps
@@ -74,22 +77,26 @@ Everything else in this document should be read as either:
 The backend event chain is implemented through portfolio read visibility. The
 remaining MVP work is about making that chain usable and reproducible:
 
-- Build a minimal React Dashboard demo console as a new Nx frontend app.
-- Use only existing API Gateway product endpoints from the MVP UI:
-  - `POST /api/portfolio/register-instrument`
-  - `GET /api/portfolio/:portfolioId?recentOrdersLimit=20`
-- Default the dashboard to seeded demo data, especially `portfolio-alpha`, while
-  still allowing the portfolio ID to be edited.
 - Add full demo-path e2e coverage that starts isolated local infrastructure,
   runs migrations and seed data, starts services and dashboard, publishes a
   synthetic `common.Signal` directly to `trading.signals` from the test harness,
   waits for reconciliation, checks the REST response, and verifies browser UI
   rendering.
+- Polish local demo documentation and env examples so the MVP is reproducible
+  from a clean checkout.
+
+Implemented Dashboard boundary:
+
+- The MVP UI uses only existing API Gateway product endpoints:
+  - `POST /api/portfolio/register-instrument`
+  - `GET /api/portfolio/:portfolioId?recentOrdersLimit=20`
+- The dashboard defaults to seeded demo data, especially `portfolio-alpha`, while
+  still allowing the portfolio ID to be edited.
 - Keep synthetic signal publishing out of product APIs. Until the Prediction
   Engine exists, direct Kafka signal publishing is test/demo harness behavior,
   not a Dashboard or API Gateway feature.
-- Polish local demo documentation and env examples so the MVP is reproducible
-  from a clean checkout.
+- The MVP UI intentionally has no signal injection, list-portfolios API,
+  strategy editor, trading controls, market charts, websocket stream, or auth.
 
 ## Target Architecture
 
@@ -322,6 +329,9 @@ Expected env files:
   - `KAFKA_BROKERS`
   - optional `KAFKA_CONSUMER_RETRY_MAX_ATTEMPTS`, `KAFKA_CONSUMER_RETRY_BASE_MS`, `KAFKA_CONSUMER_RETRY_MAX_MS`
   - optional `PORT` for `api-gateway`
+  - optional `API_GATEWAY_CORS_ORIGINS` for dashboard browser access; defaults to `http://localhost:4200,http://127.0.0.1:4200`
+- `apps/dashboard/.env`
+  - optional `VITE_API_BASE_URL`; defaults in code to `http://localhost:3000/api`
 - `apps/portfolio-manager/.env`
   - `DATABASE_URL`
   - optional `PORTFOLIO_MANAGER_METRICS_PORT`
@@ -348,6 +358,7 @@ npx nx run portfolio-manager:seed
 npx nx serve portfolio-manager
 npx nx serve execution-engine
 npx nx serve api-gateway
+npx nx serve dashboard
 ```
 
 If local Kafka topics need to be re-created after startup, rerun:

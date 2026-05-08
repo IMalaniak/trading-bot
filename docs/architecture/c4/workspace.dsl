@@ -289,19 +289,22 @@ workspace "Trading Bot System" {
                 core -> binanceClient "Sends requests to Binance via"
             }
 
-            dashboard = container "Dashboard" "React" "Planned user interface. MVP scope is a demo console for portfolio visibility and instrument registration through existing API Gateway endpoints." "Single Page Application" {
-                tags "Planned"
+            dashboard = container "Dashboard" "React, Vite, Tailwind CSS" "Implemented MVP demo console for portfolio visibility and instrument registration through existing API Gateway endpoints." "Single Page Application" {
+                tags "Implemented"
                 router = component "Router" "Routes the MVP demo console and later dashboard sections." "TypeScript/React" {
-                    tags "MVP Planned"
+                    tags "Implemented"
                 }
                 portfolioUI = component "MVP Portfolio Demo Console" "Displays the selected portfolio summary, open positions, recent simulated orders, and nested fills. Defaults to seeded portfolio-alpha with an editable portfolio ID." "TypeScript/React" {
-                    tags "MVP Planned"
+                    tags "Implemented"
                 }
                 instrumentRegistrationUI = component "MVP Instrument Registration Form" "Submits instrument registration through API Gateway and shows success, validation, loading, and upstream error states." "TypeScript/React" {
-                    tags "MVP Planned"
+                    tags "Implemented"
                 }
                 refreshStateUI = component "MVP Refresh and Empty States" "Handles refresh, loading, empty, and error states for the demo console." "TypeScript/React" {
-                    tags "MVP Planned"
+                    tags "Implemented"
+                }
+                themeUI = component "Theme Controller" "Uses system preference by default and allows Light/System/Dark user override." "TypeScript/React" {
+                    tags "Implemented"
                 }
                 strategyConfigUI = component "Future Strategy Config UI" "Lets users define and edit strategy preferences after MVP." "TypeScript/React" {
                     tags "Planned"
@@ -316,11 +319,14 @@ workspace "Trading Bot System" {
                     tags "Planned"
                 }
 
-                apiClient = component "API Client" "REST client for communicating with API Gateway." "REST"
+                apiClient = component "API Client" "REST client for communicating with API Gateway using the configured VITE_API_BASE_URL." "REST" {
+                    tags "Implemented"
+                }
 
                 router -> portfolioUI "Routes MVP portfolio visibility via"
                 router -> instrumentRegistrationUI "Routes MVP instrument registration via"
                 router -> refreshStateUI "Routes MVP request states via"
+                router -> themeUI "Routes theme shell via"
                 router -> controlPanelUI "Will route start/stop trading actions via"
                 router -> strategyConfigUI "Will route strategy preferences configuration via"
                 router -> marketChartsUI "Will route market data and indicators via"
@@ -328,6 +334,7 @@ workspace "Trading Bot System" {
 
                 portfolioUI -> apiClient "Fetches GET /api/portfolio/:portfolioId via"
                 instrumentRegistrationUI -> apiClient "Posts POST /api/portfolio/register-instrument via"
+                refreshStateUI -> apiClient "Normalizes loading and upstream errors from"
                 refreshStateUI -> portfolioUI "Displays request state for"
                 controlPanelUI -> apiClient "Will send start/stop commands via"
                 strategyConfigUI -> apiClient "Will send strategy config updates via"
@@ -554,6 +561,7 @@ workspace "Trading Bot System" {
             include tradingBot.dashboard.portfolioUI
             include tradingBot.dashboard.instrumentRegistrationUI
             include tradingBot.dashboard.refreshStateUI
+            include tradingBot.dashboard.themeUI
             include tradingBot.dashboard.strategyConfigUI
             include tradingBot.dashboard.marketChartsUI
             include tradingBot.dashboard.signalMonitorUI
