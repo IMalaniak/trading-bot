@@ -398,8 +398,9 @@ Ensure the MVP survives partial failures and is operable by one engineer.
 ### Detailed Tasks
 
 1. Retry and DLQ design
-   - Define max retry attempts and backoff policy per consumer.
-   - Define dead-letter topics and payload shape.
+   - Implement shared consumer retry wrapper with 5 total attempts by default.
+   - Add per-topic DLQs for `trading.signals`, `trading.signals.portfolio`, `trades.approved`, and `orders.fills`.
+   - Add protobuf `DeadLetterEvent` envelope carrying original topic, partition, offset, key, headers, bytes, service, consumer group, attempts, error fields, and correlation/causation IDs.
 2. Observability
    - Add counters and timers for:
      - consume rate
@@ -408,6 +409,7 @@ Ensure the MVP survives partial failures and is operable by one engineer.
      - outbox backlog
    - Standardize log fields:
      - `eventId`, `correlationId`, `topic`, `key`, `service`
+   - Expose Prometheus metrics at API Gateway `/metrics`, Portfolio Manager `:9101/metrics`, and Execution Engine `:9102/metrics`.
 3. Failure scenario tests
    - Broker unavailable during emit.
    - Consumer crash/restart while in-flight.
@@ -429,6 +431,7 @@ Ensure the MVP survives partial failures and is operable by one engineer.
 - System recovers from temporary broker or DB failure without losing committed business events.
 - DLQ path is verified in test or controlled local drill.
 - Operational docs are sufficient to execute replay/recovery.
+- Outbox events are not dead-lettered; they remain retryable and observable through backlog metrics.
 
 ### Validation Commands
 

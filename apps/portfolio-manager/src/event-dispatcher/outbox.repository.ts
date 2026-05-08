@@ -12,6 +12,17 @@ import { randomUUID } from 'crypto';
 import { OutboxEventStatus, Prisma } from '../prisma/generated/client';
 import { PrismaService } from '../prisma/prisma.service';
 
+export interface OutboxBacklogMetricRow {
+  topic: string;
+  status: string;
+  count: number;
+}
+
+export interface OutboxBacklogMetrics {
+  rows: OutboxBacklogMetricRow[];
+  oldestPendingAt: Date | null;
+}
+
 @Injectable()
 export class OutboxRepository implements OutboxDispatcherRepository {
   constructor(private readonly prisma: PrismaService) {}
@@ -98,5 +109,38 @@ export class OutboxRepository implements OutboxDispatcherRepository {
         lastError,
       },
     });
+  }
+
+  async getBacklogMetrics(): Promise<OutboxBacklogMetrics> {
+    const statuses = [
+      OutboxEventStatus.PENDING,
+      OutboxEventStatus.IN_FLIGHT,
+      OutboxEventStatus.FAILED,
+    ];
+    const [rows, oldestPending] = await Promise.all([
+      this.prisma.outboxEvent.groupBy({
+        by: ['topic', 'status'],
+        where: {
+          status: { in: statuses },
+        },
+        _count: { _all: true },
+      }),
+      this.prisma.outboxEvent.findFirst({
+        where: {
+          status: { in: statuses },
+        },
+        orderBy: { createdAt: 'asc' },
+        select: { createdAt: true },
+      }),
+    ]);
+
+    return {
+      rows: rows.map((row) => ({
+        topic: row.topic,
+        status: row.status,
+        count: row._count._all,
+      })),
+      oldestPendingAt: oldestPending?.createdAt ?? null,
+    };
   }
 }

@@ -9,6 +9,7 @@ import {
   portfolioKey,
 } from '@trading-bot/common';
 import {
+  DeadLetterEvent,
   OrderFill,
   OrderPlaced,
   OrderStatus,
@@ -29,6 +30,7 @@ import { AppModule } from '../app/app.module';
 import { executionEngineRuntimeConfig } from '../config/runtime.config';
 import { EventDispatcherService } from '../event-dispatcher/event-dispatcher.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { KAFKA_CONSUMER_GROUPS } from './const/kafka-consumer-groups';
 
 type CollectedMessage =
   | {
@@ -170,6 +172,7 @@ describe('Execution engine integration', () => {
 
     for (const topic of [
       KAFKA_TOPICS.TRADES_APPROVED,
+      KAFKA_TOPICS.TRADES_APPROVED_DLQ,
       KAFKA_TOPICS.ORDERS_PLACED,
       KAFKA_TOPICS.ORDERS_FILLS,
     ]) {
@@ -289,5 +292,72 @@ describe('Execution engine integration', () => {
     expect(await prisma.executionOrder.count()).toBe(1);
     expect(await prisma.executionFill.count()).toBe(2);
     expect(await prisma.outboxEvent.count()).toBe(3);
+  });
+
+  it('sends malformed approved trades to the per-topic DLQ before committing', async () => {
+    const dlqCollector = await startKafkaMessageCollector({
+      kafka,
+      topics: [KAFKA_TOPICS.TRADES_APPROVED_DLQ],
+      groupIdPrefix: 'execution-engine-dlq-integration',
+      mapMessage: ({ key, headers, value }) => ({
+        key,
+        headers,
+        payload: DeadLetterEvent.decode(value ?? new Uint8Array()),
+      }),
+    });
+
+    try {
+      await kafkaProducer.send({
+        topic: KAFKA_TOPICS.TRADES_APPROVED,
+        messages: [
+          {
+            key: portfolioKey('portfolio-alpha'),
+            value: Buffer.from([255]),
+            headers: buildEventMetadataHeaders({
+              eventId: 'malformed-approval-event',
+              eventType: KAFKA_TOPICS.TRADES_APPROVED,
+              schemaVersion: KAFKA_EVENT_SCHEMA_VERSIONS.TRADES_APPROVED,
+              occurredAt: new Date().toISOString(),
+              producer: KAFKA_EVENT_PRODUCERS.PORTFOLIO_MANAGER,
+              correlationId: 'workflow-1',
+            }),
+          },
+        ],
+      });
+
+      await waitForCondition(
+        () => dlqCollector.messages.length === 1,
+        10000,
+        'Timed out waiting for approved trade DLQ message.',
+      );
+
+      const deadLetter = dlqCollector.messages[0]?.payload;
+
+      expect(await prisma.executionOrder.count()).toBe(0);
+      expect(deadLetter).toEqual(
+        expect.objectContaining({
+          originalTopic: KAFKA_TOPICS.TRADES_APPROVED,
+          originalKey: 'portfolio-alpha',
+          attempts: 5,
+          service: KAFKA_EVENT_PRODUCERS.EXECUTION_ENGINE,
+          consumerGroup: KAFKA_CONSUMER_GROUPS.APPROVED_TRADES,
+          correlationId: 'workflow-1',
+          causationId: 'malformed-approval-event',
+        }),
+      );
+      expect(deadLetter?.originalValue).toEqual(Buffer.from([255]));
+      expect(dlqCollector.messages[0]?.key).toBe('portfolio-alpha');
+      expect(dlqCollector.messages[0]?.headers).toEqual(
+        expect.objectContaining({
+          [KAFKA_EVENT_HEADER_NAMES.EVENT_TYPE]:
+            KAFKA_TOPICS.TRADES_APPROVED_DLQ,
+          [KAFKA_EVENT_HEADER_NAMES.CORRELATION_ID]: 'workflow-1',
+          [KAFKA_EVENT_HEADER_NAMES.CAUSATION_ID]: 'malformed-approval-event',
+        }),
+      );
+    } finally {
+      await dlqCollector.consumer.stop();
+      await dlqCollector.consumer.disconnect();
+    }
   });
 });

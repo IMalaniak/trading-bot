@@ -6,6 +6,7 @@ describe('EventDispatcherService', () => {
     claimBatch: jest.Mock;
     markDispatched: jest.Mock;
     markFailed: jest.Mock;
+    getBacklogMetrics: jest.Mock;
   };
   let kafkaClient: {
     connect: jest.MockedFunction<() => Promise<void>>;
@@ -13,6 +14,11 @@ describe('EventDispatcherService', () => {
     emit: jest.Mock;
   };
   let service: EventDispatcherService;
+  let metrics: {
+    recordOutboxDispatch: jest.Mock;
+    setOutboxBacklog: jest.Mock;
+    setOldestOutboxAgeSeconds: jest.Mock;
+  };
 
   beforeEach(() => {
     outboxRepository = {
@@ -20,16 +26,26 @@ describe('EventDispatcherService', () => {
       claimBatch: jest.fn(),
       markDispatched: jest.fn(),
       markFailed: jest.fn(),
+      getBacklogMetrics: jest.fn().mockResolvedValue({
+        rows: [],
+        oldestPendingAt: null,
+      }),
     };
     kafkaClient = {
       connect: jest.fn(),
       close: jest.fn(),
       emit: jest.fn(),
     };
+    metrics = {
+      recordOutboxDispatch: jest.fn(),
+      setOutboxBacklog: jest.fn(),
+      setOldestOutboxAgeSeconds: jest.fn(),
+    };
     service = new EventDispatcherService(
       outboxRepository as never,
       kafkaClient as never,
       { enableOutboxInterval: false, enableApprovedTradesConsumer: false },
+      metrics as never,
     );
   });
 
@@ -52,6 +68,7 @@ describe('EventDispatcherService', () => {
       outboxRepository as never,
       kafkaClient as never,
       { enableOutboxInterval: true, enableApprovedTradesConsumer: false },
+      metrics as never,
     );
 
     await service.onModuleInit();
@@ -92,5 +109,6 @@ describe('EventDispatcherService', () => {
       batchSize: 50,
       staleInFlightTimeoutMs: 30000,
     });
+    expect(metrics.setOldestOutboxAgeSeconds).toHaveBeenCalledWith(0);
   });
 });

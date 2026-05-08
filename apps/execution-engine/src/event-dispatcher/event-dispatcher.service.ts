@@ -8,7 +8,11 @@ import {
 import type { ConfigType } from '@nestjs/config';
 import { ClientKafka } from '@nestjs/microservices';
 import type { OutboxMessageInput } from '@trading-bot/common';
-import { KafkaOutboxDispatcher } from '@trading-bot/common';
+import {
+  InjectTradingBotMetrics,
+  KafkaOutboxDispatcher,
+  TradingBotMetrics,
+} from '@trading-bot/common';
 
 import { executionEngineRuntimeConfig } from '../config/runtime.config';
 import { Prisma } from '../prisma/generated/client';
@@ -31,11 +35,14 @@ export class EventDispatcherService implements OnModuleInit, OnModuleDestroy {
     private readonly runtimeConfig: ConfigType<
       typeof executionEngineRuntimeConfig
     >,
+    @InjectTradingBotMetrics()
+    private readonly metrics: TradingBotMetrics,
   ) {
     this.dispatcher = new KafkaOutboxDispatcher({
       repository: outboxRepository,
       kafkaEmitter: kafkaClient,
       logger: this.logger,
+      metrics: this.metrics,
     });
   }
 
@@ -76,5 +83,26 @@ export class EventDispatcherService implements OnModuleInit, OnModuleDestroy {
 
   async dispatchOutboxBatch(): Promise<void> {
     await this.dispatcher.dispatchBatch();
+    await this.refreshOutboxMetrics();
+  }
+
+  private async refreshOutboxMetrics(): Promise<void> {
+    const backlog = await this.outboxRepository.getBacklogMetrics();
+
+    for (const row of backlog.rows) {
+      this.metrics.setOutboxBacklog(
+        {
+          topic: row.topic,
+          status: row.status,
+        },
+        row.count,
+      );
+    }
+
+    this.metrics.setOldestOutboxAgeSeconds(
+      backlog.oldestPendingAt
+        ? Math.max(0, (Date.now() - backlog.oldestPendingAt.getTime()) / 1000)
+        : 0,
+    );
   }
 }

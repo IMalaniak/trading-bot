@@ -50,6 +50,8 @@ describe('InstrumentRegisteredEventFactory', () => {
       [KAFKA_EVENT_HEADER_NAMES.PRODUCER]:
         KAFKA_EVENT_PRODUCERS.PORTFOLIO_MANAGER,
       [KAFKA_EVENT_HEADER_NAMES.CONTENT_TYPE]: 'application/x-protobuf',
+      [KAFKA_EVENT_HEADER_NAMES.CORRELATION_ID]: event.message
+        .eventId as string,
     });
     expect(payload).toEqual({
       instrument: {

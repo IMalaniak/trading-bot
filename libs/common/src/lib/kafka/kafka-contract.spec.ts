@@ -1,4 +1,5 @@
 import {
+  DeadLetterEvent,
   OrderFill,
   OrderPlaced,
   OrderStatus,
@@ -10,6 +11,8 @@ import {
 } from '../../proto';
 import {
   buildEventMetadataHeaders,
+  childKafkaEventContext,
+  deadLetterTopicFor,
   instrumentKey,
   KAFKA_EVENT_CONTENT_TYPES,
   KAFKA_EVENT_HEADER_NAMES,
@@ -52,7 +55,46 @@ describe('Kafka contract', () => {
         KAFKA_EVENT_PRODUCERS.PORTFOLIO_MANAGER,
       [KAFKA_EVENT_HEADER_NAMES.CONTENT_TYPE]:
         KAFKA_EVENT_CONTENT_TYPES.PROTOBUF,
+      [KAFKA_EVENT_HEADER_NAMES.CORRELATION_ID]: 'event-1',
     });
+  });
+
+  it('propagates correlation, causation, and trace headers', () => {
+    const childContext = childKafkaEventContext(
+      {
+        eventId: 'source-event-1',
+        correlationId: 'workflow-1',
+        traceparent: '00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00',
+      },
+      'child-event-1',
+    );
+
+    expect(
+      buildEventMetadataHeaders({
+        eventId: 'child-event-1',
+        eventType: KAFKA_TOPICS.TRADING_SIGNALS_PORTFOLIO,
+        schemaVersion: KAFKA_EVENT_SCHEMA_VERSIONS.TRADING_SIGNALS_PORTFOLIO,
+        occurredAt: '2026-03-22T12:34:56.789Z',
+        producer: KAFKA_EVENT_PRODUCERS.PORTFOLIO_MANAGER,
+        ...childContext,
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        [KAFKA_EVENT_HEADER_NAMES.CORRELATION_ID]: 'workflow-1',
+        [KAFKA_EVENT_HEADER_NAMES.CAUSATION_ID]: 'source-event-1',
+        [KAFKA_EVENT_HEADER_NAMES.TRACEPARENT]:
+          '00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00',
+      }),
+    );
+  });
+
+  it('maps source topics to per-topic dead-letter topics', () => {
+    expect(deadLetterTopicFor(KAFKA_TOPICS.TRADING_SIGNALS)).toBe(
+      KAFKA_TOPICS.TRADING_SIGNALS_DLQ,
+    );
+    expect(deadLetterTopicFor(KAFKA_TOPICS.TRADES_APPROVED)).toBe(
+      KAFKA_TOPICS.TRADES_APPROVED_DLQ,
+    );
   });
 
   it('reads required Kafka headers and advances offsets', () => {
@@ -174,5 +216,37 @@ describe('Kafka contract', () => {
     expect(decoded.changedPositionExposureNotional).toBe(
       '150.000000000000000004',
     );
+  });
+
+  it('round-trips dead-letter events with original bytes and headers', () => {
+    const deadLetter = DeadLetterEvent.fromPartial({
+      originalTopic: KAFKA_TOPICS.ORDERS_FILLS,
+      originalPartition: 2,
+      originalOffset: '42',
+      originalKey: 'portfolio-alpha',
+      originalValue: Buffer.from([1, 2, 3]),
+      originalHeaders: [
+        { name: KAFKA_EVENT_HEADER_NAMES.EVENT_ID, value: 'fill-event-1' },
+      ],
+      service: KAFKA_EVENT_PRODUCERS.PORTFOLIO_MANAGER,
+      consumerGroup: 'portfolio-manager-order-fills',
+      attempts: 5,
+      failureClass: 'Error',
+      errorMessage: 'boom',
+      firstFailedAt: '2026-03-22T12:34:56.789Z',
+      deadLetteredAt: '2026-03-22T12:35:01.789Z',
+      correlationId: 'workflow-1',
+      causationId: 'fill-event-1',
+    });
+
+    const decoded = DeadLetterEvent.decode(
+      DeadLetterEvent.encode(deadLetter).finish(),
+    );
+
+    expect(decoded.originalValue).toEqual(Buffer.from([1, 2, 3]));
+    expect(decoded.originalHeaders).toEqual([
+      { name: KAFKA_EVENT_HEADER_NAMES.EVENT_ID, value: 'fill-event-1' },
+    ]);
+    expect(decoded.correlationId).toBe('workflow-1');
   });
 });

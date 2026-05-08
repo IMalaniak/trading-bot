@@ -8,3 +8,7 @@ trades.rejected
 orders.placed
 orders.fills
 portfolio.updated
+trading.signals.dlq
+trading.signals.portfolio.dlq
+trades.approved.dlq
+orders.fills.dlq
