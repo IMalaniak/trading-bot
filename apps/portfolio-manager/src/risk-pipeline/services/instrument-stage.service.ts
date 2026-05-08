@@ -120,6 +120,7 @@ export class InstrumentStageService {
           const event = this.portfolioSignalCandidateEventFactory.create(
             candidate,
             context.signal,
+            context.eventContext,
           );
 
           await this.eventDispatcher.enqueueEvent(

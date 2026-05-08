@@ -45,6 +45,13 @@ export interface OutboxDispatcherLogger {
   error(message: string, error?: unknown): void;
 }
 
+export interface OutboxDispatcherMetrics {
+  recordOutboxDispatch(
+    labels: { topic: string },
+    outcome: 'success' | 'failure',
+  ): void;
+}
+
 export interface OutboxDispatcherOptions {
   batchSize?: number;
   emitAttempts?: number;
@@ -61,6 +68,7 @@ export interface OutboxDispatcherInput {
   repository: OutboxDispatcherRepository;
   kafkaEmitter: OutboxKafkaEmitter;
   logger: OutboxDispatcherLogger;
+  metrics?: OutboxDispatcherMetrics;
   options?: OutboxDispatcherOptions;
 }
 
@@ -166,6 +174,10 @@ export class KafkaOutboxDispatcher {
         `Outbox event ${event.id} dispatched successfully`,
       );
       await this.input.repository.markDispatched(event.id, this.options.now());
+      this.input.metrics?.recordOutboxDispatch(
+        { topic: event.topic },
+        'success',
+      );
       return;
     }
 
@@ -186,6 +198,7 @@ export class KafkaOutboxDispatcher {
       nextAttemptAt,
       lastError: error,
     });
+    this.input.metrics?.recordOutboxDispatch({ topic: event.topic }, 'failure');
   }
 
   private async emitEvent(event: OutboxDispatchRecord): Promise<string | null> {

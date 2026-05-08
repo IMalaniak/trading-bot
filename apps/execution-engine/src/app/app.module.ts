@@ -1,7 +1,11 @@
 import { join } from 'node:path';
 
 import { Module } from '@nestjs/common';
-import { CommonModule } from '@trading-bot/common';
+import {
+  CommonModule,
+  KAFKA_EVENT_PRODUCERS,
+  TradingBotMetricsModule,
+} from '@trading-bot/common';
 
 import { executionEngineRuntimeConfig } from '../config/runtime.config';
 import { validate } from '../env.validation';
@@ -19,9 +23,9 @@ const appEnvPath = join(__dirname, '../../.env');
         validate,
       },
     }),
+    TradingBotMetricsModule.forRoot(KAFKA_EVENT_PRODUCERS.EXECUTION_ENGINE),
     ExecutionModule,
   ],
   controllers: [],
-  providers: [],
 })
 export class AppModule {}

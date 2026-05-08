@@ -7,9 +7,16 @@ import {
 } from '@nestjs/common';
 import type { ConfigType } from '@nestjs/config';
 import { ConfigService } from '@nestjs/config';
-import { KAFKA_TOPICS, nextKafkaOffset } from '@trading-bot/common';
+import {
+  deadLetterTopicFor,
+  InjectTradingBotMetrics,
+  KAFKA_EVENT_PRODUCERS,
+  KAFKA_TOPICS,
+  ReliableKafkaConsumer,
+  TradingBotMetrics,
+} from '@trading-bot/common';
 import { PortfolioSignalCandidate } from '@trading-bot/common/proto';
-import { Consumer, Kafka, logLevel } from 'kafkajs';
+import { Consumer, Kafka, logLevel, Producer } from 'kafkajs';
 
 import { portfolioManagerRuntimeConfig } from '../config/runtime.config';
 import { KAFKA_CONSUMER_GROUPS } from './const/kafka-consumer-groups';
@@ -19,6 +26,8 @@ import { PortfolioStageService } from './services/portfolio-stage.service';
 export class PortfolioTopicConsumer implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(PortfolioTopicConsumer.name);
   private consumer?: Consumer;
+  private dlqProducer?: Producer;
+  private runner?: ReliableKafkaConsumer<PortfolioSignalCandidate>;
 
   constructor(
     private readonly configService: ConfigService,
@@ -27,6 +36,8 @@ export class PortfolioTopicConsumer implements OnModuleInit, OnModuleDestroy {
     private readonly runtimeConfig: ConfigType<
       typeof portfolioManagerRuntimeConfig
     >,
+    @InjectTradingBotMetrics()
+    private readonly metrics: TradingBotMetrics,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -47,8 +58,27 @@ export class PortfolioTopicConsumer implements OnModuleInit, OnModuleDestroy {
     this.consumer = kafka.consumer({
       groupId: KAFKA_CONSUMER_GROUPS.PORTFOLIO_STAGE,
     });
+    this.dlqProducer = kafka.producer();
+    this.runner = new ReliableKafkaConsumer({
+      service: KAFKA_EVENT_PRODUCERS.PORTFOLIO_MANAGER,
+      consumerGroup: KAFKA_CONSUMER_GROUPS.PORTFOLIO_STAGE,
+      sourceTopic: KAFKA_TOPICS.TRADING_SIGNALS_PORTFOLIO,
+      dlqTopic: deadLetterTopicFor(KAFKA_TOPICS.TRADING_SIGNALS_PORTFOLIO),
+      decode: (value) => PortfolioSignalCandidate.decode(value),
+      handle: async ({ payload, eventContext }) => {
+        await this.portfolioStageService.handleCandidate(payload, eventContext);
+      },
+      commitOffset: async (offset) => {
+        await this.consumer?.commitOffsets([offset]);
+      },
+      dlqProducer: this.dlqProducer,
+      logger: this.logger,
+      metrics: this.metrics,
+      retryPolicy: this.retryPolicy(),
+    });
 
     await this.consumer.connect();
+    await this.dlqProducer.connect();
     await this.consumer.subscribe({
       topic: KAFKA_TOPICS.TRADING_SIGNALS_PORTFOLIO,
       fromBeginning: false,
@@ -56,20 +86,8 @@ export class PortfolioTopicConsumer implements OnModuleInit, OnModuleDestroy {
 
     await this.consumer.run({
       autoCommit: false,
-      eachMessage: async ({ topic, partition, message }) => {
-        const candidate = PortfolioSignalCandidate.decode(
-          message.value ?? new Uint8Array(),
-        );
-
-        await this.portfolioStageService.handleCandidate(candidate);
-
-        await this.consumer?.commitOffsets([
-          {
-            topic,
-            partition,
-            offset: nextKafkaOffset(message.offset),
-          },
-        ]);
+      eachMessage: async (payload) => {
+        await this.runner?.handleMessage(payload);
       },
     });
   }
@@ -88,5 +106,31 @@ export class PortfolioTopicConsumer implements OnModuleInit, OnModuleDestroy {
       });
       this.consumer = undefined;
     }
+    if (this.dlqProducer) {
+      await this.dlqProducer.disconnect().catch((error: Error) => {
+        this.logger.warn(
+          `Failed to disconnect portfolio candidate DLQ producer: ${error.message}`,
+        );
+      });
+      this.dlqProducer = undefined;
+    }
+    this.runner = undefined;
+  }
+
+  private retryPolicy() {
+    return {
+      maxAttempts: this.configService.get<number>(
+        'KAFKA_CONSUMER_RETRY_MAX_ATTEMPTS',
+        5,
+      ),
+      retryBaseMs: this.configService.get<number>(
+        'KAFKA_CONSUMER_RETRY_BASE_MS',
+        250,
+      ),
+      retryMaxMs: this.configService.get<number>(
+        'KAFKA_CONSUMER_RETRY_MAX_MS',
+        5000,
+      ),
+    };
   }
 }

@@ -2,9 +2,11 @@ import { Injectable } from '@nestjs/common';
 import type { OutboxMessageInput } from '@trading-bot/common';
 import {
   buildEventMetadataHeaders,
+  childKafkaEventContext,
   KAFKA_EVENT_PRODUCERS,
   KAFKA_EVENT_SCHEMA_VERSIONS,
   KAFKA_TOPICS,
+  type KafkaEventContext,
   portfolioKey,
 } from '@trading-bot/common';
 import {
@@ -67,9 +69,11 @@ export class TradeDecisionEventFactory {
   create(
     candidate: CandidateRecord,
     decisionRecord: RiskDecisionRecord,
+    parentContext?: KafkaEventContext,
   ): TradeDecisionEvent {
     const eventId = randomUUID();
     const occurredAt = decisionRecord.decidedAt.toISOString();
+    const eventContext = childKafkaEventContext(parentContext, eventId);
     const topic =
       decisionRecord.decision === RiskDecisionStatus.APPROVED
         ? KAFKA_TOPICS.TRADES_APPROVED
@@ -102,6 +106,9 @@ export class TradeDecisionEventFactory {
               : KAFKA_EVENT_SCHEMA_VERSIONS.TRADES_REJECTED,
           occurredAt,
           producer: KAFKA_EVENT_PRODUCERS.PORTFOLIO_MANAGER,
+          correlationId: eventContext.correlationId,
+          causationId: eventContext.causationId,
+          traceparent: eventContext.traceparent,
         }),
       },
     };

@@ -12,12 +12,14 @@ describe('KafkaOutboxDispatcher', () => {
     warn: jest.Mock;
     error: jest.Mock;
   };
+  let metrics: { recordOutboxDispatch: jest.Mock };
 
   const createDispatcher = () =>
     new KafkaOutboxDispatcher({
       repository,
       kafkaEmitter,
       logger,
+      metrics,
       options: {
         emitRetryBaseMs: 0,
         now: () => new Date('2026-03-25T12:00:00.000Z'),
@@ -38,6 +40,9 @@ describe('KafkaOutboxDispatcher', () => {
       debug: jest.fn(),
       warn: jest.fn(),
       error: jest.fn(),
+    };
+    metrics = {
+      recordOutboxDispatch: jest.fn(),
     };
   });
 
@@ -82,6 +87,10 @@ describe('KafkaOutboxDispatcher', () => {
       'orders.fills',
     ]);
     expect(repository.markDispatched.mock.calls).toHaveLength(3);
+    expect(metrics.recordOutboxDispatch).toHaveBeenCalledWith(
+      { topic: 'orders.placed' },
+      'success',
+    );
   });
 
   it('marks failed events with retry state after emit attempts are exhausted', async () => {
@@ -111,5 +120,9 @@ describe('KafkaOutboxDispatcher', () => {
         },
       ],
     ]);
+    expect(metrics.recordOutboxDispatch).toHaveBeenCalledWith(
+      { topic: 'orders.placed' },
+      'failure',
+    );
   });
 });

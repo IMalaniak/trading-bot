@@ -1,10 +1,38 @@
 import nx from '@nx/eslint-plugin';
 import eslint from '@eslint/js';
 import eslintPluginPrettierRecommended from 'eslint-plugin-prettier/recommended';
+import eslintNestJs from '@darraghor/eslint-plugin-nestjs-typed';
 import tseslint from 'typescript-eslint';
 import unusedImports from 'eslint-plugin-unused-imports';
 import simpleImports from 'eslint-plugin-simple-import-sort';
 import { defineConfig } from 'eslint/config';
+
+export function nestjsTypedConfigForProject(projectRoot, { swagger = false } = {}) {
+  const sourceGlob = `${projectRoot}/src/**/*.ts`;
+  const recommendedRules = eslintNestJs.configs.flatRecommended[1].rules;
+  const noSwaggerRules = eslintNestJs.configs.flatNoSwagger[0].rules;
+
+  return [
+    {
+      name: `${projectRoot}/nestjs-typed`,
+      files: [sourceGlob],
+      plugins: {
+        '@darraghor/nestjs-typed': eslintNestJs.plugin,
+      },
+      rules: {
+        ...recommendedRules,
+        ...(swagger ? {} : noSwaggerRules),
+        '@darraghor/nestjs-typed/injectable-should-be-provided': [
+          'error',
+          {
+            src: [sourceGlob],
+            filterFromPaths: ['dist', 'node_modules', '.test.', '.spec.', 'src/prisma/generated'],
+          },
+        ],
+      },
+    },
+  ];
+}
 
 export default defineConfig(
   ...nx.configs['flat/base'],

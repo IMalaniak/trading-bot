@@ -1,8 +1,9 @@
-import baseConfig from '../../eslint.config.mjs';
+import baseConfig, { nestjsTypedConfigForProject } from '../../eslint.config.mjs';
 import globals from 'globals';
 
 export default [
   ...baseConfig,
+  ...nestjsTypedConfigForProject('apps/portfolio-manager'),
   {
     languageOptions: {
       globals: {

@@ -1,3 +1,4 @@
+import { KafkaEventContext } from '@trading-bot/common';
 import { OrderFill, SignalSide } from '@trading-bot/common/proto';
 
 import { PortfolioOrderStatus } from '../../prisma/generated/enums';
@@ -8,6 +9,7 @@ export interface SourceFillContext {
   kafkaKey: string;
   receivedAt: Date;
   fill: OrderFill;
+  eventContext?: KafkaEventContext;
 }
 
 export interface NormalizedOrderFill {

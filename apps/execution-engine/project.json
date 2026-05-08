@@ -56,7 +56,8 @@
       },
       "configurations": {
         "development": {
-          "buildTarget": "execution-engine:build:development"
+          "buildTarget": "execution-engine:build:development",
+          "port": 9231
         },
         "production": {
           "buildTarget": "execution-engine:build:production"

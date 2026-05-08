@@ -2,9 +2,11 @@ import { Injectable } from '@nestjs/common';
 import type { OutboxMessageInput } from '@trading-bot/common';
 import {
   buildEventMetadataHeaders,
+  childKafkaEventContext,
   KAFKA_EVENT_PRODUCERS,
   KAFKA_EVENT_SCHEMA_VERSIONS,
   KAFKA_TOPICS,
+  type KafkaEventContext,
   portfolioKey,
 } from '@trading-bot/common';
 import { PortfolioUpdated } from '@trading-bot/common/proto';
@@ -18,9 +20,13 @@ interface PortfolioUpdatedEvent {
 
 @Injectable()
 export class PortfolioUpdatedEventFactory {
-  create(snapshot: PortfolioSummarySnapshotRecord): PortfolioUpdatedEvent {
+  create(
+    snapshot: PortfolioSummarySnapshotRecord,
+    parentContext?: KafkaEventContext,
+  ): PortfolioUpdatedEvent {
     const eventId = `${snapshot.sourceFillId}:portfolio-updated`;
     const occurredAt = snapshot.updatedAt.toISOString();
+    const eventContext = childKafkaEventContext(parentContext, eventId);
     const payload = PortfolioUpdated.fromPartial({
       portfolioId: snapshot.portfolioId,
       sourceFillId: snapshot.sourceFillId,
@@ -48,6 +54,9 @@ export class PortfolioUpdatedEventFactory {
           schemaVersion: KAFKA_EVENT_SCHEMA_VERSIONS.PORTFOLIO_UPDATED,
           occurredAt,
           producer: KAFKA_EVENT_PRODUCERS.PORTFOLIO_MANAGER,
+          correlationId: eventContext.correlationId,
+          causationId: eventContext.causationId,
+          traceparent: eventContext.traceparent,
         }),
       },
     };

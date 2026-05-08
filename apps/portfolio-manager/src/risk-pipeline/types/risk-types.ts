@@ -1,3 +1,4 @@
+import { KafkaEventContext } from '@trading-bot/common';
 import { Signal, SignalSide } from '@trading-bot/common/proto';
 
 import {
@@ -12,6 +13,7 @@ export interface SourceSignalContext {
   kafkaKey: string;
   receivedAt: Date;
   signal: Signal;
+  eventContext?: KafkaEventContext;
 }
 
 export interface PortfolioRiskConfig {

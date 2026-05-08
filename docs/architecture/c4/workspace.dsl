@@ -4,6 +4,10 @@ workspace "Trading Bot System" {
 
     model {
         trader = person "Trader" "User who monitors and configures the trading bot."
+        operator = person "Operator" "Engineer who monitors metrics, drains DLQs, and runs replay/recovery workflows."
+        prometheus = softwareSystem "Prometheus" "Planned metrics scraper for service /metrics endpoints." "External" {
+            tags "Planned"
+        }
 
         tradingBot = softwareSystem "Trading Bot" "An automated trading system with ML-based predictions and execution." {
 
@@ -109,6 +113,9 @@ workspace "Trading Bot System" {
                     outboxDispatcher = component "Outbox Dispatcher" "Uses the shared Kafka outbox dispatcher core with a portfolio-owned Prisma repository adapter." "TypeScript" {
                         tags "Implemented"
                     }
+                    metricsEndpoint = component "Metrics Endpoint" "Exposes Prometheus metrics for Kafka consumer outcomes, retries, DLQ writes, outbox dispatch outcomes, backlog, and oldest pending age." "Nest HTTP /metrics" {
+                        tags "Implemented"
+                    }
                     instrumentStageConsumer = component "Instrument Stage Consumer" "Consumes trading.signals keyed by instrument_key." "TypeScript" {
                         tags "Implemented"
                     }
@@ -116,6 +123,12 @@ workspace "Trading Bot System" {
                         tags "Implemented"
                     }
                     fillReconciliationConsumer = component "Fill Reconciliation Consumer" "Consumes orders.fills keyed by portfolio_key and reads fill event-id headers." "TypeScript" {
+                        tags "Implemented"
+                    }
+                    consumerReliabilityWrapper = component "Consumer Reliability Wrapper" "Wraps implemented Kafka consumers with bounded retry, structured context logging, DLQ publishing, and offset commits after handler success or DLQ success." "TypeScript" {
+                        tags "Implemented"
+                    }
+                    dlqPublisher = component "DLQ Publisher" "Publishes DeadLetterEvent protobuf envelopes to per-topic DLQs while preserving the original Kafka key." "TypeScript" {
                         tags "Implemented"
                     }
                     fillReconciliationService = component "Fill Reconciliation Service" "Deduplicates fills, upserts portfolio-owned order/fill state, recalculates signed net positions and aggregate exposure, releases completed reservations, and enqueues portfolio.updated." "TypeScript" {
@@ -133,16 +146,21 @@ workspace "Trading Bot System" {
                     gRPC -> portfolioQueryService "Handles portfolio read and instrument resolution requests via"
                     portfolioQueryService -> portfolioStateRepository "Reads summary, positions, orders/fills-derived state, and instruments via"
                     instrumentStageConsumer -> instrumentStageService "Feeds trading.signals into"
+                    instrumentStageConsumer -> consumerReliabilityWrapper "Processes messages through"
                     instrumentStageService -> riskConfigRepository "Loads active portfolio configs from"
                     instrumentStageService -> riskStateRepository "Writes signal receipts, candidate rows, and outbox rows via"
                     instrumentStageService -> kafkaPublisher "Publishes trading.signals.portfolio via outbox"
                     portfolioStageConsumer -> portfolioStageService "Feeds trading.signals.portfolio into"
+                    portfolioStageConsumer -> consumerReliabilityWrapper "Processes messages through"
                     portfolioStageService -> tradeSizingService "Derives requested size via"
                     portfolioStageService -> riskRules "Evaluates candidates against"
                     portfolioStageService -> riskConfigRepository "Loads portfolio caps from"
                     portfolioStageService -> riskStateRepository "Writes decisions, reservations, and outbox rows via"
                     portfolioStageService -> kafkaPublisher "Publishes trades.approved and trades.rejected via outbox"
                     fillReconciliationConsumer -> fillReconciliationService "Feeds orders.fills into"
+                    fillReconciliationConsumer -> consumerReliabilityWrapper "Processes messages through"
+                    consumerReliabilityWrapper -> dlqPublisher "Sends exhausted failures to"
+                    consumerReliabilityWrapper -> metricsEndpoint "Records consumer retry and DLQ metrics via"
                     fillReconciliationService -> portfolioStateRepository "Writes orders, fills, positions, snapshots, and reservation releases via"
                     fillReconciliationService -> kafkaPublisher "Publishes portfolio.updated via outbox"
                     executionUpdatesConsumer -> portfolioManager "Will feed orders.placed updates into"
@@ -151,6 +169,7 @@ workspace "Trading Bot System" {
                     portfolioManager -> riskStateRepository "Persists instrument state and outbox rows via"
                     outboxDispatcher -> riskStateRepository "Claims outbox rows from"
                     outboxDispatcher -> kafkaPublisher "Publishes claimed outbox rows via"
+                    outboxDispatcher -> metricsEndpoint "Records dispatch and backlog metrics via"
                 }
 
                 postgres = container "Portfolio DB" "Stores instruments, outbox rows, portfolios, signal receipts, candidate audit rows, risk decisions, exposure reservations, reconciled orders/fills, signed positions, and summary snapshots today; later it can also store users and trade history." "PostgreSQL" "Datastore" {
@@ -172,6 +191,12 @@ workspace "Trading Bot System" {
                     approvedTradesConsumer = component "Approved Trades Consumer" "Consumes trades.approved keyed by portfolio_key and reads approval event-id headers." "TypeScript" {
                         tags "Implemented"
                     }
+                    consumerReliabilityWrapper = component "Consumer Reliability Wrapper" "Wraps the approved-trades Kafka consumer with bounded retry, structured context logging, DLQ publishing, and offset commits after handler success or DLQ success." "TypeScript" {
+                        tags "Implemented"
+                    }
+                    dlqPublisher = component "DLQ Publisher" "Publishes DeadLetterEvent protobuf envelopes to trades.approved.dlq while preserving the original Kafka key." "TypeScript" {
+                        tags "Implemented"
+                    }
                     simulatorCore = component "Execution Simulator Core" "Builds deterministic order IDs, placed events, one partial fill, and one final fill from approved trades." "TypeScript" {
                         tags "Implemented"
                     }
@@ -184,6 +209,9 @@ workspace "Trading Bot System" {
                     outboxDispatcher = component "Outbox Dispatcher" "Uses the shared Kafka outbox dispatcher core with an execution-owned Prisma repository adapter and lifecycle ordering." "TypeScript" {
                         tags "Implemented"
                     }
+                    metricsEndpoint = component "Metrics Endpoint" "Exposes Prometheus metrics for Kafka consumer outcomes, retries, DLQ writes, outbox dispatch outcomes, backlog, and oldest pending age." "Nest HTTP /metrics" {
+                        tags "Implemented"
+                    }
                     kafkaPublisher = component "Kafka Publisher" "Publishes orders.placed and orders.fills execution updates to Kafka." "TypeScript" {
                         tags "Implemented"
                     }
@@ -192,11 +220,15 @@ workspace "Trading Bot System" {
                     }
 
                     approvedTradesConsumer -> simulatorCore "Feeds approved trade decisions to"
+                    approvedTradesConsumer -> consumerReliabilityWrapper "Processes messages through"
+                    consumerReliabilityWrapper -> dlqPublisher "Sends exhausted failures to"
+                    consumerReliabilityWrapper -> metricsEndpoint "Records consumer retry and DLQ metrics via"
                     simulatorCore -> executionStateRepository "Writes orders, fills, and outbox rows via"
                     gRPC -> executionQueryService "Handles recent execution order read requests via"
                     executionQueryService -> executionStateRepository "Reads orders and fills from"
                     outboxDispatcher -> executionStateRepository "Claims outbox rows from"
                     outboxDispatcher -> kafkaPublisher "Publishes claimed lifecycle events via"
+                    outboxDispatcher -> metricsEndpoint "Records dispatch and backlog metrics via"
                     tradeExecutor -> gRPC_Client "Will communicate with External API Facade over"
                 }
 
@@ -221,6 +253,9 @@ workspace "Trading Bot System" {
                     portfolioReadAggregator = component "Portfolio Read Aggregator" "Combines portfolio state with recent execution orders into the REST portfolio visibility response." "TypeScript" {
                         tags "Implemented"
                     }
+                    metricsEndpoint = component "Metrics Endpoint" "Exposes API Gateway Prometheus metrics on GET /metrics outside the /api prefix." "Nest HTTP /metrics" {
+                        tags "Implemented"
+                    }
                     signalProxy = component "Signal Proxy" "Forwards dashboard queries to Prediction Engine (Signal API)." "TypeScript"
                     riskProxy = component "Risk Proxy" "Forwards strategy/risk config updates to Risk & Portfolio Manager (Risk API)." "TypeScript"
 
@@ -228,6 +263,7 @@ workspace "Trading Bot System" {
                     core -> marketDataProxy "Sends market data requests to"
                     core -> portfolioProxy "Sends instrument registration, portfolio reads, and instrument resolution requests to"
                     core -> portfolioReadAggregator "Builds portfolio visibility responses via"
+                    core -> metricsEndpoint "Exposes operational metrics via"
                     portfolioReadAggregator -> portfolioProxy "Reads portfolio summary, positions, and instruments via"
                     portfolioReadAggregator -> executionProxy "Reads recent execution orders via"
                     core -> signalProxy "Sends signal requests to"
@@ -307,6 +343,13 @@ workspace "Trading Bot System" {
 
         // Container-level relationships
         trader -> tradingBot.dashboard.router "Monitors portfolio and configures strategies"
+        operator -> tradingBot.messageBus "Inspects DLQ topics and replays repaired events"
+        operator -> tradingBot.portfolioManager.metricsEndpoint "Inspects portfolio-manager metrics"
+        operator -> tradingBot.executionEngine.metricsEndpoint "Inspects execution-engine metrics"
+        operator -> tradingBot.apiGateway.metricsEndpoint "Inspects API Gateway metrics"
+        prometheus -> tradingBot.portfolioManager.metricsEndpoint "Will scrape metrics from"
+        prometheus -> tradingBot.executionEngine.metricsEndpoint "Will scrape metrics from"
+        prometheus -> tradingBot.apiGateway.metricsEndpoint "Will scrape metrics from"
 
         tradingBot.dashboard.apiClient -> tradingBot.apiGateway.REST "Sends API requests (UI)"
         tradingBot.apiGateway.gRPC_Client -> tradingBot.dataIngestion.gRPC "Requests market data and subscription updates (Market Data API)"
@@ -323,7 +366,9 @@ workspace "Trading Bot System" {
         tradingBot.portfolioManager.kafkaPublisher -> tradingBot.messageBus "Publishes trading.signals.portfolio to"
         tradingBot.portfolioManager.kafkaPublisher -> tradingBot.messageBus "Publishes trades.approved and trades.rejected to"
         tradingBot.portfolioManager.kafkaPublisher -> tradingBot.messageBus "Publishes portfolio.updated to"
+        tradingBot.portfolioManager.dlqPublisher -> tradingBot.messageBus "Publishes trading.signals.dlq, trading.signals.portfolio.dlq, and orders.fills.dlq to"
         tradingBot.executionEngine.kafkaPublisher -> tradingBot.messageBus "Publishes orders.placed and orders.fills to"
+        tradingBot.executionEngine.dlqPublisher -> tradingBot.messageBus "Publishes trades.approved.dlq to"
 
         tradingBot.dataIngestion.kafkaConsumer -> tradingBot.messageBus "Consumes instrument.registered, market.raw.data, and features.indicators from"
         tradingBot.featureEngineering.kafkaConsumer -> tradingBot.messageBus "Consumes market.raw.data from"
@@ -407,6 +452,8 @@ workspace "Trading Bot System" {
             include tradingBot.apiGateway.gRPC_Client
             include tradingBot.portfolioManager.gRPC
             include tradingBot.portfolioManager.instrumentStageConsumer
+            include tradingBot.portfolioManager.consumerReliabilityWrapper
+            include tradingBot.portfolioManager.dlqPublisher
             include tradingBot.portfolioManager.instrumentStageService
             include tradingBot.portfolioManager.portfolioStageConsumer
             include tradingBot.portfolioManager.portfolioStageService
@@ -418,6 +465,7 @@ workspace "Trading Bot System" {
             include tradingBot.portfolioManager.strategyConfigManager
             include tradingBot.portfolioManager.kafkaPublisher
             include tradingBot.portfolioManager.outboxDispatcher
+            include tradingBot.portfolioManager.metricsEndpoint
             include tradingBot.portfolioManager.portfolioManager
             include tradingBot.portfolioManager.portfolioQueryService
             include tradingBot.portfolioManager.riskConfigRepository
@@ -425,6 +473,8 @@ workspace "Trading Bot System" {
             include tradingBot.portfolioManager.portfolioStateRepository
             include tradingBot.postgres
             include tradingBot.messageBus
+            include operator
+            include prometheus
             autolayout lr
         }
 
@@ -436,16 +486,21 @@ workspace "Trading Bot System" {
 
         component tradingBot.executionEngine "ExecutionEngine-Components" {
             include tradingBot.executionEngine.approvedTradesConsumer
+            include tradingBot.executionEngine.consumerReliabilityWrapper
+            include tradingBot.executionEngine.dlqPublisher
             include tradingBot.executionEngine.simulatorCore
             include tradingBot.executionEngine.executionStateRepository
             include tradingBot.executionEngine.executionQueryService
             include tradingBot.executionEngine.outboxDispatcher
+            include tradingBot.executionEngine.metricsEndpoint
             include tradingBot.executionEngine.kafkaPublisher
             include tradingBot.executionEngine.tradeExecutor
             include tradingBot.executionEngine.gRPC
             include tradingBot.executionEngine.gRPC_Client
             include tradingBot.executionPostgres
             include tradingBot.messageBus
+            include operator
+            include prometheus
             include tradingBot.externalAPIFacade.gRPC
             autolayout lr
         }
@@ -459,12 +514,15 @@ workspace "Trading Bot System" {
             include tradingBot.apiGateway.portfolioProxy
             include tradingBot.apiGateway.executionProxy
             include tradingBot.apiGateway.portfolioReadAggregator
+            include tradingBot.apiGateway.metricsEndpoint
             include tradingBot.apiGateway.signalProxy
             include tradingBot.apiGateway.riskProxy
             include tradingBot.dataIngestion.gRPC
             include tradingBot.predictionEngine.gRPC
             include tradingBot.portfolioManager.gRPC
             include tradingBot.executionEngine.gRPC
+            include operator
+            include prometheus
             autolayout lr
         }
 

@@ -158,7 +158,7 @@ export class FillReconciliationService {
 
     try {
       await this.prisma.$transaction(async (tx) => {
-        await this.reconcileFill(fill, tx);
+        await this.reconcileFill(fill, tx, context.eventContext);
       });
     } catch (error) {
       if (isUniqueConstraintViolation(error)) {
@@ -176,6 +176,7 @@ export class FillReconciliationService {
   private async reconcileFill(
     fill: NormalizedOrderFill,
     tx: PrismaDbClient,
+    eventContext?: SourceFillContext['eventContext'],
   ): Promise<void> {
     const existingFill = await this.repository.findFillById(fill.id, tx);
 
@@ -230,7 +231,7 @@ export class FillReconciliationService {
       },
       tx,
     );
-    const event = this.eventFactory.create(snapshot);
+    const event = this.eventFactory.create(snapshot, eventContext);
 
     await this.eventDispatcher.enqueueEvent(tx, event.topic, event.message);
   }

@@ -10,6 +10,7 @@ describe('EventDispatcherService', () => {
     claimBatch: jest.Mock;
     markDispatched: jest.Mock;
     markFailed: jest.Mock;
+    getBacklogMetrics: jest.Mock;
   };
   let kafka: {
     emit: jest.Mock;
@@ -17,6 +18,12 @@ describe('EventDispatcherService', () => {
     close: jest.Mock;
   };
   let runtimeConfig: ReturnType<typeof portfolioManagerRuntimeConfig>;
+  let metrics: {
+    recordOutboxDispatch: jest.Mock;
+    setOutboxBacklog: jest.Mock;
+    setOutboxBacklogSnapshot: jest.Mock;
+    setOldestOutboxAgeSeconds: jest.Mock;
+  };
 
   beforeEach(() => {
     outboxRepository = {
@@ -24,6 +31,10 @@ describe('EventDispatcherService', () => {
       claimBatch: jest.fn(),
       markDispatched: jest.fn(),
       markFailed: jest.fn(),
+      getBacklogMetrics: jest.fn().mockResolvedValue({
+        rows: [],
+        oldestPendingAt: null,
+      }),
     };
     kafka = {
       emit: jest.fn(),
@@ -31,10 +42,17 @@ describe('EventDispatcherService', () => {
       close: jest.fn(),
     };
     runtimeConfig = portfolioManagerRuntimeConfig();
+    metrics = {
+      recordOutboxDispatch: jest.fn(),
+      setOutboxBacklog: jest.fn(),
+      setOutboxBacklogSnapshot: jest.fn(),
+      setOldestOutboxAgeSeconds: jest.fn(),
+    };
     service = new EventDispatcherService(
       outboxRepository as never,
       kafka as never,
       runtimeConfig,
+      metrics as never,
     );
   });
 
@@ -66,6 +84,7 @@ describe('EventDispatcherService', () => {
       outboxRepository as never,
       kafka as never,
       runtimeConfig,
+      metrics as never,
     );
 
     await service.onModuleInit();
@@ -110,5 +129,27 @@ describe('EventDispatcherService', () => {
       batchSize: 50,
       staleInFlightTimeoutMs: 30000,
     });
+    expect(metrics.setOutboxBacklogSnapshot).toHaveBeenCalledWith([]);
+    expect(metrics.setOldestOutboxAgeSeconds).toHaveBeenCalledWith(0);
+  });
+
+  it('publishes outbox backlog metrics as a snapshot', async () => {
+    outboxRepository.claimBatch.mockResolvedValue([]);
+    outboxRepository.getBacklogMetrics.mockResolvedValue({
+      rows: [
+        { topic: KAFKA_TOPICS.PORTFOLIO_UPDATED, status: 'PENDING', count: 2 },
+      ],
+      oldestPendingAt: null,
+    });
+
+    await service.dispatchOutboxBatch();
+
+    expect(metrics.setOutboxBacklogSnapshot).toHaveBeenCalledWith([
+      {
+        topic: KAFKA_TOPICS.PORTFOLIO_UPDATED,
+        status: 'PENDING',
+        value: 2,
+      },
+    ]);
   });
 });

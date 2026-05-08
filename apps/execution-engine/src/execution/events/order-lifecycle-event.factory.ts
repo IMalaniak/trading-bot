@@ -2,9 +2,11 @@ import { Injectable } from '@nestjs/common';
 import type { OutboxMessageInput } from '@trading-bot/common';
 import {
   buildEventMetadataHeaders,
+  childKafkaEventContext,
   KAFKA_EVENT_PRODUCERS,
   KAFKA_EVENT_SCHEMA_VERSIONS,
   KAFKA_TOPICS,
+  type KafkaEventContext,
   portfolioKey,
 } from '@trading-bot/common';
 import { OrderFill, OrderPlaced, OrderStatus } from '@trading-bot/common/proto';
@@ -76,11 +78,15 @@ const createFillPayload = (
 
 @Injectable()
 export class OrderLifecycleEventFactory {
-  create(lifecycle: SimulatedOrderLifecycle): LifecycleEvent[] {
+  create(
+    lifecycle: SimulatedOrderLifecycle,
+    parentContext?: KafkaEventContext,
+  ): LifecycleEvent[] {
     const placedEventId = `${lifecycle.order.id}:placed`;
     const placedAt = lifecycle.order.placedAt.toISOString();
     const key = portfolioKey(lifecycle.order.portfolioId);
     const placedPayload = createPlacedPayload(lifecycle.order);
+    const placedContext = childKafkaEventContext(parentContext, placedEventId);
 
     return [
       {
@@ -96,6 +102,9 @@ export class OrderLifecycleEventFactory {
             schemaVersion: KAFKA_EVENT_SCHEMA_VERSIONS.ORDERS_PLACED,
             occurredAt: placedAt,
             producer: KAFKA_EVENT_PRODUCERS.EXECUTION_ENGINE,
+            correlationId: placedContext.correlationId,
+            causationId: placedContext.causationId,
+            traceparent: placedContext.traceparent,
           }),
         },
       },
@@ -103,6 +112,7 @@ export class OrderLifecycleEventFactory {
         const eventId = fill.id;
         const filledAt = fill.filledAt.toISOString();
         const fillPayload = createFillPayload(lifecycle.order, fill);
+        const fillContext = childKafkaEventContext(parentContext, eventId);
 
         return {
           topic: KAFKA_TOPICS.ORDERS_FILLS,
@@ -117,6 +127,9 @@ export class OrderLifecycleEventFactory {
               schemaVersion: KAFKA_EVENT_SCHEMA_VERSIONS.ORDERS_FILLS,
               occurredAt: filledAt,
               producer: KAFKA_EVENT_PRODUCERS.EXECUTION_ENGINE,
+              correlationId: fillContext.correlationId,
+              causationId: fillContext.causationId,
+              traceparent: fillContext.traceparent,
             }),
           },
         };

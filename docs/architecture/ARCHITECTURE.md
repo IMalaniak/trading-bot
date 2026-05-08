@@ -38,6 +38,7 @@ The current implementation is still intentionally narrow:
 - `portfolio-manager` stores instruments, runs the current two-stage risk pipeline, writes outbox records, and dispatches Kafka events.
 - `execution-engine` consumes approved trades, persists deterministic simulated order lifecycles, writes outbox records, and dispatches order events.
 - `common` owns shared proto contracts and Kafka contract helpers.
+- `common` also owns the reusable Kafka consumer retry/DLQ wrapper and Prometheus metric helpers used by implemented services.
 - Local infra provides Redpanda, Postgres, and TimescaleDB.
 
 Everything else in this document should be read as either:
@@ -61,6 +62,7 @@ Everything else in this document should be read as either:
 | Prediction Engine                | Planned              | Not implemented in this repo yet.                                                                      |
 | Execution Engine                 | Implemented          | Event simulator consumes approved trades, emits deterministic placed/fill lifecycle events, and exposes execution-owned order/fill read queries over gRPC. |
 | Execution DB (Postgres schema)   | Implemented          | Source of truth for simulated orders, fills, and execution outbox rows.                                |
+| Reliability & Operability        | Implemented          | Implemented consumers use bounded retry, per-topic DLQs, correlation/causation headers, structured logs, and Prometheus metrics endpoints. |
 | External API Facade              | Planned              | Not implemented in this repo yet.                                                                      |
 | Dashboard                        | Planned              | Not implemented in this repo yet.                                                                      |
 | Schema Registry                  | Planned              | Documented as a future capability; not provisioned in local infra.                                     |
@@ -98,6 +100,9 @@ Standard headers:
 - `occurred-at`
 - `producer`
 - `content-type`
+- `correlation-id`
+- `causation-id` when the event is derived from another event
+- `traceparent` when an upstream producer supplied W3C tracing context
 
 Current payload boundaries:
 
@@ -108,6 +113,7 @@ Current payload boundaries:
 - `orders.placed` uses `OrderPlaced`.
 - `orders.fills` uses `OrderFill`.
 - `portfolio.updated` uses `PortfolioUpdated`.
+- `*.dlq` topics use `DeadLetterEvent`.
 
 The risk pipeline intentionally does not reuse `common.Signal` for downstream portfolio-scoped or decision-scoped topics. Those topics carry lifecycle-specific fields such as `source_event_id`, `portfolio_id`, decision kind, and reason codes.
 
@@ -116,6 +122,8 @@ For Iteration 1 through Iteration 3:
 - `event-type` is the topic name
 - `schema-version` starts at `"1"` per topic
 - `event-id` is generated before the outbox row is written; for events published by `portfolio-manager`, that same value is stored as the outbox row ID and stays stable across retries
+- `correlation-id` defaults to the inbound `correlation-id`, then inbound `event-id`, then the current event ID
+- `causation-id` is the immediate source event ID for derived events
 - execution simulator event IDs are deterministic: `<order_id>:placed`, `<order_id>:fill:1`, and `<order_id>:fill:2`
 - `content-type` is `application/x-protobuf`
 
@@ -175,6 +183,44 @@ Current read API notes:
 - Risk cap checks use filled position exposure plus active exposure reservations.
 - A matching exposure reservation is released only after the order has a final fill and all fill sequences from `1..finalSequence` are present.
 
+### Consumer retry and DLQ policy
+
+Implemented Kafka consumers share the same reliability wrapper:
+
+- total handler attempts: `5` by default
+- exponential backoff defaults: `250ms`, `500ms`, `1s`, `2s`, capped by `KAFKA_CONSUMER_RETRY_MAX_MS`
+- the original Kafka offset is committed only after handler success or after the DLQ publish succeeds
+- if DLQ publish fails, the original offset is not committed and the broker can redeliver the source message
+- DLQ messages keep the original Kafka key and carry a protobuf `DeadLetterEvent` with original topic, partition, offset, key, headers, value bytes, service, consumer group, attempts, error fields, and correlation/causation IDs
+
+Outbox rows do not move to DLQ. A committed business event remains retryable in
+the owning service database until Kafka accepts it.
+
+### Metrics and runbooks
+
+Prometheus metrics endpoints:
+
+- API Gateway: `GET /metrics` on the existing HTTP app
+- Portfolio Manager: Nest hybrid HTTP listener on `PORTFOLIO_MANAGER_METRICS_PORT`, default `9101`
+- Execution Engine: Nest hybrid HTTP listener on `EXECUTION_ENGINE_METRICS_PORT`, default `9102`
+
+The `/metrics` route is provided by `@willsoto/nestjs-prometheus`; application
+metric updates still go through the shared `TradingBotMetrics` facade so unit
+tests can use isolated registries.
+
+Current metric families:
+
+- `trading_bot_kafka_consumer_messages_total`
+- `trading_bot_kafka_consumer_retries_total`
+- `trading_bot_kafka_consumer_dlq_messages_total`
+- `trading_bot_kafka_consumer_processing_seconds`
+- `trading_bot_outbox_dispatch_total`
+- `trading_bot_outbox_backlog`
+- `trading_bot_outbox_oldest_pending_age_seconds`
+
+Operational replay, stuck outbox, DLQ drain, and local failure drill steps live in
+[Reliability Runbooks](../operations/reliability-runbooks.md).
+
 ### Versioning rules
 
 - Additive protobuf field additions are allowed on the same topic.
@@ -223,6 +269,10 @@ Local development bootstraps all documented topics explicitly and disables broke
 | `orders.placed`             | Implemented           | Implemented Execution Engine simulator                   | Planned Risk & Portfolio Manager                        | `portfolio_key`  | Per portfolio      |
 | `orders.fills`              | Implemented           | Implemented Execution Engine simulator                   | Implemented Risk & Portfolio Manager                    | `portfolio_key`  | Per portfolio      |
 | `portfolio.updated`         | Implemented           | Implemented Risk & Portfolio Manager                     | Planned downstream adapters and analytics               | `portfolio_key`  | Per portfolio      |
+| `trading.signals.dlq`       | Implemented           | Implemented Risk & Portfolio Manager consumer wrapper    | Operator replay workflow                                | original key     | Per original key   |
+| `trading.signals.portfolio.dlq` | Implemented        | Implemented Risk & Portfolio Manager consumer wrapper    | Operator replay workflow                                | original key     | Per original key   |
+| `trades.approved.dlq`       | Implemented           | Implemented Execution Engine consumer wrapper            | Operator replay workflow                                | original key     | Per original key   |
+| `orders.fills.dlq`          | Implemented           | Implemented Risk & Portfolio Manager consumer wrapper    | Operator replay workflow                                | original key     | Per original key   |
 
 Local bootstrap defaults:
 
@@ -240,15 +290,18 @@ Expected env files:
   - `PORTFOLIO_MANAGER_GRPC_URL`
   - `EXECUTION_ENGINE_GRPC_URL`
   - `KAFKA_BROKERS`
+  - optional `KAFKA_CONSUMER_RETRY_MAX_ATTEMPTS`, `KAFKA_CONSUMER_RETRY_BASE_MS`, `KAFKA_CONSUMER_RETRY_MAX_MS`
   - optional `PORT` for `api-gateway`
 - `apps/portfolio-manager/.env`
   - `DATABASE_URL`
+  - optional `PORTFOLIO_MANAGER_METRICS_PORT`
 - `apps/portfolio-manager/.env.test-integration`
   - isolated integration-test `DATABASE_URL`
   - isolated integration-test `KAFKA_BROKERS`
 - `apps/execution-engine/.env`
   - `EXECUTION_ENGINE_DATABASE_URL`
   - `EXECUTION_ENGINE_GRPC_URL`
+  - optional `EXECUTION_ENGINE_METRICS_PORT`
 - `apps/execution-engine/.env.test-integration`
   - isolated integration-test `EXECUTION_ENGINE_DATABASE_URL`
   - isolated integration-test `KAFKA_BROKERS`

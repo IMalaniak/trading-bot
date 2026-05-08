@@ -9,6 +9,8 @@ export {
 export { PortfolioSummary, Position } from './common/portfolio';
 export { Signal, SignalSide } from './common/signal';
 export {
+  DeadLetterEvent,
+  DeadLetterHeader,
   InstrumentRegistered,
   OrderFill,
   OrderPlaced,

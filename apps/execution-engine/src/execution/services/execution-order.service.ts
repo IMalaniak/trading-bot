@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { type KafkaEventContext } from '@trading-bot/common';
 import { TradeDecision } from '@trading-bot/common/proto';
 
 import { EventDispatcherService } from '../../event-dispatcher/event-dispatcher.service';
@@ -21,6 +22,7 @@ export class ExecutionOrderService {
   async handleApprovedTrade(
     approvalEventId: string,
     decision: TradeDecision,
+    eventContext?: KafkaEventContext,
   ): Promise<void> {
     const existingOrder = await this.prisma.executionOrder.findFirst({
       where: {
@@ -57,7 +59,7 @@ export class ExecutionOrderService {
 
         await this.persistLifecycle(tx, lifecycle);
 
-        for (const event of this.eventFactory.create(lifecycle)) {
+        for (const event of this.eventFactory.create(lifecycle, eventContext)) {
           await this.eventDispatcher.enqueueEvent(
             tx,
             event.topic,

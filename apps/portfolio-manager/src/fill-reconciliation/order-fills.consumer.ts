@@ -8,13 +8,15 @@ import {
 import type { ConfigType } from '@nestjs/config';
 import { ConfigService } from '@nestjs/config';
 import {
-  KAFKA_EVENT_HEADER_NAMES,
+  deadLetterTopicFor,
+  InjectTradingBotMetrics,
+  KAFKA_EVENT_PRODUCERS,
   KAFKA_TOPICS,
-  nextKafkaOffset,
-  readRequiredKafkaHeader,
+  ReliableKafkaConsumer,
+  TradingBotMetrics,
 } from '@trading-bot/common';
 import { OrderFill } from '@trading-bot/common/proto';
-import { Consumer, Kafka, logLevel } from 'kafkajs';
+import { Consumer, Kafka, logLevel, Producer } from 'kafkajs';
 
 import { portfolioManagerRuntimeConfig } from '../config/runtime.config';
 import { FILL_RECONCILIATION_KAFKA_CONSUMER_GROUPS } from './const/kafka-consumer-groups';
@@ -24,6 +26,8 @@ import { FillReconciliationService } from './services/fill-reconciliation.servic
 export class OrderFillsConsumer implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(OrderFillsConsumer.name);
   private consumer?: Consumer;
+  private dlqProducer?: Producer;
+  private runner?: ReliableKafkaConsumer<OrderFill>;
 
   constructor(
     private readonly configService: ConfigService,
@@ -32,6 +36,8 @@ export class OrderFillsConsumer implements OnModuleInit, OnModuleDestroy {
     private readonly runtimeConfig: ConfigType<
       typeof portfolioManagerRuntimeConfig
     >,
+    @InjectTradingBotMetrics()
+    private readonly metrics: TradingBotMetrics,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -52,8 +58,39 @@ export class OrderFillsConsumer implements OnModuleInit, OnModuleDestroy {
     this.consumer = kafka.consumer({
       groupId: FILL_RECONCILIATION_KAFKA_CONSUMER_GROUPS.ORDER_FILLS,
     });
+    this.dlqProducer = kafka.producer();
+    this.runner = new ReliableKafkaConsumer({
+      service: KAFKA_EVENT_PRODUCERS.PORTFOLIO_MANAGER,
+      consumerGroup: FILL_RECONCILIATION_KAFKA_CONSUMER_GROUPS.ORDER_FILLS,
+      sourceTopic: KAFKA_TOPICS.ORDERS_FILLS,
+      dlqTopic: deadLetterTopicFor(KAFKA_TOPICS.ORDERS_FILLS),
+      decode: (value) => OrderFill.decode(value),
+      handle: async ({
+        eventId,
+        kafkaKey,
+        receivedAt,
+        payload,
+        eventContext,
+      }) => {
+        await this.fillReconciliationService.handleFill({
+          kafkaEventId: eventId,
+          kafkaKey,
+          receivedAt,
+          fill: payload,
+          eventContext,
+        });
+      },
+      commitOffset: async (offset) => {
+        await this.consumer?.commitOffsets([offset]);
+      },
+      dlqProducer: this.dlqProducer,
+      logger: this.logger,
+      metrics: this.metrics,
+      retryPolicy: this.retryPolicy(),
+    });
 
     await this.consumer.connect();
+    await this.dlqProducer.connect();
     await this.consumer.subscribe({
       topic: KAFKA_TOPICS.ORDERS_FILLS,
       fromBeginning: false,
@@ -61,28 +98,8 @@ export class OrderFillsConsumer implements OnModuleInit, OnModuleDestroy {
 
     await this.consumer.run({
       autoCommit: false,
-      eachMessage: async ({ topic, partition, message }) => {
-        const kafkaEventId = readRequiredKafkaHeader(
-          message.headers,
-          KAFKA_EVENT_HEADER_NAMES.EVENT_ID,
-        );
-        const kafkaKey = message.key?.toString('utf8') ?? '';
-        const fill = OrderFill.decode(message.value ?? new Uint8Array());
-
-        await this.fillReconciliationService.handleFill({
-          kafkaEventId,
-          kafkaKey,
-          receivedAt: new Date(),
-          fill,
-        });
-
-        await this.consumer?.commitOffsets([
-          {
-            topic,
-            partition,
-            offset: nextKafkaOffset(message.offset),
-          },
-        ]);
+      eachMessage: async (payload) => {
+        await this.runner?.handleMessage(payload);
       },
     });
   }
@@ -101,5 +118,31 @@ export class OrderFillsConsumer implements OnModuleInit, OnModuleDestroy {
       });
       this.consumer = undefined;
     }
+    if (this.dlqProducer) {
+      await this.dlqProducer.disconnect().catch((error: Error) => {
+        this.logger.warn(
+          `Failed to disconnect order fills DLQ producer: ${error.message}`,
+        );
+      });
+      this.dlqProducer = undefined;
+    }
+    this.runner = undefined;
+  }
+
+  private retryPolicy() {
+    return {
+      maxAttempts: this.configService.get<number>(
+        'KAFKA_CONSUMER_RETRY_MAX_ATTEMPTS',
+        5,
+      ),
+      retryBaseMs: this.configService.get<number>(
+        'KAFKA_CONSUMER_RETRY_BASE_MS',
+        250,
+      ),
+      retryMaxMs: this.configService.get<number>(
+        'KAFKA_CONSUMER_RETRY_MAX_MS',
+        5000,
+      ),
+    };
   }
 }

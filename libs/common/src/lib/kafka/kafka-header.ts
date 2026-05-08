@@ -37,5 +37,15 @@ export const readRequiredKafkaHeader = (
   return value;
 };
 
+export const kafkaHeadersToStringRecord = (
+  headers: KafkaHeaders,
+): Record<string, string | undefined> =>
+  Object.fromEntries(
+    Object.entries(headers ?? {}).map(([name, value]) => [
+      name,
+      kafkaHeaderValueToString(value),
+    ]),
+  );
+
 export const nextKafkaOffset = (offset: string): string =>
   (BigInt(offset) + 1n).toString();

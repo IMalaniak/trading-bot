@@ -96,3 +96,26 @@ message PortfolioUpdated {
   string changed_position_exposure_notional = 9;
   string updated_at = 10;
 }
+
+message DeadLetterHeader {
+  string name = 1;
+  string value = 2;
+}
+
+message DeadLetterEvent {
+  string original_topic = 1;
+  int32 original_partition = 2;
+  string original_offset = 3;
+  string original_key = 4;
+  bytes original_value = 5;
+  repeated DeadLetterHeader original_headers = 6;
+  string service = 7;
+  string consumer_group = 8;
+  int32 attempts = 9;
+  string failure_class = 10;
+  string error_message = 11;
+  string first_failed_at = 12;
+  string dead_lettered_at = 13;
+  string correlation_id = 14;
+  string causation_id = 15;
+}

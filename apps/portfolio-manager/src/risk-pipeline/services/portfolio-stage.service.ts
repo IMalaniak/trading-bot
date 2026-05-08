@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { KAFKA_TOPICS } from '@trading-bot/common';
+import { KAFKA_TOPICS, type KafkaEventContext } from '@trading-bot/common';
 import { PortfolioSignalCandidate } from '@trading-bot/common/proto';
 
 import { EventDispatcherService } from '../../event-dispatcher/event-dispatcher.service';
@@ -53,7 +53,10 @@ export class PortfolioStageService {
     private readonly eventDispatcher: EventDispatcherService,
   ) {}
 
-  async handleCandidate(payload: PortfolioSignalCandidate): Promise<void> {
+  async handleCandidate(
+    payload: PortfolioSignalCandidate,
+    eventContext?: KafkaEventContext,
+  ): Promise<void> {
     const existingDecision =
       await this.decisionRepository.findByCandidateIdempotencyKey(
         payload.candidateIdempotencyKey,
@@ -162,6 +165,7 @@ export class PortfolioStageService {
         const event = this.tradeDecisionEventFactory.create(
           candidate,
           decisionRecord,
+          eventContext,
         );
         await this.eventDispatcher.enqueueEvent(tx, event.topic, event.message);
       });

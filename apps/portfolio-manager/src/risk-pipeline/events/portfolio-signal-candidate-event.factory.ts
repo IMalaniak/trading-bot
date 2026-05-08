@@ -2,9 +2,11 @@ import { Injectable } from '@nestjs/common';
 import type { OutboxMessageInput } from '@trading-bot/common';
 import {
   buildEventMetadataHeaders,
+  childKafkaEventContext,
   KAFKA_EVENT_PRODUCERS,
   KAFKA_EVENT_SCHEMA_VERSIONS,
   KAFKA_TOPICS,
+  type KafkaEventContext,
   portfolioKey,
 } from '@trading-bot/common';
 import { PortfolioSignalCandidate, Signal } from '@trading-bot/common/proto';
@@ -22,9 +24,11 @@ export class PortfolioSignalCandidateEventFactory {
   create(
     candidate: CandidateRecord,
     signal: Signal,
+    parentContext?: KafkaEventContext,
   ): PortfolioSignalCandidateEvent {
     const eventId = randomUUID();
     const occurredAt = new Date().toISOString();
+    const eventContext = childKafkaEventContext(parentContext, eventId);
     const payload = PortfolioSignalCandidate.fromPartial({
       signal,
       sourceEventId: candidate.sourceEventId,
@@ -45,6 +49,9 @@ export class PortfolioSignalCandidateEventFactory {
           schemaVersion: KAFKA_EVENT_SCHEMA_VERSIONS.TRADING_SIGNALS_PORTFOLIO,
           occurredAt,
           producer: KAFKA_EVENT_PRODUCERS.PORTFOLIO_MANAGER,
+          correlationId: eventContext.correlationId,
+          causationId: eventContext.causationId,
+          traceparent: eventContext.traceparent,
         }),
       },
     };

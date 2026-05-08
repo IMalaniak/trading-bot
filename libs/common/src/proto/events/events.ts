@@ -106,6 +106,29 @@ export interface PortfolioUpdated {
   updatedAt: string;
 }
 
+export interface DeadLetterHeader {
+  name: string;
+  value: string;
+}
+
+export interface DeadLetterEvent {
+  originalTopic: string;
+  originalPartition: number;
+  originalOffset: string;
+  originalKey: string;
+  originalValue: Buffer;
+  originalHeaders: DeadLetterHeader[];
+  service: string;
+  consumerGroup: string;
+  attempts: number;
+  failureClass: string;
+  errorMessage: string;
+  firstFailedAt: string;
+  deadLetteredAt: string;
+  correlationId: string;
+  causationId: string;
+}
+
 function createBaseInstrumentRegistered(): InstrumentRegistered {
   return { instrument: undefined, registeredAt: "" };
 }
@@ -1014,6 +1037,294 @@ export const PortfolioUpdated: MessageFns<PortfolioUpdated> = {
     message.changedPositionAverageEntryPrice = object.changedPositionAverageEntryPrice ?? "";
     message.changedPositionExposureNotional = object.changedPositionExposureNotional ?? "";
     message.updatedAt = object.updatedAt ?? "";
+    return message;
+  },
+};
+
+function createBaseDeadLetterHeader(): DeadLetterHeader {
+  return { name: "", value: "" };
+}
+
+export const DeadLetterHeader: MessageFns<DeadLetterHeader> = {
+  encode(message: DeadLetterHeader, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.name !== "") {
+      writer.uint32(10).string(message.name);
+    }
+    if (message.value !== "") {
+      writer.uint32(18).string(message.value);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): DeadLetterHeader {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseDeadLetterHeader();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.name = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.value = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  create<I extends Exact<DeepPartial<DeadLetterHeader>, I>>(base?: I): DeadLetterHeader {
+    return DeadLetterHeader.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<DeadLetterHeader>, I>>(object: I): DeadLetterHeader {
+    const message = createBaseDeadLetterHeader();
+    message.name = object.name ?? "";
+    message.value = object.value ?? "";
+    return message;
+  },
+};
+
+function createBaseDeadLetterEvent(): DeadLetterEvent {
+  return {
+    originalTopic: "",
+    originalPartition: 0,
+    originalOffset: "",
+    originalKey: "",
+    originalValue: Buffer.alloc(0),
+    originalHeaders: [],
+    service: "",
+    consumerGroup: "",
+    attempts: 0,
+    failureClass: "",
+    errorMessage: "",
+    firstFailedAt: "",
+    deadLetteredAt: "",
+    correlationId: "",
+    causationId: "",
+  };
+}
+
+export const DeadLetterEvent: MessageFns<DeadLetterEvent> = {
+  encode(message: DeadLetterEvent, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.originalTopic !== "") {
+      writer.uint32(10).string(message.originalTopic);
+    }
+    if (message.originalPartition !== 0) {
+      writer.uint32(16).int32(message.originalPartition);
+    }
+    if (message.originalOffset !== "") {
+      writer.uint32(26).string(message.originalOffset);
+    }
+    if (message.originalKey !== "") {
+      writer.uint32(34).string(message.originalKey);
+    }
+    if (message.originalValue.length !== 0) {
+      writer.uint32(42).bytes(message.originalValue);
+    }
+    for (const v of message.originalHeaders) {
+      DeadLetterHeader.encode(v!, writer.uint32(50).fork()).join();
+    }
+    if (message.service !== "") {
+      writer.uint32(58).string(message.service);
+    }
+    if (message.consumerGroup !== "") {
+      writer.uint32(66).string(message.consumerGroup);
+    }
+    if (message.attempts !== 0) {
+      writer.uint32(72).int32(message.attempts);
+    }
+    if (message.failureClass !== "") {
+      writer.uint32(82).string(message.failureClass);
+    }
+    if (message.errorMessage !== "") {
+      writer.uint32(90).string(message.errorMessage);
+    }
+    if (message.firstFailedAt !== "") {
+      writer.uint32(98).string(message.firstFailedAt);
+    }
+    if (message.deadLetteredAt !== "") {
+      writer.uint32(106).string(message.deadLetteredAt);
+    }
+    if (message.correlationId !== "") {
+      writer.uint32(114).string(message.correlationId);
+    }
+    if (message.causationId !== "") {
+      writer.uint32(122).string(message.causationId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): DeadLetterEvent {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseDeadLetterEvent();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.originalTopic = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.originalPartition = reader.int32();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.originalOffset = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.originalKey = reader.string();
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.originalValue = Buffer.from(reader.bytes());
+          continue;
+        }
+        case 6: {
+          if (tag !== 50) {
+            break;
+          }
+
+          message.originalHeaders.push(DeadLetterHeader.decode(reader, reader.uint32()));
+          continue;
+        }
+        case 7: {
+          if (tag !== 58) {
+            break;
+          }
+
+          message.service = reader.string();
+          continue;
+        }
+        case 8: {
+          if (tag !== 66) {
+            break;
+          }
+
+          message.consumerGroup = reader.string();
+          continue;
+        }
+        case 9: {
+          if (tag !== 72) {
+            break;
+          }
+
+          message.attempts = reader.int32();
+          continue;
+        }
+        case 10: {
+          if (tag !== 82) {
+            break;
+          }
+
+          message.failureClass = reader.string();
+          continue;
+        }
+        case 11: {
+          if (tag !== 90) {
+            break;
+          }
+
+          message.errorMessage = reader.string();
+          continue;
+        }
+        case 12: {
+          if (tag !== 98) {
+            break;
+          }
+
+          message.firstFailedAt = reader.string();
+          continue;
+        }
+        case 13: {
+          if (tag !== 106) {
+            break;
+          }
+
+          message.deadLetteredAt = reader.string();
+          continue;
+        }
+        case 14: {
+          if (tag !== 114) {
+            break;
+          }
+
+          message.correlationId = reader.string();
+          continue;
+        }
+        case 15: {
+          if (tag !== 122) {
+            break;
+          }
+
+          message.causationId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  create<I extends Exact<DeepPartial<DeadLetterEvent>, I>>(base?: I): DeadLetterEvent {
+    return DeadLetterEvent.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<DeadLetterEvent>, I>>(object: I): DeadLetterEvent {
+    const message = createBaseDeadLetterEvent();
+    message.originalTopic = object.originalTopic ?? "";
+    message.originalPartition = object.originalPartition ?? 0;
+    message.originalOffset = object.originalOffset ?? "";
+    message.originalKey = object.originalKey ?? "";
+    message.originalValue = object.originalValue ?? Buffer.alloc(0);
+    message.originalHeaders = object.originalHeaders?.map((e) => DeadLetterHeader.fromPartial(e)) || [];
+    message.service = object.service ?? "";
+    message.consumerGroup = object.consumerGroup ?? "";
+    message.attempts = object.attempts ?? 0;
+    message.failureClass = object.failureClass ?? "";
+    message.errorMessage = object.errorMessage ?? "";
+    message.firstFailedAt = object.firstFailedAt ?? "";
+    message.deadLetteredAt = object.deadLetteredAt ?? "";
+    message.correlationId = object.correlationId ?? "";
+    message.causationId = object.causationId ?? "";
     return message;
   },
 };
