@@ -5,12 +5,20 @@ import { DashboardApiError, type OrderStatusName } from '../lib/portfolio-api';
 
 export const getErrorMessage = (error: unknown): string => {
   if (error instanceof DashboardApiError) {
+    if (error.code === 'INSTRUMENT_ALREADY_ATTACHED') {
+      return 'This instrument is already configured for the selected portfolio.';
+    }
+
+    if (error.code === 'INSTRUMENT_METADATA_CONFLICT') {
+      return 'An instrument with this symbol and venue already exists with different metadata.';
+    }
+
     if (error.status === 404) {
-      return 'Portfolio was not found. Check the portfolio ID and try again.';
+      return 'Portfolio was not found. Select another portfolio and try again.';
     }
 
     if (error.status === 409) {
-      return 'Instrument already exists.';
+      return error.message;
     }
 
     return error.message;

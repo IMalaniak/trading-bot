@@ -29,6 +29,7 @@ describe('portfolio API client', () => {
       jsonResponse({
         summary: {},
         positions: [],
+        configuredInstruments: [],
         recentOrders: [],
       }),
     );
@@ -39,33 +40,57 @@ describe('portfolio API client', () => {
     );
 
     expect(fetchMock).toHaveBeenCalledWith(
-      'https://api.example/api/portfolio/portfolio%20alpha?recentOrdersLimit=20',
+      'https://api.example/api/portfolios/portfolio%20alpha?recentOrdersLimit=20',
       expect.any(Object),
     );
   });
 
-  it('posts registration payloads unchanged', async () => {
+  it('lists portfolios', async () => {
     const fetchMock = vi
       .fn()
-      .mockResolvedValue(jsonResponse({ id: 'instrument-1' }));
+      .mockResolvedValue(jsonResponse({ portfolios: [] }));
     vi.stubGlobal('fetch', fetchMock);
 
-    await createDashboardApi('https://api.example/api').registerInstrument({
-      symbol: 'BTC/USDT',
-      assetClass: 'crypto',
-      venue: 'BINANCE',
-      externalSymbol: 'BTCUSDT',
+    await createDashboardApi('https://api.example/api').listPortfolios();
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://api.example/api/portfolios',
+      expect.any(Object),
+    );
+  });
+
+  it('posts portfolio instrument payloads unchanged', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(jsonResponse({ portfolioId: 'portfolio-alpha' }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await createDashboardApi(
+      'https://api.example/api',
+    ).registerPortfolioInstrument('portfolio alpha', {
+      symbol: 'AAPL',
+      assetClass: 'stock',
+      venue: 'NASDAQ',
+      externalSymbol: 'AAPL',
+      enabled: true,
+      targetNotional: '100',
+      maxTradeNotional: '25',
+      maxPositionNotional: '400',
     });
 
     expect(fetchMock).toHaveBeenCalledWith(
-      'https://api.example/api/portfolio/register-instrument',
+      'https://api.example/api/portfolios/portfolio%20alpha/instrument',
       expect.objectContaining({
         method: 'POST',
         body: JSON.stringify({
-          symbol: 'BTC/USDT',
-          assetClass: 'crypto',
-          venue: 'BINANCE',
-          externalSymbol: 'BTCUSDT',
+          symbol: 'AAPL',
+          assetClass: 'stock',
+          venue: 'NASDAQ',
+          externalSymbol: 'AAPL',
+          enabled: true,
+          targetNotional: '100',
+          maxTradeNotional: '25',
+          maxPositionNotional: '400',
         }),
       }),
     );
@@ -114,7 +139,15 @@ describe('portfolio API client', () => {
     );
 
     const error = await createDashboardApi('https://api.example/api')
-      .registerInstrument({ symbol: '', assetClass: 'crypto', venue: '' })
+      .registerPortfolioInstrument('portfolio-alpha', {
+        symbol: '',
+        assetClass: 'stock',
+        venue: '',
+        enabled: true,
+        targetNotional: '',
+        maxTradeNotional: '',
+        maxPositionNotional: '',
+      })
       .catch((e: unknown) => e);
 
     expect(error).toBeInstanceOf(DashboardApiError);

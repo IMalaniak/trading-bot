@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
 import {
   exposureUsagePercent,
@@ -9,15 +9,31 @@ import {
   formatSignalSide,
 } from './formatters';
 
+const originalLanguages = navigator.languages;
+const setBrowserLanguages = (languages: readonly string[]) => {
+  Object.defineProperty(navigator, 'languages', {
+    configurable: true,
+    value: languages,
+  });
+};
+
 describe('dashboard formatters', () => {
+  afterEach(() => {
+    setBrowserLanguages(originalLanguages);
+  });
+
   it('formats decimal strings without losing labels for invalid values', () => {
-    expect(formatDecimal('1500.2500', 2)).toBe('1,500.25');
+    setBrowserLanguages(['de-DE']);
+
+    expect(formatDecimal('1500.2500', 2)).toBe('1.500,25');
     expect(formatDecimal('not-a-number')).toBe('not-a-number');
     expect(formatDecimal(undefined)).toBe('-');
   });
 
-  it('formats notional values as USDT', () => {
-    expect(formatNotional('1000')).toBe('1,000 USDT');
+  it('formats notional values without a currency suffix', () => {
+    setBrowserLanguages(['en-US']);
+
+    expect(formatNotional('1000')).toBe('1,000');
   });
 
   it('formats timestamps and preserves invalid strings', () => {

@@ -1,63 +1,123 @@
 import { Injectable } from '@nestjs/common';
 import { RpcException } from '@nestjs/microservices';
-import { GrpcStatusCode } from '@trading-bot/common';
+import { AppResponseCode, GrpcStatusCode } from '@trading-bot/common';
 import {
-  RegisterInstrumentRequest,
-  RegisterInstrumentResponse,
+  RegisterPortfolioInstrumentRequest,
+  RegisterPortfolioInstrumentResponse,
 } from '@trading-bot/common/proto';
 
 import { EventDispatcherService } from '../event-dispatcher/event-dispatcher.service';
-import { Prisma } from '../prisma/generated/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { InstrumentRegisteredEventFactory } from './events/instrument-registered-event.factory';
-import { InstrumentMapper } from './mapper/instrument.mapper';
+import { PortfolioReadMapper } from './mapper/portfolio-read.mapper';
+
+export const PORTFOLIO_NOT_FOUND_ERROR = 'Portfolio was not found';
+export const INSTRUMENT_ALREADY_ATTACHED_ERROR =
+  'Instrument already attached to portfolio';
+export const INSTRUMENT_METADATA_CONFLICT_ERROR =
+  'Instrument metadata conflicts with existing instrument';
 
 @Injectable()
 export class PortfolioService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly instrumentMapper: InstrumentMapper,
+    private readonly portfolioReadMapper: PortfolioReadMapper,
     private readonly instrumentRegisteredEventFactory: InstrumentRegisteredEventFactory,
     private readonly eventDispatcher: EventDispatcherService,
   ) {}
 
-  async registerInstrument(
-    data: RegisterInstrumentRequest,
-  ): Promise<RegisterInstrumentResponse> {
-    const instrument = await this.prisma.$transaction(async (tx) => {
-      const createdInstrument = await tx.instrument
-        .create({
+  async registerPortfolioInstrument(
+    data: RegisterPortfolioInstrumentRequest,
+  ): Promise<RegisterPortfolioInstrumentResponse> {
+    const configuredInstrument = await this.prisma.$transaction(async (tx) => {
+      const portfolio = await tx.portfolio.findUnique({
+        where: { id: data.portfolioId },
+        select: { id: true },
+      });
+
+      if (!portfolio) {
+        throw new RpcException({
+          message: PORTFOLIO_NOT_FOUND_ERROR,
+          code: GrpcStatusCode.NOT_FOUND,
+          appCode: AppResponseCode.PORTFOLIO_NOT_FOUND,
+        });
+      }
+
+      const requestedExternalSymbol = data.externalSymbol || undefined;
+      const existingInstrument = await tx.instrument.findFirst({
+        where: {
+          symbol: data.symbol,
+          venue: data.venue,
+        },
+      });
+
+      const instrument =
+        existingInstrument ??
+        (await tx.instrument.create({
           data: {
             symbol: data.symbol,
             assetClass: data.assetClass,
             venue: data.venue,
-            externalSymbol: data.externalSymbol,
+            externalSymbol: requestedExternalSymbol,
           },
-        })
-        .catch((error) => {
-          if (error instanceof Prisma.PrismaClientKnownRequestError) {
-            if (error.code === 'P2002') {
-              throw new RpcException({
-                message: 'Instrument already exists',
-                code: GrpcStatusCode.ALREADY_EXISTS,
-              });
-            }
-          }
-          throw error;
+        }));
+
+      if (!existingInstrument) {
+        const registrationEvent =
+          this.instrumentRegisteredEventFactory.create(instrument);
+
+        await this.eventDispatcher.enqueueEvent(
+          tx,
+          registrationEvent.topic,
+          registrationEvent.message,
+        );
+      } else if (
+        existingInstrument.assetClass !== Number(data.assetClass) ||
+        (requestedExternalSymbol !== undefined &&
+          existingInstrument.externalSymbol !== requestedExternalSymbol)
+      ) {
+        throw new RpcException({
+          message: INSTRUMENT_METADATA_CONFLICT_ERROR,
+          code: GrpcStatusCode.ALREADY_EXISTS,
+          appCode: AppResponseCode.INSTRUMENT_METADATA_CONFLICT,
         });
+      }
 
-      const registrationEvent =
-        this.instrumentRegisteredEventFactory.create(createdInstrument);
+      const existingConfig = await tx.portfolioInstrumentConfig.findUnique({
+        where: {
+          portfolioId_instrumentId: {
+            portfolioId: data.portfolioId,
+            instrumentId: instrument.id,
+          },
+        },
+      });
 
-      await this.eventDispatcher.enqueueEvent(
-        tx,
-        registrationEvent.topic,
-        registrationEvent.message,
-      );
+      if (existingConfig) {
+        throw new RpcException({
+          message: INSTRUMENT_ALREADY_ATTACHED_ERROR,
+          code: GrpcStatusCode.ALREADY_EXISTS,
+          appCode: AppResponseCode.INSTRUMENT_ALREADY_ATTACHED,
+        });
+      }
 
-      return createdInstrument;
+      return await tx.portfolioInstrumentConfig.create({
+        data: {
+          portfolioId: data.portfolioId,
+          instrumentId: instrument.id,
+          enabled: data.enabled,
+          targetNotional: data.targetNotional,
+          maxTradeNotional: data.maxTradeNotional,
+          maxPositionNotional: data.maxPositionNotional,
+        },
+        include: {
+          instrument: true,
+        },
+      });
     });
 
-    return { instrument: this.instrumentMapper.map(instrument) };
+    return {
+      configuredInstrument:
+        this.portfolioReadMapper.mapConfiguredInstrument(configuredInstrument),
+    };
   }
 }

@@ -24,6 +24,7 @@
     "noFallthroughCasesInSwitch": true,
     "paths": {
       "@trading-bot/common": ["libs/common/src/index.ts"],
+      "@trading-bot/common/validation": ["libs/common/src/lib/validation/index.ts"],
       "@trading-bot/common/proto": ["libs/common/src/proto/index.ts"],
       "@trading-bot/testing": ["libs/testing/src/index.ts"]
     }

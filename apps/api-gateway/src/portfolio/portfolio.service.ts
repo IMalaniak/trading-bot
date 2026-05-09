@@ -6,7 +6,12 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 import { type ClientGrpc } from '@nestjs/microservices';
-import { isGrpcServiceError } from '@trading-bot/common';
+import {
+  AppResponseCode,
+  GrpcStatusCode,
+  isAppResponseCode,
+  isGrpcServiceError,
+} from '@trading-bot/common';
 import {
   EXECUTION_ENGINE_CLIENT,
   PORTFOLIO_MANAGER_CLIENT,
@@ -23,19 +28,21 @@ import {
   TimeoutError,
 } from 'rxjs';
 
-import { grpcCodeToHttpStatus } from '../utils/grpc-code-to-http-status';
+import { grpcStatusToHttpStatus } from '../utils/grpc-status-to-http-status';
 import { InstrumentDto } from './dto/instrument.dto';
+import {
+  RegisterPortfolioInstrumentRequestDto,
+  RegisterPortfolioInstrumentResponseDto,
+} from './dto/portfolio-instrument.dto';
 import {
   DEFAULT_RECENT_ORDER_LIMIT,
   ExecutionOrderDto,
+  ListPortfoliosResponseDto,
+  PortfolioInstrumentConfigDto,
   PortfolioPositionDto,
   PortfolioReadResponseDto,
   PortfolioSummaryDto,
 } from './dto/portfolio-read.dto';
-import {
-  RegisterInstrumentRequestDto,
-  RegisterInstrumentResponseDto,
-} from './dto/register-instrument.dto';
 import { IExecutionEngine } from './execution-engine.client.interface';
 import { IRiskAndPortfolioManager } from './risk-and-portfolio.client.interface';
 
@@ -64,28 +71,54 @@ export class PortfolioService implements OnModuleInit {
       );
   }
 
-  public registerInstrument(
-    data: RegisterInstrumentRequestDto,
-  ): Observable<RegisterInstrumentResponseDto> {
-    return this.portfolioManagerClient.registerInstrument(data.toGRPC()).pipe(
+  public listPortfolios(): Observable<ListPortfoliosResponseDto> {
+    return this.portfolioManagerClient.listPortfolios({}).pipe(
       timeout(REQUEST_TIMEOUT_MS),
-      map(({ instrument }) => {
-        if (!instrument) {
-          // domain-level missing-instrument; map to HTTP 502 (Bad Gateway) because upstream failed
+      map((response) => {
+        if (!Array.isArray(response.portfolios)) {
           throw new HttpException(
             {
-              message: 'Risk service returned no instrument',
-              type: 'NoInstrument',
+              message:
+                'Risk service returned invalid portfolio list payload: portfolios must be an array',
+              code: AppResponseCode.UPSTREAM_UNAVAILABLE,
             },
             HttpStatus.BAD_GATEWAY,
           );
         }
-        return InstrumentDto.fromGRPC(instrument);
+
+        return ListPortfoliosResponseDto.fromGRPC(response);
       }),
       catchError((err: unknown) =>
-        this.mapUpstreamError('register instrument', err),
+        this.mapUpstreamError('list portfolios', err),
       ),
     );
+  }
+
+  public registerPortfolioInstrument(
+    portfolioId: string,
+    data: RegisterPortfolioInstrumentRequestDto,
+  ): Observable<RegisterPortfolioInstrumentResponseDto> {
+    return this.portfolioManagerClient
+      .registerPortfolioInstrument(data.toGRPC(portfolioId))
+      .pipe(
+        timeout(REQUEST_TIMEOUT_MS),
+        map(({ configuredInstrument }) => {
+          if (!configuredInstrument) {
+            throw new HttpException(
+              {
+                message: 'Risk service returned no configured instrument',
+                code: AppResponseCode.UPSTREAM_UNAVAILABLE,
+              },
+              HttpStatus.BAD_GATEWAY,
+            );
+          }
+
+          return PortfolioInstrumentConfigDto.fromGRPC(configuredInstrument);
+        }),
+        catchError((err: unknown) =>
+          this.mapUpstreamError('register portfolio instrument', err),
+        ),
+      );
   }
 
   public getPortfolio(
@@ -105,7 +138,18 @@ export class PortfolioService implements OnModuleInit {
             {
               message:
                 'Risk service returned invalid portfolio payload: positions must be an array',
-              type: 'InvalidPortfolioPayload',
+              code: AppResponseCode.UPSTREAM_UNAVAILABLE,
+            },
+            HttpStatus.BAD_GATEWAY,
+          );
+        }
+
+        if (!Array.isArray(portfolio.configuredInstruments)) {
+          throw new HttpException(
+            {
+              message:
+                'Risk service returned invalid portfolio payload: configuredInstruments must be an array',
+              code: AppResponseCode.UPSTREAM_UNAVAILABLE,
             },
             HttpStatus.BAD_GATEWAY,
           );
@@ -116,7 +160,7 @@ export class PortfolioService implements OnModuleInit {
             {
               message:
                 'Execution service returned invalid orders payload: orders must be an array',
-              type: 'InvalidExecutionPayload',
+              code: AppResponseCode.UPSTREAM_UNAVAILABLE,
             },
             HttpStatus.BAD_GATEWAY,
           );
@@ -128,7 +172,7 @@ export class PortfolioService implements OnModuleInit {
           throw new HttpException(
             {
               message: 'Risk service returned no portfolio summary',
-              type: 'NoPortfolioSummary',
+              code: AppResponseCode.UPSTREAM_UNAVAILABLE,
             },
             HttpStatus.BAD_GATEWAY,
           );
@@ -165,7 +209,7 @@ export class PortfolioService implements OnModuleInit {
                 {
                   message:
                     'Risk service returned invalid instruments payload: instruments must be an array',
-                  type: 'InvalidInstrumentsPayload',
+                  code: AppResponseCode.UPSTREAM_UNAVAILABLE,
                 },
                 HttpStatus.BAD_GATEWAY,
               );
@@ -182,6 +226,9 @@ export class PortfolioService implements OnModuleInit {
               summary: PortfolioSummaryDto.fromGRPC(portfolioSummary),
               positions: portfolio.positions.map((position) =>
                 PortfolioPositionDto.fromGRPC(position),
+              ),
+              configuredInstruments: portfolio.configuredInstruments.map(
+                (config) => PortfolioInstrumentConfigDto.fromGRPC(config),
               ),
               recentOrders: execution.orders.map((order) =>
                 ExecutionOrderDto.fromGRPC(
@@ -200,12 +247,19 @@ export class PortfolioService implements OnModuleInit {
 
   private mapUpstreamError(operation: string, err: unknown): Observable<never> {
     if (isGrpcServiceError(err)) {
-      const { code, details } = err;
-      const status = grpcCodeToHttpStatus(code);
+      const { appCode, code, details, message } = err;
+      const status = grpcStatusToHttpStatus(code);
+      const responseCode = isAppResponseCode(appCode)
+        ? appCode
+        : this.getTransportAppCode(code);
+
       return throwError(
         () =>
           new HttpException(
-            { message: details || 'gRPC error', grpcCode: code },
+            {
+              message: details || message || 'gRPC error',
+              code: responseCode,
+            },
             status,
           ),
       );
@@ -219,7 +273,10 @@ export class PortfolioService implements OnModuleInit {
       return throwError(
         () =>
           new HttpException(
-            { message: `Timed out while trying to ${operation}` },
+            {
+              message: `Timed out while trying to ${operation}`,
+              code: AppResponseCode.UPSTREAM_TIMEOUT,
+            },
             HttpStatus.GATEWAY_TIMEOUT,
           ),
       );
@@ -229,9 +286,24 @@ export class PortfolioService implements OnModuleInit {
     return throwError(
       () =>
         new HttpException(
-          { message: `Failed to ${operation}: ${message}` },
+          {
+            message: `Failed to ${operation}: ${message}`,
+            code: AppResponseCode.INTERNAL_ERROR,
+          },
           HttpStatus.INTERNAL_SERVER_ERROR,
         ),
     );
+  }
+
+  private getTransportAppCode(code: GrpcStatusCode): AppResponseCode {
+    if (code === GrpcStatusCode.DEADLINE_EXCEEDED) {
+      return AppResponseCode.UPSTREAM_TIMEOUT;
+    }
+
+    if (code === GrpcStatusCode.UNAVAILABLE) {
+      return AppResponseCode.UPSTREAM_UNAVAILABLE;
+    }
+
+    return AppResponseCode.INTERNAL_ERROR;
   }
 }

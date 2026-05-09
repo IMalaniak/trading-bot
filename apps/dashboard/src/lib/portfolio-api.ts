@@ -1,5 +1,4 @@
 export const DEFAULT_API_BASE_URL = 'http://localhost:3000/api';
-export const DEFAULT_PORTFOLIO_ID = 'portfolio-alpha';
 export const RECENT_ORDERS_LIMIT = 20;
 
 export type AssetClassName = 'unspecified' | 'crypto' | 'stock';
@@ -36,6 +35,16 @@ export interface PortfolioPositionDto {
   averageEntryPrice: string;
   exposureNotional: string;
   lastFillId: string;
+  updatedAt: string;
+}
+
+export interface PortfolioInstrumentConfigDto {
+  portfolioId: string;
+  instrument: InstrumentDto;
+  enabled: boolean;
+  targetNotional: string;
+  maxTradeNotional: string;
+  maxPositionNotional: string;
   updatedAt: string;
 }
 
@@ -77,14 +86,23 @@ export interface ExecutionOrderDto {
 export interface PortfolioReadResponseDto {
   summary: PortfolioSummaryDto;
   positions: PortfolioPositionDto[];
+  configuredInstruments: PortfolioInstrumentConfigDto[];
   recentOrders: ExecutionOrderDto[];
 }
 
-export interface RegisterInstrumentRequestDto {
+export interface ListPortfoliosResponseDto {
+  portfolios: PortfolioSummaryDto[];
+}
+
+export interface RegisterPortfolioInstrumentRequestDto {
   symbol: string;
   assetClass: AssetClassName;
   venue: string;
   externalSymbol?: string;
+  enabled: boolean;
+  targetNotional: string;
+  maxTradeNotional: string;
+  maxPositionNotional: string;
 }
 
 export class DashboardApiError extends Error {
@@ -92,6 +110,7 @@ export class DashboardApiError extends Error {
     message: string,
     public readonly status?: number,
     public readonly details?: string[],
+    public readonly code?: string,
   ) {
     super(message);
     this.name = 'DashboardApiError';
@@ -140,11 +159,14 @@ const toApiError = async (response: Response): Promise<DashboardApiError> => {
     isRecord(body) && Array.isArray(body.message)
       ? body.message.filter((item): item is string => typeof item === 'string')
       : undefined;
+  const code =
+    isRecord(body) && typeof body.code === 'string' ? body.code : undefined;
 
   return new DashboardApiError(
     message || 'Request failed',
     response.status,
     details,
+    code,
   );
 };
 
@@ -183,21 +205,25 @@ export const createDashboardApi = (
   const baseUrl = normalizeApiBaseUrl(apiBaseUrl);
 
   return {
+    listPortfolios: async (): Promise<ListPortfoliosResponseDto> =>
+      await requestJson<ListPortfoliosResponseDto>(`${baseUrl}/portfolios`),
+
     getPortfolio: async (
       portfolioId: string,
       recentOrdersLimit = RECENT_ORDERS_LIMIT,
     ): Promise<PortfolioReadResponseDto> => {
       const encodedPortfolioId = encodeURIComponent(portfolioId);
-      const url = `${baseUrl}/portfolio/${encodedPortfolioId}?recentOrdersLimit=${recentOrdersLimit}`;
+      const url = `${baseUrl}/portfolios/${encodedPortfolioId}?recentOrdersLimit=${recentOrdersLimit}`;
 
       return await requestJson<PortfolioReadResponseDto>(url);
     },
 
-    registerInstrument: async (
-      payload: RegisterInstrumentRequestDto,
-    ): Promise<InstrumentDto> =>
-      await requestJson<InstrumentDto>(
-        `${baseUrl}/portfolio/register-instrument`,
+    registerPortfolioInstrument: async (
+      portfolioId: string,
+      payload: RegisterPortfolioInstrumentRequestDto,
+    ): Promise<PortfolioInstrumentConfigDto> =>
+      await requestJson<PortfolioInstrumentConfigDto>(
+        `${baseUrl}/portfolios/${encodeURIComponent(portfolioId)}/instrument`,
         {
           method: 'POST',
           body: JSON.stringify(payload),

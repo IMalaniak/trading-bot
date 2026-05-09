@@ -1,5 +1,13 @@
 import type { OrderStatusName, SignalSideName } from './portfolio-api';
 
+const getBrowserLocale = (): string | undefined => {
+  if (typeof navigator === 'undefined') {
+    return undefined;
+  }
+
+  return navigator.languages[0] || navigator.language || undefined;
+};
+
 export const formatDecimal = (
   value: string | number | undefined,
   maximumFractionDigits = 8,
@@ -15,13 +23,13 @@ export const formatDecimal = (
     return String(value);
   }
 
-  return new Intl.NumberFormat('en-US', {
+  return new Intl.NumberFormat(getBrowserLocale(), {
     maximumFractionDigits,
   }).format(numericValue);
 };
 
 export const formatNotional = (value: string | number | undefined): string =>
-  `${formatDecimal(value, 2)} USDT`;
+  formatDecimal(value, 2);
 
 export const formatDateTime = (value: string | undefined): string => {
   if (!value) {
@@ -34,7 +42,7 @@ export const formatDateTime = (value: string | undefined): string => {
     return value;
   }
 
-  return new Intl.DateTimeFormat('en-US', {
+  return new Intl.DateTimeFormat(getBrowserLocale(), {
     month: 'short',
     day: '2-digit',
     hour: '2-digit',

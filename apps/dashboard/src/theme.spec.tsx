@@ -46,8 +46,20 @@ describe('theme handling', () => {
 
     await waitFor(() => expect(document.documentElement).toHaveClass('dark'));
 
-    await userEvent.click(screen.getByTitle('Light theme'));
+    await userEvent.click(
+      screen.getByRole('button', { name: /theme settings: system/i }),
+    );
+    await userEvent.click(
+      screen.getByRole('menuitemradio', { name: /light/i }),
+    );
     expect(document.documentElement).not.toHaveClass('dark');
     expect(localStorage.getItem('trading-bot-dashboard-theme')).toBe('light');
+
+    await userEvent.click(
+      screen.getByRole('button', { name: /theme settings: light/i }),
+    );
+    await userEvent.click(screen.getByRole('menuitemradio', { name: /dark/i }));
+    expect(document.documentElement).toHaveClass('dark');
+    expect(localStorage.getItem('trading-bot-dashboard-theme')).toBe('dark');
   });
 });

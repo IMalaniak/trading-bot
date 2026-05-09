@@ -2,85 +2,55 @@ import '@testing-library/jest-dom/vitest';
 
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { BrowserRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { PortfolioReadResponseDto } from '../lib/portfolio-api';
+import type {
+  ListPortfoliosResponseDto,
+  PortfolioReadResponseDto,
+} from '../lib/portfolio-api';
 import App from './app';
 
-const portfolioFixture: PortfolioReadResponseDto = {
-  summary: {
-    portfolioId: 'portfolio-alpha',
-    name: 'Alpha Portfolio',
-    isActive: true,
-    exposureCapNotional: '1000',
-    aggregateExposureNotional: '150',
-    openPositionCount: 1,
-    updatedAt: '2026-03-25T12:00:05.000Z',
-  },
-  positions: [
+const portfolioListFixture: ListPortfoliosResponseDto = {
+  portfolios: [
     {
       portfolioId: 'portfolio-alpha',
-      instrument: {
-        id: 'instrument-1',
-        symbol: 'BTC/USDT',
-        assetClass: 'crypto',
-        venue: 'BINANCE',
-        externalSymbol: 'BTCUSDT',
-      },
-      quantity: '0.5',
-      averageEntryPrice: '30000',
-      exposureNotional: '15000',
-      lastFillId: 'ord_abc:fill:2',
+      name: 'Alpha Portfolio',
+      isActive: true,
+      exposureCapNotional: '1000',
+      aggregateExposureNotional: '150',
+      openPositionCount: 1,
       updatedAt: '2026-03-25T12:00:05.000Z',
-    },
-  ],
-  recentOrders: [
-    {
-      orderId: 'ord_abc',
-      approvalEventId: 'approval-event-1',
-      candidateIdempotencyKey: 'source-event-1:portfolio-alpha',
-      sourceEventId: 'source-event-1',
-      portfolioId: 'portfolio-alpha',
-      instrumentId: 'instrument-1',
-      instrument: {
-        id: 'instrument-1',
-        symbol: 'BTC/USDT',
-        assetClass: 'crypto',
-        venue: 'BINANCE',
-        externalSymbol: 'BTCUSDT',
-      },
-      signalId: 'signal-1',
-      side: 'buy',
-      requestedNotional: '100',
-      requestedQuantity: '1',
-      referencePrice: '100',
-      status: 'filled',
-      approvedAt: '2026-03-25T12:00:02.000Z',
-      placedAt: '2026-03-25T12:00:03.000Z',
-      lastActivityAt: '2026-03-25T12:00:05.000Z',
-      fills: [
-        {
-          fillId: 'ord_abc:fill:2',
-          orderId: 'ord_abc',
-          portfolioId: 'portfolio-alpha',
-          instrumentId: 'instrument-1',
-          sequence: 2,
-          fillNotional: '50',
-          fillQuantity: '0.5',
-          fillPrice: '100',
-          cumulativeFilledNotional: '100',
-          cumulativeFilledQuantity: '1',
-          orderStatus: 'filled',
-          filledAt: '2026-03-25T12:00:05.000Z',
-        },
-      ],
     },
   ],
 };
 
+const portfolioFixture: PortfolioReadResponseDto = {
+  summary: portfolioListFixture.portfolios[0],
+  configuredInstruments: [
+    {
+      portfolioId: 'portfolio-alpha',
+      instrument: {
+        id: 'instrument-aapl',
+        symbol: 'AAPL',
+        assetClass: 'stock',
+        venue: 'NASDAQ',
+        externalSymbol: 'AAPL',
+      },
+      enabled: true,
+      targetNotional: '100',
+      maxTradeNotional: '25',
+      maxPositionNotional: '400',
+      updatedAt: '2026-03-25T12:00:05.000Z',
+    },
+  ],
+  positions: [],
+  recentOrders: [],
+};
+
 const emptyPortfolioFixture: PortfolioReadResponseDto = {
   ...portfolioFixture,
+  configuredInstruments: [],
   positions: [],
   recentOrders: [],
   summary: {
@@ -109,13 +79,14 @@ const installMatchMedia = (matches = false) => {
   }));
 };
 
-const renderApp = () =>
+const renderApp = (initialEntries = ['/']) =>
   render(
-    <BrowserRouter
+    <MemoryRouter
       future={{ v7_relativeSplatPath: true, v7_startTransition: true }}
+      initialEntries={initialEntries}
     >
       <App />
-    </BrowserRouter>,
+    </MemoryRouter>,
   );
 
 describe('App', () => {
@@ -128,114 +99,194 @@ describe('App', () => {
     vi.unstubAllGlobals();
   });
 
-  it('loads portfolio-alpha by default and renders portfolio state', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(portfolioFixture));
+  it('lists portfolios initially without loading a hardcoded portfolio', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(jsonResponse(portfolioListFixture));
     vi.stubGlobal('fetch', fetchMock);
 
     renderApp();
 
     expect(await screen.findByText('Alpha Portfolio')).toBeInTheDocument();
-    expect(screen.getAllByText('BTC/USDT').length).toBeGreaterThan(0);
-    expect(screen.getByText('ord_abc')).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock).toHaveBeenCalledWith(
-      'http://localhost:3000/api/portfolio/portfolio-alpha?recentOrdersLimit=20',
+      'http://localhost:3000/api/portfolios',
       expect.any(Object),
     );
   });
 
-  it('renders empty positions and orders states', async () => {
+  it('navigates from portfolio list to selected portfolio details', async () => {
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url === 'http://localhost:3000/api/portfolios') {
+        return Promise.resolve(jsonResponse(portfolioListFixture));
+      }
+
+      return Promise.resolve(jsonResponse(portfolioFixture));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderApp();
+
+    await userEvent.click(await screen.findByText('Alpha Portfolio'));
+
+    expect(
+      await screen.findByText('Portfolio Instruments'),
+    ).toBeInTheDocument();
+    expect(screen.getAllByText('AAPL').length).toBeGreaterThan(0);
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://localhost:3000/api/portfolios/portfolio-alpha?recentOrdersLimit=20',
+      expect.any(Object),
+    );
+  });
+
+  it('renders empty configured instruments, positions, and orders states', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(jsonResponse(emptyPortfolioFixture)),
     );
 
-    renderApp();
+    renderApp(['/portfolios/portfolio-alpha']);
 
-    expect(await screen.findByText('No open positions')).toBeInTheDocument();
+    expect(
+      await screen.findByText('No portfolio instruments'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('No open positions')).toBeInTheDocument();
     expect(screen.getByText('No recent orders')).toBeInTheDocument();
   });
 
-  it('keeps the last data visible while refresh fails', async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(jsonResponse(portfolioFixture))
-      .mockResolvedValueOnce(
-        jsonResponse({ message: 'Execution service unavailable' }, 502),
-      );
-    vi.stubGlobal('fetch', fetchMock);
-
-    renderApp();
-
-    expect(await screen.findByText('Alpha Portfolio')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: /refresh/i }));
-
-    expect(
-      await screen.findByText('Execution service unavailable'),
-    ).toBeInTheDocument();
-    expect(screen.getByText('Alpha Portfolio')).toBeInTheDocument();
-  });
-
-  it('validates and submits instrument registration', async () => {
+  it('validates and submits portfolio-scoped instrument registration', async () => {
     const fetchMock = vi
       .fn()
       .mockImplementation((url: string, init?: RequestInit) => {
         if (init?.method === 'POST') {
           return Promise.resolve(
             jsonResponse({
-              id: 'instrument-sol-usdt',
-              symbol: 'SOL/USDT',
-              assetClass: 'crypto',
-              venue: 'BINANCE',
-              externalSymbol: 'SOLUSDT',
+              portfolioId: 'portfolio-alpha',
+              instrument: {
+                id: 'instrument-msft',
+                symbol: 'MSFT',
+                assetClass: 'stock',
+                venue: 'NASDAQ',
+                externalSymbol: 'MSFT',
+              },
+              enabled: true,
+              targetNotional: '200',
+              maxTradeNotional: '50',
+              maxPositionNotional: '500',
+              updatedAt: '2026-03-25T12:00:05.000Z',
             }),
           );
         }
 
-        return Promise.resolve(jsonResponse(portfolioFixture));
+        return Promise.resolve(jsonResponse(emptyPortfolioFixture));
       });
     vi.stubGlobal('fetch', fetchMock);
 
-    renderApp();
+    renderApp(['/portfolios/portfolio-alpha']);
 
     await screen.findByText('Alpha Portfolio');
-    const submitButton = screen.getByRole('button', { name: /^register$/i });
+    const submitButton = screen.getByRole('button', {
+      name: /^add to portfolio$/i,
+    });
     expect(submitButton).toBeDisabled();
 
-    await userEvent.type(screen.getByLabelText(/^symbol$/i), 'SOL/USDT');
-    await userEvent.type(
-      screen.getByLabelText(/^external symbol$/i),
-      'SOLUSDT',
-    );
+    await userEvent.type(screen.getByLabelText(/^symbol$/i), 'MSFT');
+    await userEvent.selectOptions(screen.getByLabelText(/^asset class$/i), [
+      'stock',
+    ]);
+    await userEvent.type(screen.getByLabelText(/^venue$/i), 'NASDAQ');
+    await userEvent.type(screen.getByLabelText(/^external symbol$/i), 'MSFT');
+    await userEvent.type(screen.getByLabelText(/^target notional$/i), '200');
+    await userEvent.type(screen.getByLabelText(/^max trade$/i), '50');
+    await userEvent.type(screen.getByLabelText(/^max position$/i), '500');
     await userEvent.click(submitButton);
 
-    expect(await screen.findByText(/Registered SOL\/USDT/)).toBeInTheDocument();
+    expect(await screen.findByText(/Added MSFT/)).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith(
-      'http://localhost:3000/api/portfolio/register-instrument',
+      'http://localhost:3000/api/portfolios/portfolio-alpha/instrument',
       expect.objectContaining({
         method: 'POST',
         body: JSON.stringify({
-          symbol: 'SOL/USDT',
-          assetClass: 'crypto',
-          venue: 'BINANCE',
-          externalSymbol: 'SOLUSDT',
+          symbol: 'MSFT',
+          assetClass: 'stock',
+          venue: 'NASDAQ',
+          externalSymbol: 'MSFT',
+          enabled: true,
+          targetNotional: '200',
+          maxTradeNotional: '50',
+          maxPositionNotional: '500',
         }),
       }),
     );
   });
 
-  it('uses system theme by default and allows dark theme override', async () => {
+  it('renders duplicate instrument errors from application response codes', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockImplementation((url: string, init?: RequestInit) => {
+        if (init?.method === 'POST') {
+          return Promise.resolve(
+            jsonResponse(
+              {
+                message: 'Instrument already attached to portfolio',
+                code: 'INSTRUMENT_ALREADY_ATTACHED',
+              },
+              409,
+            ),
+          );
+        }
+
+        return Promise.resolve(jsonResponse(emptyPortfolioFixture));
+      });
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderApp(['/portfolios/portfolio-alpha']);
+
+    await screen.findByText('Alpha Portfolio');
+    await userEvent.type(screen.getByLabelText(/^symbol$/i), 'MSFT');
+    await userEvent.selectOptions(screen.getByLabelText(/^asset class$/i), [
+      'stock',
+    ]);
+    await userEvent.type(screen.getByLabelText(/^venue$/i), 'NASDAQ');
+    await userEvent.type(screen.getByLabelText(/^target notional$/i), '200');
+    await userEvent.type(screen.getByLabelText(/^max trade$/i), '50');
+    await userEvent.type(screen.getByLabelText(/^max position$/i), '500');
+    await userEvent.click(
+      screen.getByRole('button', { name: /^add to portfolio$/i }),
+    );
+
+    expect(
+      await screen.findByText(
+        'This instrument is already configured for the selected portfolio.',
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('uses system theme by default and exposes a compact theme menu', async () => {
     installMatchMedia(true);
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue(jsonResponse(portfolioFixture)),
+      vi.fn().mockResolvedValue(jsonResponse(portfolioListFixture)),
     );
 
     renderApp();
 
     await waitFor(() => expect(document.documentElement).toHaveClass('dark'));
 
-    await userEvent.click(screen.getByTitle('Light theme'));
+    await userEvent.click(
+      screen.getByRole('button', { name: /theme settings: system/i }),
+    );
+    await userEvent.click(
+      screen.getByRole('menuitemradio', { name: /light/i }),
+    );
     expect(document.documentElement).not.toHaveClass('dark');
     expect(localStorage.getItem('trading-bot-dashboard-theme')).toBe('light');
+
+    await userEvent.click(
+      screen.getByRole('button', { name: /theme settings: light/i }),
+    );
+    await userEvent.click(screen.getByRole('menuitemradio', { name: /dark/i }));
+    expect(document.documentElement).toHaveClass('dark');
+    expect(localStorage.getItem('trading-bot-dashboard-theme')).toBe('dark');
   });
 });

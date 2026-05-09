@@ -1,10 +1,11 @@
-import { Monitor, Moon, Sun } from 'lucide-react';
+import { Check, Monitor, Moon, Sun } from 'lucide-react';
 import {
   createContext,
   type ReactNode,
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 
@@ -120,30 +121,84 @@ export const useTheme = (): ThemeContextValue => {
 
 export function ThemeToggle() {
   const { preference, setPreference } = useTheme();
+  const [isOpen, setIsOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const currentOption =
+    themeOptions.find((option) => option.value === preference) ??
+    themeOptions[0];
+  const { Icon } = currentOption;
+
+  useEffect(() => {
+    if (!isOpen) {
+      return undefined;
+    }
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (menuRef.current?.contains(event.target as Node)) {
+        return;
+      }
+
+      setIsOpen(false);
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsOpen(false);
+      }
+    };
+
+    document.addEventListener('pointerdown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isOpen]);
 
   return (
-    <div
-      aria-label="Theme"
-      className="inline-grid grid-cols-3 rounded-md border border-zinc-200 bg-white p-1 shadow-sm dark:border-zinc-800 dark:bg-zinc-950"
-      role="group"
-    >
-      {themeOptions.map(({ value, label, Icon }) => (
-        <button
-          aria-pressed={preference === value}
-          className={`flex h-9 min-w-9 items-center justify-center rounded px-2 text-xs font-medium transition ${
-            preference === value
-              ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-950'
-              : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-900'
-          }`}
-          key={value}
-          onClick={() => setPreference(value)}
-          title={`${label} theme`}
-          type="button"
+    <div className="relative" ref={menuRef}>
+      <button
+        aria-expanded={isOpen}
+        aria-haspopup="menu"
+        aria-label={`Theme settings: ${currentOption.label}`}
+        className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-zinc-200 bg-white text-zinc-700 shadow-sm transition hover:bg-zinc-100 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-200 dark:hover:bg-zinc-900"
+        onClick={() => setIsOpen((current) => !current)}
+        title={`Theme settings: ${currentOption.label}`}
+        type="button"
+      >
+        <Icon aria-hidden="true" className="h-4 w-4" />
+      </button>
+      {isOpen ? (
+        <div
+          className="absolute right-0 top-12 z-50 w-44 overflow-hidden rounded-md border border-zinc-200 bg-white p-1 text-sm shadow-lg dark:border-zinc-800 dark:bg-zinc-950"
+          role="menu"
         >
-          <Icon aria-hidden="true" className="h-4 w-4 sm:mr-1.5" />
-          <span className="hidden sm:inline">{label}</span>
-        </button>
-      ))}
+          {themeOptions.map((option) => {
+            const OptionIcon = option.Icon;
+            const isSelected = option.value === preference;
+
+            return (
+              <button
+                aria-checked={isSelected}
+                className="flex h-9 w-full items-center gap-2 rounded px-2 text-left text-zinc-700 transition hover:bg-zinc-100 focus:bg-zinc-100 focus:outline-none dark:text-zinc-200 dark:hover:bg-zinc-900 dark:focus:bg-zinc-900"
+                key={option.value}
+                onClick={() => {
+                  setPreference(option.value);
+                  setIsOpen(false);
+                }}
+                role="menuitemradio"
+                type="button"
+              >
+                <OptionIcon aria-hidden="true" className="h-4 w-4" />
+                <span className="flex-1">{option.label}</span>
+                {isSelected ? (
+                  <Check aria-hidden="true" className="h-4 w-4 text-cyan-500" />
+                ) : null}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -1,13 +1,15 @@
-import { AlertTriangle, RefreshCw, Search } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, RefreshCw } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
+import { Link, useParams } from 'react-router-dom';
 
 import { InstrumentRegistration } from '../components/instrument-registration';
+import { PortfolioInstrumentsView } from '../components/portfolio-instruments-view';
 import { PortfolioSummary } from '../components/portfolio-summary';
 import { PositionsView } from '../components/positions-view';
 import { RecentOrdersView } from '../components/recent-orders-view';
 import {
   createDashboardApi,
-  DEFAULT_PORTFOLIO_ID,
+  type PortfolioInstrumentConfigDto,
   type PortfolioReadResponseDto,
 } from '../lib/portfolio-api';
 import { ThemeToggle } from '../theme';
@@ -30,20 +32,29 @@ const initialPortfolioState: PortfolioState = {
 };
 
 export function DashboardPage() {
-  const [portfolioInput, setPortfolioInput] = useState(DEFAULT_PORTFOLIO_ID);
-  const [portfolioId, setPortfolioId] = useState(DEFAULT_PORTFOLIO_ID);
+  const { portfolioId = '' } = useParams<{ portfolioId: string }>();
   const [state, setState] = useState<PortfolioState>(initialPortfolioState);
 
   const loadPortfolio = useCallback(
-    async (nextPortfolioId: string, keepData = false) => {
+    async (keepData = false) => {
+      if (!portfolioId) {
+        setState({
+          status: 'error',
+          isRefreshing: false,
+          error: 'Select a portfolio to view details.',
+        });
+        return;
+      }
+
       setState((current) => ({
         data: keepData ? current.data : undefined,
+        error: undefined,
         status: keepData && current.data ? 'success' : 'loading',
         isRefreshing: keepData && Boolean(current.data),
       }));
 
       try {
-        const data = await api.getPortfolio(nextPortfolioId);
+        const data = await api.getPortfolio(portfolioId);
         setState({ data, status: 'success', isRefreshing: false });
       } catch (error) {
         setState((current) => ({
@@ -54,20 +65,36 @@ export function DashboardPage() {
         }));
       }
     },
-    [],
+    [portfolioId],
   );
 
   useEffect(() => {
-    void loadPortfolio(portfolioId);
-  }, [loadPortfolio, portfolioId]);
+    void loadPortfolio();
+  }, [loadPortfolio]);
 
-  const applyPortfolioId = useCallback(() => {
-    const nextPortfolioId = portfolioInput.trim();
+  const handleInstrumentRegistered = useCallback(
+    (configuredInstrument: PortfolioInstrumentConfigDto) => {
+      setState((current) => {
+        if (!current.data) {
+          return current;
+        }
 
-    if (nextPortfolioId && nextPortfolioId !== portfolioId) {
-      setPortfolioId(nextPortfolioId);
-    }
-  }, [portfolioId, portfolioInput]);
+        const withoutExisting = current.data.configuredInstruments.filter(
+          (config) =>
+            config.instrument.id !== configuredInstrument.instrument.id,
+        );
+
+        return {
+          ...current,
+          data: {
+            ...current.data,
+            configuredInstruments: [configuredInstrument, ...withoutExisting],
+          },
+        };
+      });
+    },
+    [],
+  );
 
   return (
     <main className="min-h-screen bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100">
@@ -84,45 +111,26 @@ export function DashboardPage() {
             </div>
             <ThemeToggle />
           </div>
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <label className="relative flex-1">
-              <span className="sr-only">Portfolio ID</span>
-              <Search
+          <div className="flex items-center justify-between gap-2">
+            <Link
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-zinc-300 bg-white px-3 text-sm font-semibold text-zinc-800 transition hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
+              to="/"
+            >
+              <ArrowLeft aria-hidden="true" className="h-4 w-4" />
+              Portfolios
+            </Link>
+            <button
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-cyan-600 px-4 text-sm font-semibold text-white transition hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={state.status === 'loading' || state.isRefreshing}
+              onClick={() => void loadPortfolio(true)}
+              type="button"
+            >
+              <RefreshCw
                 aria-hidden="true"
-                className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400"
+                className={`h-4 w-4 ${state.isRefreshing ? 'animate-spin' : ''}`}
               />
-              <input
-                className="h-11 w-full rounded-md border border-zinc-300 bg-white pl-9 pr-3 text-sm text-zinc-950 outline-none transition focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
-                onChange={(event) => setPortfolioInput(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') {
-                    applyPortfolioId();
-                  }
-                }}
-                value={portfolioInput}
-              />
-            </label>
-            <div className="grid grid-cols-2 gap-2 sm:flex">
-              <button
-                className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-zinc-300 bg-white px-4 text-sm font-semibold text-zinc-800 transition hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
-                onClick={applyPortfolioId}
-                type="button"
-              >
-                Apply
-              </button>
-              <button
-                className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-cyan-600 px-4 text-sm font-semibold text-white transition hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-60"
-                disabled={state.status === 'loading' || state.isRefreshing}
-                onClick={() => void loadPortfolio(portfolioId, true)}
-                type="button"
-              >
-                <RefreshCw
-                  aria-hidden="true"
-                  className={`h-4 w-4 ${state.isRefreshing ? 'animate-spin' : ''}`}
-                />
-                Refresh
-              </button>
-            </div>
+              Refresh
+            </button>
           </div>
         </div>
       </div>
@@ -136,6 +144,9 @@ export function DashboardPage() {
           ) : state.data ? (
             <>
               <PortfolioSummary data={state.data} />
+              <PortfolioInstrumentsView
+                instruments={state.data.configuredInstruments}
+              />
               <PositionsView positions={state.data.positions} />
               <RecentOrdersView orders={state.data.recentOrders} />
             </>
@@ -143,12 +154,15 @@ export function DashboardPage() {
             <EmptyState
               Icon={AlertTriangle}
               title="Portfolio unavailable"
-              description="The dashboard could not load this portfolio. Check the portfolio ID or try again."
+              description="The dashboard could not load this portfolio. Check the selected portfolio or try again."
             />
           ) : null}
         </div>
         <aside className="space-y-5">
-          <InstrumentRegistration />
+          <InstrumentRegistration
+            onRegistered={handleInstrumentRegistered}
+            portfolioId={portfolioId}
+          />
         </aside>
       </div>
     </main>

@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { RpcException } from '@nestjs/microservices';
 
+import { AppResponseCode } from '../const/app-response-code.enum';
 import { GrpcStatusCode } from '../const/grpc-status-code.enum';
 
 const flattenValidationErrors = (
@@ -32,6 +33,7 @@ const createGrpcValidationException = (
 
   return new RpcException({
     code: GrpcStatusCode.INVALID_ARGUMENT,
+    appCode: AppResponseCode.VALIDATION_FAILED,
     message: 'Validation failed',
     details: details || 'Validation failed',
   });

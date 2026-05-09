@@ -6,20 +6,32 @@ import "common/instrument.proto";
 import "common/portfolio.proto";
 
 service RiskAndPortfolioManager {
-  rpc RegisterInstrument (RegisterInstrumentRequest) returns (RegisterInstrumentResponse);
+  rpc RegisterPortfolioInstrument (RegisterPortfolioInstrumentRequest) returns (RegisterPortfolioInstrumentResponse);
+  rpc ListPortfolios(ListPortfoliosRequest) returns (ListPortfoliosResponse);
   rpc GetPortfolio(GetPortfolioRequest) returns (GetPortfolioResponse);
   rpc ListInstruments(ListInstrumentsRequest) returns (ListInstrumentsResponse);
 }
 
-message RegisterInstrumentRequest {
-  tradingbot.common.AssetClass asset_class = 1;
-  string symbol = 2;
-  string venue = 3;
-  string external_symbol = 4; // optional
+message RegisterPortfolioInstrumentRequest {
+  string portfolio_id = 1;
+  tradingbot.common.AssetClass asset_class = 2;
+  string symbol = 3;
+  string venue = 4;
+  string external_symbol = 5; // optional
+  bool enabled = 6;
+  string target_notional = 7;
+  string max_trade_notional = 8;
+  string max_position_notional = 9;
 }
 
-message RegisterInstrumentResponse {
-  tradingbot.common.Instrument instrument = 1;  // includes instrument_id
+message RegisterPortfolioInstrumentResponse {
+  tradingbot.common.PortfolioInstrumentConfig configured_instrument = 1;
+}
+
+message ListPortfoliosRequest {}
+
+message ListPortfoliosResponse {
+  repeated tradingbot.common.PortfolioSummary portfolios = 1;
 }
 
 message GetPortfolioRequest {
@@ -29,6 +41,7 @@ message GetPortfolioRequest {
 message GetPortfolioResponse {
   tradingbot.common.PortfolioSummary summary = 1;
   repeated tradingbot.common.Position positions = 2;
+  repeated tradingbot.common.PortfolioInstrumentConfig configured_instruments = 3;
 }
 
 message ListInstrumentsRequest {

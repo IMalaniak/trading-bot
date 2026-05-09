@@ -70,6 +70,7 @@ describe('Portfolio read integration', () => {
         openPositionCount: 0,
       }),
       positions: [],
+      configuredInstruments: [],
     });
   });
 
@@ -122,6 +123,7 @@ describe('Portfolio read integration', () => {
           }),
         }),
       ],
+      configuredInstruments: [],
     });
   });
 });

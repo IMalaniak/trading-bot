@@ -8,16 +8,16 @@ export class InstrumentDto implements Omit<Instrument, 'assetClass'> {
   @ApiProperty({ type: String, format: 'uuid' })
   id: string;
 
-  @ApiProperty({ example: 'BTC/USDT' })
+  @ApiProperty({ example: 'AAPL' })
   symbol: string;
 
   @ApiProperty({ enum: AssetClassName, example: AssetClassName.CRYPTO })
   assetClass: AssetClassName;
 
-  @ApiProperty({ example: 'BINANCE' })
+  @ApiProperty({ example: 'NASDAQ' })
   venue: string;
 
-  @ApiPropertyOptional({ example: 'BTCUSDT' })
+  @ApiPropertyOptional({ example: 'AAPL' })
   externalSymbol?: string;
 
   static fromGRPC(instrument: Instrument): InstrumentDto {

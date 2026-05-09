@@ -3,13 +3,14 @@ import { GrpcMethod } from '@nestjs/microservices';
 import type {
   GetPortfolioResponse,
   ListInstrumentsResponse,
-  RegisterInstrumentRequest,
-  RegisterInstrumentResponse,
+  ListPortfoliosResponse,
+  RegisterPortfolioInstrumentResponse,
 } from '@trading-bot/common/proto';
 
 import {
   GetPortfolioRequestDto,
   ListInstrumentsRequestDto,
+  RegisterPortfolioInstrumentRequestDto,
 } from './dto/portfolio-read-request.dto';
 import { PortfolioService } from './portfolio.service';
 import { PortfolioQueryService } from './services/portfolio-query.service';
@@ -21,11 +22,16 @@ export class PortfolioController {
     private readonly portfolioQueryService: PortfolioQueryService,
   ) {}
 
-  @GrpcMethod('RiskAndPortfolioManager', 'RegisterInstrument')
-  async registerInstrument(
-    data: RegisterInstrumentRequest,
-  ): Promise<RegisterInstrumentResponse> {
-    return await this.portfolioService.registerInstrument(data);
+  @GrpcMethod('RiskAndPortfolioManager', 'RegisterPortfolioInstrument')
+  async registerPortfolioInstrument(
+    data: RegisterPortfolioInstrumentRequestDto,
+  ): Promise<RegisterPortfolioInstrumentResponse> {
+    return await this.portfolioService.registerPortfolioInstrument(data);
+  }
+
+  @GrpcMethod('RiskAndPortfolioManager', 'ListPortfolios')
+  async listPortfolios(): Promise<ListPortfoliosResponse> {
+    return await this.portfolioQueryService.listPortfolios();
   }
 
   @GrpcMethod('RiskAndPortfolioManager', 'GetPortfolio')

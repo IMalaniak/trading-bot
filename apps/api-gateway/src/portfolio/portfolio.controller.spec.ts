@@ -1,4 +1,5 @@
 import { ValidationPipe } from '@nestjs/common';
+import { PATH_METADATA } from '@nestjs/common/constants';
 import { APP_PIPE } from '@nestjs/core';
 import { Test, TestingModule } from '@nestjs/testing';
 
@@ -20,8 +21,9 @@ describe('PortfolioController', () => {
         {
           provide: PortfolioService,
           useValue: {
+            listPortfolios: jest.fn(),
             getPortfolio: jest.fn(),
-            registerInstrument: jest.fn(),
+            registerPortfolioInstrument: jest.fn(),
           },
         },
       ],
@@ -32,5 +34,11 @@ describe('PortfolioController', () => {
 
   it('should be defined', () => {
     expect(controller).toBeDefined();
+  });
+
+  it('uses the plural REST resource path', () => {
+    expect(Reflect.getMetadata(PATH_METADATA, PortfolioController)).toBe(
+      'portfolios',
+    );
   });
 });
