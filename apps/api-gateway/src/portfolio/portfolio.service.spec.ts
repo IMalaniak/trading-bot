@@ -9,8 +9,11 @@ import {
   SignalSide,
 } from '@trading-bot/common/proto';
 import { lastValueFrom, of, throwError } from 'rxjs';
+import { TimeoutError } from 'rxjs';
 
+import { AssetClassName } from './dto/asset-class-name.enum';
 import { OrderStatusName } from './dto/order-status-name.enum';
+import { RegisterInstrumentRequestDto } from './dto/register-instrument.dto';
 import { SignalSideName } from './dto/signal-side-name.enum';
 import { IExecutionEngine } from './execution-engine.client.interface';
 import { PortfolioService } from './portfolio.service';
@@ -321,6 +324,106 @@ describe('PortfolioService', () => {
         type: 'InvalidExecutionPayload',
       },
       status: HttpStatus.BAD_GATEWAY,
+    });
+  });
+
+  describe('registerInstrument', () => {
+    const registrationPayload = Object.assign(
+      new RegisterInstrumentRequestDto(),
+      {
+        symbol: 'BTC/USDT',
+        assetClass: AssetClassName.CRYPTO,
+        venue: 'BINANCE',
+        externalSymbol: 'BTCUSDT',
+      },
+    );
+
+    it('maps a successful upstream response to an InstrumentDto', async () => {
+      portfolioClient.registerInstrument.mockReturnValue(
+        of({
+          instrument: {
+            id: 'instrument-1',
+            assetClass: AssetClass.CRYPTO,
+            symbol: 'BTC/USDT',
+            venue: 'BINANCE',
+            externalSymbol: 'BTCUSDT',
+          },
+        }),
+      );
+
+      await expect(
+        lastValueFrom(service.registerInstrument(registrationPayload)),
+      ).resolves.toEqual({
+        id: 'instrument-1',
+        assetClass: 'crypto',
+        symbol: 'BTC/USDT',
+        venue: 'BINANCE',
+        externalSymbol: 'BTCUSDT',
+      });
+    });
+
+    it('maps a missing upstream instrument to HTTP 502', async () => {
+      portfolioClient.registerInstrument.mockReturnValue(
+        of({ instrument: undefined }),
+      );
+
+      await expect(
+        lastValueFrom(service.registerInstrument(registrationPayload)),
+      ).rejects.toMatchObject({
+        response: {
+          message: 'Risk service returned no instrument',
+          type: 'NoInstrument',
+        },
+        status: HttpStatus.BAD_GATEWAY,
+      });
+    });
+
+    it('maps a portfolio-manager ALREADY_EXISTS error to HTTP 409', async () => {
+      portfolioClient.registerInstrument.mockReturnValue(
+        throwError(() => ({
+          code: GrpcStatusCode.ALREADY_EXISTS,
+          details: 'Instrument already exists',
+        })),
+      );
+
+      await expect(
+        lastValueFrom(service.registerInstrument(registrationPayload)),
+      ).rejects.toMatchObject({
+        response: {
+          message: 'Instrument already exists',
+          grpcCode: GrpcStatusCode.ALREADY_EXISTS,
+        },
+        status: HttpStatus.CONFLICT,
+      });
+    });
+
+    it('maps a registration timeout to HTTP 504', async () => {
+      portfolioClient.registerInstrument.mockReturnValue(
+        throwError(() => new TimeoutError()),
+      );
+
+      await expect(
+        lastValueFrom(service.registerInstrument(registrationPayload)),
+      ).rejects.toMatchObject({
+        response: { message: 'Timed out while trying to register instrument' },
+        status: HttpStatus.GATEWAY_TIMEOUT,
+      });
+    });
+  });
+
+  it('maps a getPortfolio timeout to HTTP 504', async () => {
+    portfolioClient.getPortfolio.mockReturnValue(
+      throwError(() => new TimeoutError()),
+    );
+    executionClient.listPortfolioExecutionOrders.mockReturnValue(
+      of({ orders: [] }),
+    );
+
+    await expect(
+      lastValueFrom(service.getPortfolio('portfolio-alpha', 10)),
+    ).rejects.toMatchObject({
+      response: { message: 'Timed out while trying to get portfolio' },
+      status: HttpStatus.GATEWAY_TIMEOUT,
     });
   });
 });

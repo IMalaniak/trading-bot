@@ -6,6 +6,7 @@ import {
   formatDecimal,
   formatNotional,
   formatOrderStatus,
+  formatSignalSide,
 } from './formatters';
 
 describe('dashboard formatters', () => {
@@ -32,5 +33,11 @@ describe('dashboard formatters', () => {
 
   it('formats snake case order statuses', () => {
     expect(formatOrderStatus('partially_filled')).toBe('Partially Filled');
+  });
+
+  it('formats signal sides', () => {
+    expect(formatSignalSide('buy')).toBe('Buy');
+    expect(formatSignalSide('sell')).toBe('Sell');
+    expect(formatSignalSide('hold')).toBe('Hold');
   });
 });

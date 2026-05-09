@@ -82,32 +82,9 @@ export class PortfolioService implements OnModuleInit {
         }
         return InstrumentDto.fromGRPC(instrument);
       }),
-      catchError((err: unknown) => {
-        if (isGrpcServiceError(err)) {
-          const { code, details } = err;
-          const status = grpcCodeToHttpStatus(code);
-          return throwError(
-            () =>
-              new HttpException(
-                { message: details || 'gRPC error', grpcCode: code },
-                status,
-              ),
-          );
-        }
-
-        if (err instanceof HttpException) {
-          return throwError(() => err);
-        }
-
-        const message = err instanceof Error ? err.message : String(err);
-        return throwError(
-          () =>
-            new HttpException(
-              { message: `Failed to register instrument: ${message}` },
-              HttpStatus.INTERNAL_SERVER_ERROR,
-            ),
-        );
-      }),
+      catchError((err: unknown) =>
+        this.mapUpstreamError('register instrument', err),
+      ),
     );
   }
 

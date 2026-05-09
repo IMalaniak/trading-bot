@@ -26,7 +26,7 @@ const installMatchMedia = (matches = false) => {
 
 describe('theme handling', () => {
   beforeEach(() => {
-    localStorage.clear();
+    localStorage.removeItem('trading-bot-dashboard-theme');
     document.documentElement.className = '';
     installMatchMedia();
   });

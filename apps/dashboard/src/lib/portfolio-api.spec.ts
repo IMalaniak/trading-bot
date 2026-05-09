@@ -97,4 +97,34 @@ describe('portfolio API client', () => {
       message: 'Network error: connection refused',
     });
   });
+
+  it('normalizes NestJS class-validator array message errors', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        jsonResponse(
+          {
+            message: ['symbol must be a string', 'venue must not be empty'],
+            statusCode: 400,
+            error: 'Bad Request',
+          },
+          400,
+        ),
+      ),
+    );
+
+    const error = await createDashboardApi('https://api.example/api')
+      .registerInstrument({ symbol: '', assetClass: 'crypto', venue: '' })
+      .catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(DashboardApiError);
+    expect((error as DashboardApiError).message).toBe(
+      'symbol must be a string, venue must not be empty',
+    );
+    expect((error as DashboardApiError).details).toEqual([
+      'symbol must be a string',
+      'venue must not be empty',
+    ]);
+    expect((error as DashboardApiError).status).toBe(400);
+  });
 });

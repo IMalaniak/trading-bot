@@ -5,8 +5,8 @@ import userEvent from '@testing-library/user-event';
 import { BrowserRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type { PortfolioReadResponseDto } from '../lib/portfolio-api';
 import App from './app';
-import type { PortfolioReadResponseDto } from './portfolio-api';
 
 const portfolioFixture: PortfolioReadResponseDto = {
   summary: {
@@ -120,7 +120,7 @@ const renderApp = () =>
 
 describe('App', () => {
   beforeEach(() => {
-    localStorage.clear();
+    localStorage.removeItem('trading-bot-dashboard-theme');
     installMatchMedia();
   });
 
