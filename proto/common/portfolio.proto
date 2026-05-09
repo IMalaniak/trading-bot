@@ -25,3 +25,14 @@ message PortfolioSummary {
   int32 open_position_count = 6;
   string updated_at = 7;
 }
+
+// PortfolioInstrumentConfig represents an instrument configured for one portfolio.
+message PortfolioInstrumentConfig {
+  string portfolio_id = 1;
+  Instrument instrument = 2;
+  bool enabled = 3;
+  string target_notional = 4;
+  string max_trade_notional = 5;
+  string max_position_notional = 6;
+  string updated_at = 7;
+}

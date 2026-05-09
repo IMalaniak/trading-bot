@@ -5,14 +5,23 @@ describe('PortfolioQueryRepository', () => {
   let prisma: {
     portfolio: {
       findUnique: jest.Mock;
+      findMany: jest.Mock;
     };
     portfolioPosition: {
       findMany: jest.Mock;
       aggregate: jest.Mock;
       findFirst: jest.Mock;
+      count: jest.Mock;
+      groupBy: jest.Mock;
     };
     portfolioSummarySnapshot: {
       findFirst: jest.Mock;
+      groupBy: jest.Mock;
+    };
+    portfolioInstrumentConfig: {
+      findMany: jest.Mock;
+      findFirst: jest.Mock;
+      groupBy: jest.Mock;
     };
     instrument: {
       findMany: jest.Mock;
@@ -24,14 +33,23 @@ describe('PortfolioQueryRepository', () => {
     prisma = {
       portfolio: {
         findUnique: jest.fn(),
+        findMany: jest.fn(),
       },
       portfolioPosition: {
         findMany: jest.fn(),
         aggregate: jest.fn(),
         findFirst: jest.fn(),
+        count: jest.fn(),
+        groupBy: jest.fn(),
       },
       portfolioSummarySnapshot: {
         findFirst: jest.fn(),
+        groupBy: jest.fn(),
+      },
+      portfolioInstrumentConfig: {
+        findMany: jest.fn(),
+        findFirst: jest.fn(),
+        groupBy: jest.fn(),
       },
       instrument: {
         findMany: jest.fn(),
@@ -55,17 +73,42 @@ describe('PortfolioQueryRepository', () => {
     prisma.portfolioPosition.aggregate.mockResolvedValue({
       _sum: { exposureNotional: null },
     });
+    prisma.portfolioPosition.count.mockResolvedValue(0);
     prisma.portfolioSummarySnapshot.findFirst.mockResolvedValue({
       updatedAt: snapshotUpdatedAt,
     });
     prisma.portfolioPosition.findFirst.mockResolvedValue({
       updatedAt: positionUpdatedAt,
     });
+    prisma.portfolioInstrumentConfig.findMany.mockResolvedValue([]);
+    prisma.portfolioInstrumentConfig.findFirst.mockResolvedValue(null);
 
     await expect(
       repository.findPortfolio('portfolio-alpha'),
     ).resolves.toMatchObject({
       updatedAt: positionUpdatedAt,
+    });
+  });
+
+  it('lists portfolio summaries active first and then by name and id', async () => {
+    const updatedAt = new Date('2026-03-25T12:00:00.000Z');
+    prisma.portfolio.findMany.mockResolvedValue([
+      {
+        id: 'portfolio-alpha',
+        name: 'Alpha Portfolio',
+        isActive: true,
+        exposureCapNotional: '1000',
+        createdAt: updatedAt,
+        updatedAt,
+      },
+    ]);
+    prisma.portfolioPosition.groupBy.mockResolvedValue([]);
+    prisma.portfolioSummarySnapshot.groupBy.mockResolvedValue([]);
+    prisma.portfolioInstrumentConfig.groupBy.mockResolvedValue([]);
+
+    await expect(repository.listPortfolioSummaries()).resolves.toHaveLength(1);
+    expect(prisma.portfolio.findMany).toHaveBeenCalledWith({
+      orderBy: [{ isActive: 'desc' }, { name: 'asc' }, { id: 'asc' }],
     });
   });
 });

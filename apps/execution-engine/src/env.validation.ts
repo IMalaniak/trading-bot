@@ -1,5 +1,14 @@
 import { createValidateFunction, NodeEnvironment } from '@trading-bot/common';
-import { IsEnum, IsNumber, IsString, Max, Min } from 'class-validator';
+import {
+  IsEnum,
+  IsInt,
+  IsNotEmpty,
+  IsString,
+  IsUrl,
+  Matches,
+  Max,
+  Min,
+} from 'class-validator';
 
 interface EnvConfig {
   NODE_ENV: NodeEnvironment;
@@ -16,28 +25,38 @@ class EnvironmentVariables implements EnvConfig {
   @IsEnum(NodeEnvironment)
   NODE_ENV: NodeEnvironment;
 
-  @IsString()
+  @IsUrl(
+    { protocols: ['postgresql', 'postgres'], require_tld: false },
+    {
+      message:
+        'EXECUTION_ENGINE_DATABASE_URL must be a valid PostgreSQL connection URL',
+    },
+  )
   EXECUTION_ENGINE_DATABASE_URL: string;
 
   @IsString()
+  @Matches(/^[\w.-]+(:\d+)?$/, {
+    message: 'EXECUTION_ENGINE_GRPC_URL must be a valid host:port string',
+  })
   EXECUTION_ENGINE_GRPC_URL: string;
 
   @IsString()
+  @IsNotEmpty()
   KAFKA_BROKERS: string;
 
-  @IsNumber()
+  @IsInt()
   @Min(1)
   KAFKA_CONSUMER_RETRY_MAX_ATTEMPTS: number;
 
-  @IsNumber()
+  @IsInt()
   @Min(0)
   KAFKA_CONSUMER_RETRY_BASE_MS: number;
 
-  @IsNumber()
+  @IsInt()
   @Min(0)
   KAFKA_CONSUMER_RETRY_MAX_MS: number;
 
-  @IsNumber()
+  @IsInt()
   @Min(0)
   @Max(65535)
   EXECUTION_ENGINE_METRICS_PORT: number;

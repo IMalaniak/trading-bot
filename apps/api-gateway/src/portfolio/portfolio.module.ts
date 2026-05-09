@@ -31,6 +31,7 @@ import { PortfolioService } from './portfolio.service';
             url: config.getOrThrow<string>('PORTFOLIO_MANAGER_GRPC_URL'),
             loader: {
               includeDirs: [join(process.cwd(), PROTO_FOLDER)],
+              defaults: true,
             },
           },
         }),
@@ -47,6 +48,7 @@ import { PortfolioService } from './portfolio.service';
             url: config.getOrThrow<string>('EXECUTION_ENGINE_GRPC_URL'),
             loader: {
               includeDirs: [join(process.cwd(), PROTO_FOLDER)],
+              defaults: true,
             },
           },
         }),

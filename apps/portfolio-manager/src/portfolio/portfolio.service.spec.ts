@@ -1,23 +1,20 @@
 import { Test } from '@nestjs/testing';
-import {
-  instrumentKey,
-  KAFKA_EVENT_HEADER_NAMES,
-  KAFKA_EVENT_PRODUCERS,
-  KAFKA_EVENT_SCHEMA_VERSIONS,
-  KAFKA_TOPICS,
-} from '@trading-bot/common';
+import { AppResponseCode } from '@trading-bot/common';
 import {
   AssetClass,
-  InstrumentRegistered,
-  RegisterInstrumentRequest,
+  RegisterPortfolioInstrumentRequest,
 } from '@trading-bot/common/proto';
 
 import { EventDispatcherService } from '../event-dispatcher/event-dispatcher.service';
-import { Prisma } from '../prisma/generated/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { InstrumentRegisteredEventFactory } from './events/instrument-registered-event.factory';
 import { InstrumentMapper } from './mapper/instrument.mapper';
-import { PortfolioService } from './portfolio.service';
+import { PortfolioReadMapper } from './mapper/portfolio-read.mapper';
+import {
+  INSTRUMENT_ALREADY_ATTACHED_ERROR,
+  INSTRUMENT_METADATA_CONFLICT_ERROR,
+  PortfolioService,
+} from './portfolio.service';
 
 describe('PortfolioService', () => {
   let service: PortfolioService;
@@ -27,13 +24,6 @@ describe('PortfolioService', () => {
   >;
   let eventDispatcher: {
     enqueueEvent: EventDispatcherService['enqueueEvent'];
-  };
-
-  const request: RegisterInstrumentRequest = {
-    assetClass: AssetClass.CRYPTO,
-    symbol: 'BTC/USDT',
-    venue: 'BINANCE',
-    externalSymbol: 'BTCUSDT',
   };
 
   beforeEach(async () => {
@@ -48,8 +38,16 @@ describe('PortfolioService', () => {
         {
           provide: PrismaService,
           useValue: {
+            portfolio: {
+              findUnique: jest.fn(),
+            },
             instrument: {
               create: jest.fn(),
+              findFirst: jest.fn(),
+            },
+            portfolioInstrumentConfig: {
+              create: jest.fn(),
+              findUnique: jest.fn(),
             },
             $transaction: jest.fn(),
           },
@@ -59,6 +57,7 @@ describe('PortfolioService', () => {
           useValue: eventDispatcher,
         },
         InstrumentMapper,
+        PortfolioReadMapper,
         InstrumentRegisteredEventFactory,
       ],
     }).compile();
@@ -67,100 +66,261 @@ describe('PortfolioService', () => {
     prismaService = moduleRef.get(PrismaService);
   });
 
-  it('creates an instrument, enqueues outbox event, and returns mapped result', async () => {
-    const createdInstrument = {
-      id: 'instrument-1',
-      assetClass: AssetClass.CRYPTO,
-      symbol: request.symbol,
-      venue: request.venue,
-      externalSymbol: request.externalSymbol,
+  describe('registerPortfolioInstrument', () => {
+    const portfolioInstrumentRequest: RegisterPortfolioInstrumentRequest = {
+      portfolioId: 'portfolio-alpha',
+      assetClass: AssetClass.STOCK,
+      symbol: 'AAPL',
+      venue: 'NASDAQ',
+      externalSymbol: 'AAPL',
+      enabled: true,
+      targetNotional: '100',
+      maxTradeNotional: '25',
+      maxPositionNotional: '400',
     };
-    const tx = {
-      instrument: {
-        create: jest.fn().mockResolvedValue(createdInstrument),
-      },
-      $executeRaw: jest.fn(),
+
+    const updatedAt = new Date('2026-03-25T12:00:00.000Z');
+    const expectRpcAppCode = async (
+      promise: Promise<unknown>,
+      appCode: AppResponseCode,
+    ) => {
+      let caught: unknown;
+
+      try {
+        await promise;
+      } catch (error) {
+        caught = error;
+      }
+
+      expect(caught).toBeDefined();
+      const payload = (
+        caught as {
+          getError?: () => unknown;
+        }
+      ).getError?.();
+
+      expect(payload).toEqual(expect.objectContaining({ appCode }));
     };
-    (prismaService.$transaction as jest.Mock).mockImplementation(
-      (cb: (client: typeof tx) => unknown) => cb(tx),
-    );
 
-    const result = await service.registerInstrument(request);
+    it('creates a new instrument and portfolio config transactionally', async () => {
+      const createdInstrument = {
+        id: 'instrument-aapl',
+        assetClass: AssetClass.STOCK,
+        symbol: 'AAPL',
+        venue: 'NASDAQ',
+        externalSymbol: 'AAPL',
+      };
+      const createdConfig = {
+        id: 'config-1',
+        portfolioId: 'portfolio-alpha',
+        instrumentId: 'instrument-aapl',
+        enabled: true,
+        targetNotional: '100',
+        maxTradeNotional: '25',
+        maxPositionNotional: '400',
+        createdAt: updatedAt,
+        updatedAt,
+        instrument: createdInstrument,
+      };
+      const tx = {
+        portfolio: {
+          findUnique: jest.fn().mockResolvedValue({ id: 'portfolio-alpha' }),
+        },
+        instrument: {
+          findFirst: jest.fn().mockResolvedValue(null),
+          create: jest.fn().mockResolvedValue(createdInstrument),
+        },
+        portfolioInstrumentConfig: {
+          findUnique: jest.fn().mockResolvedValue(null),
+          create: jest.fn().mockResolvedValue(createdConfig),
+        },
+        $executeRaw: jest.fn(),
+      };
+      (prismaService.$transaction as jest.Mock).mockImplementation(
+        (cb: (client: typeof tx) => unknown) => cb(tx),
+      );
 
-    expect(tx.instrument.create).toHaveBeenCalledWith({
-      data: {
-        symbol: request.symbol,
-        assetClass: request.assetClass,
-        venue: request.venue,
-        externalSymbol: request.externalSymbol,
-      },
+      await expect(
+        service.registerPortfolioInstrument(portfolioInstrumentRequest),
+      ).resolves.toEqual({
+        configuredInstrument: {
+          portfolioId: 'portfolio-alpha',
+          instrument: createdInstrument,
+          enabled: true,
+          targetNotional: '100',
+          maxTradeNotional: '25',
+          maxPositionNotional: '400',
+          updatedAt: '2026-03-25T12:00:00.000Z',
+        },
+      });
+      expect(tx.instrument.create).toHaveBeenCalledWith({
+        data: {
+          symbol: 'AAPL',
+          assetClass: AssetClass.STOCK,
+          venue: 'NASDAQ',
+          externalSymbol: 'AAPL',
+        },
+      });
+      expect(tx.portfolioInstrumentConfig.create).toHaveBeenCalledWith({
+        data: {
+          portfolioId: 'portfolio-alpha',
+          instrumentId: 'instrument-aapl',
+          enabled: true,
+          targetNotional: '100',
+          maxTradeNotional: '25',
+          maxPositionNotional: '400',
+        },
+        include: {
+          instrument: true,
+        },
+      });
+      expect(eventDispatcher.enqueueEvent).toHaveBeenCalledTimes(1);
     });
 
-    expect(eventDispatcher.enqueueEvent).toHaveBeenCalledTimes(1);
+    it('attaches an existing matching instrument without emitting a registration event', async () => {
+      const existingInstrument = {
+        id: 'instrument-aapl',
+        assetClass: AssetClass.STOCK,
+        symbol: 'AAPL',
+        venue: 'NASDAQ',
+        externalSymbol: 'AAPL',
+      };
+      const tx = {
+        portfolio: {
+          findUnique: jest.fn().mockResolvedValue({ id: 'portfolio-alpha' }),
+        },
+        instrument: {
+          findFirst: jest.fn().mockResolvedValue(existingInstrument),
+          create: jest.fn(),
+        },
+        portfolioInstrumentConfig: {
+          findUnique: jest.fn().mockResolvedValue(null),
+          create: jest.fn().mockResolvedValue({
+            id: 'config-1',
+            portfolioId: 'portfolio-alpha',
+            instrumentId: 'instrument-aapl',
+            enabled: true,
+            targetNotional: '100',
+            maxTradeNotional: '25',
+            maxPositionNotional: '400',
+            createdAt: updatedAt,
+            updatedAt,
+            instrument: existingInstrument,
+          }),
+        },
+      };
+      (prismaService.$transaction as jest.Mock).mockImplementation(
+        (cb: (client: typeof tx) => unknown) => cb(tx),
+      );
 
-    const firstEnqueueCall = enqueueEventMock.mock.calls[0];
-    if (!firstEnqueueCall) {
-      throw new Error('Expected enqueueEvent to be called once');
-    }
-    const [, topic, message] = firstEnqueueCall;
-    const messageHeaders = message.headers;
-    if (!messageHeaders) {
-      throw new Error('Expected enqueueEvent headers to be defined');
-    }
-    const payload = InstrumentRegistered.decode(message.value);
-
-    expect(topic).toBe(KAFKA_TOPICS.INSTRUMENT_REGISTERED);
-    expect(message.key).toBe(
-      instrumentKey(createdInstrument.venue, createdInstrument.id),
-    );
-    expect(message.eventId).toEqual(expect.any(String));
-    expect(messageHeaders).toEqual(
-      expect.objectContaining({
-        [KAFKA_EVENT_HEADER_NAMES.EVENT_ID]: message.eventId,
-        [KAFKA_EVENT_HEADER_NAMES.EVENT_TYPE]:
-          KAFKA_TOPICS.INSTRUMENT_REGISTERED,
-        [KAFKA_EVENT_HEADER_NAMES.SCHEMA_VERSION]:
-          KAFKA_EVENT_SCHEMA_VERSIONS.INSTRUMENT_REGISTERED,
-        [KAFKA_EVENT_HEADER_NAMES.PRODUCER]:
-          KAFKA_EVENT_PRODUCERS.PORTFOLIO_MANAGER,
-        [KAFKA_EVENT_HEADER_NAMES.CONTENT_TYPE]: 'application/x-protobuf',
-      }),
-    );
-    expect(payload.instrument).toEqual({
-      id: createdInstrument.id,
-      symbol: createdInstrument.symbol,
-      assetClass: createdInstrument.assetClass,
-      venue: createdInstrument.venue,
-      externalSymbol: createdInstrument.externalSymbol,
+      await expect(
+        service.registerPortfolioInstrument(portfolioInstrumentRequest),
+      ).resolves.toMatchObject({
+        configuredInstrument: {
+          portfolioId: 'portfolio-alpha',
+          instrument: existingInstrument,
+        },
+      });
+      expect(tx.instrument.create).not.toHaveBeenCalled();
+      expect(eventDispatcher.enqueueEvent).not.toHaveBeenCalled();
     });
-    expect(payload.registeredAt).toBe(
-      messageHeaders[KAFKA_EVENT_HEADER_NAMES.OCCURRED_AT],
-    );
-    expect(result).toEqual({
-      instrument: createdInstrument,
+
+    it('rejects missing portfolios with a portfolio not found app code', async () => {
+      const tx = {
+        portfolio: {
+          findUnique: jest.fn().mockResolvedValue(null),
+        },
+        instrument: {
+          findFirst: jest.fn(),
+          create: jest.fn(),
+        },
+        portfolioInstrumentConfig: {
+          findUnique: jest.fn(),
+          create: jest.fn(),
+        },
+      };
+      (prismaService.$transaction as jest.Mock).mockImplementation(
+        (cb: (client: typeof tx) => unknown) => cb(tx),
+      );
+
+      await expectRpcAppCode(
+        service.registerPortfolioInstrument(portfolioInstrumentRequest),
+        AppResponseCode.PORTFOLIO_NOT_FOUND,
+      );
+      expect(tx.instrument.findFirst).not.toHaveBeenCalled();
     });
-  });
 
-  it('throws RpcException with ALREADY_EXISTS when instrument already exists', async () => {
-    const uniqueError = new Prisma.PrismaClientKnownRequestError(
-      'Unique constraint failed',
-      {
-        code: 'P2002',
-        clientVersion: '',
-      },
-    );
-    const tx = {
-      instrument: {
-        create: jest.fn().mockRejectedValue(uniqueError),
-      },
-      $executeRaw: jest.fn(),
-    };
-    (prismaService.$transaction as jest.Mock).mockImplementation(
-      (cb: (client: typeof tx) => unknown) => cb(tx),
-    );
+    it('rejects instruments already attached to the portfolio', async () => {
+      const existingInstrument = {
+        id: 'instrument-aapl',
+        assetClass: AssetClass.STOCK,
+        symbol: 'AAPL',
+        venue: 'NASDAQ',
+        externalSymbol: 'AAPL',
+      };
+      const tx = {
+        portfolio: {
+          findUnique: jest.fn().mockResolvedValue({ id: 'portfolio-alpha' }),
+        },
+        instrument: {
+          findFirst: jest.fn().mockResolvedValue(existingInstrument),
+          create: jest.fn(),
+        },
+        portfolioInstrumentConfig: {
+          findUnique: jest.fn().mockResolvedValue({ id: 'config-1' }),
+          create: jest.fn(),
+        },
+      };
+      (prismaService.$transaction as jest.Mock).mockImplementation(
+        (cb: (client: typeof tx) => unknown) => cb(tx),
+      );
 
-    await expect(service.registerInstrument(request)).rejects.toMatchSnapshot();
+      const promise = service.registerPortfolioInstrument(
+        portfolioInstrumentRequest,
+      );
 
-    expect(eventDispatcher.enqueueEvent).not.toHaveBeenCalled();
+      await expect(promise).rejects.toThrow(INSTRUMENT_ALREADY_ATTACHED_ERROR);
+      await expectRpcAppCode(
+        promise,
+        AppResponseCode.INSTRUMENT_ALREADY_ATTACHED,
+      );
+      expect(tx.portfolioInstrumentConfig.create).not.toHaveBeenCalled();
+    });
+
+    it('rejects existing instruments with conflicting metadata', async () => {
+      const tx = {
+        portfolio: {
+          findUnique: jest.fn().mockResolvedValue({ id: 'portfolio-alpha' }),
+        },
+        instrument: {
+          findFirst: jest.fn().mockResolvedValue({
+            id: 'instrument-aapl',
+            assetClass: AssetClass.CRYPTO,
+            symbol: 'AAPL',
+            venue: 'NASDAQ',
+            externalSymbol: 'AAPL',
+          }),
+          create: jest.fn(),
+        },
+        portfolioInstrumentConfig: {
+          findUnique: jest.fn(),
+          create: jest.fn(),
+        },
+      };
+      (prismaService.$transaction as jest.Mock).mockImplementation(
+        (cb: (client: typeof tx) => unknown) => cb(tx),
+      );
+
+      const promise = service.registerPortfolioInstrument(
+        portfolioInstrumentRequest,
+      );
+
+      await expect(promise).rejects.toThrow(INSTRUMENT_METADATA_CONFLICT_ERROR);
+      await expectRpcAppCode(
+        promise,
+        AppResponseCode.INSTRUMENT_METADATA_CONFLICT,
+      );
+      expect(tx.portfolioInstrumentConfig.findUnique).not.toHaveBeenCalled();
+    });
   });
 });

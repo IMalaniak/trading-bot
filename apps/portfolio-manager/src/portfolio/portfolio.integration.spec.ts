@@ -10,7 +10,7 @@ import {
 import {
   AssetClass,
   InstrumentRegistered,
-  RegisterInstrumentRequest,
+  RegisterPortfolioInstrumentRequest,
 } from '@trading-bot/common/proto';
 import {
   startKafkaMessageCollector,
@@ -88,13 +88,17 @@ describe('PortfolioService integration', () => {
 
   beforeEach(async () => {
     await prisma.outboxEvent.deleteMany();
+    await prisma.portfolioInstrumentConfig.deleteMany();
     await prisma.instrument.deleteMany();
+    await prisma.portfolio.deleteMany();
     await truncateTopic(kafkaAdmin, KAFKA_TOPICS.INSTRUMENT_REGISTERED);
   });
 
   afterAll(async () => {
     await prisma.outboxEvent.deleteMany();
+    await prisma.portfolioInstrumentConfig.deleteMany();
     await prisma.instrument.deleteMany();
+    await prisma.portfolio.deleteMany();
     await truncateTopic(kafkaAdmin, KAFKA_TOPICS.INSTRUMENT_REGISTERED);
     await kafkaAdmin.disconnect();
     await prisma.$disconnect();
@@ -102,11 +106,16 @@ describe('PortfolioService integration', () => {
   });
 
   it('persists an instrument, creates one outbox event, and emits one registration message', async () => {
-    const request: RegisterInstrumentRequest = {
-      assetClass: AssetClass.CRYPTO,
-      symbol: 'BTC/USDT',
-      venue: 'BINANCE',
-      externalSymbol: 'BTCUSDT',
+    const request: RegisterPortfolioInstrumentRequest = {
+      portfolioId: 'portfolio-integration',
+      assetClass: AssetClass.STOCK,
+      symbol: 'AAPL',
+      venue: 'NASDAQ',
+      externalSymbol: 'AAPL',
+      enabled: true,
+      targetNotional: '100',
+      maxTradeNotional: '25',
+      maxPositionNotional: '400',
     };
     const kafka = new Kafka({
       clientId: 'portfolio-manager-integration-consumer',
@@ -129,7 +138,17 @@ describe('PortfolioService integration', () => {
     });
 
     try {
-      const result = await portfolioService.registerInstrument(request);
+      await prisma.portfolio.create({
+        data: {
+          id: request.portfolioId,
+          name: 'Integration Portfolio',
+          exposureCapNotional: '1000',
+          isActive: true,
+        },
+      });
+
+      const result =
+        await portfolioService.registerPortfolioInstrument(request);
 
       await eventDispatcher.dispatchOutboxBatch();
       await waitForCondition(
@@ -139,6 +158,8 @@ describe('PortfolioService integration', () => {
       );
 
       const instruments = await prisma.instrument.findMany();
+      const instrumentConfigs =
+        await prisma.portfolioInstrumentConfig.findMany();
       const outboxEvents = await prisma.outboxEvent.findMany();
       const consumed = collector.messages[0];
 
@@ -147,12 +168,18 @@ describe('PortfolioService integration', () => {
       }
 
       expect(instruments).toHaveLength(1);
+      expect(instrumentConfigs).toHaveLength(1);
       expect(outboxEvents).toHaveLength(1);
       expect(outboxEvents[0]?.topic).toBe(KAFKA_TOPICS.INSTRUMENT_REGISTERED);
       expect(outboxEvents[0]?.key).toBe(
         instrumentKey(instruments[0].venue, instruments[0].id),
       );
-      expect(result.instrument?.id).toBe(instruments[0]?.id);
+      expect(result.configuredInstrument?.instrument?.id).toBe(
+        instruments[0]?.id,
+      );
+      expect(result.configuredInstrument?.portfolioId).toBe(
+        request.portfolioId,
+      );
 
       expect(consumed.key).toBe(
         instrumentKey(instruments[0].venue, instruments[0].id),

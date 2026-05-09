@@ -1,7 +1,7 @@
 import { HttpStatus } from '@nestjs/common';
 import { GrpcStatusCode } from '@trading-bot/common';
 
-export function grpcCodeToHttpStatus(code?: GrpcStatusCode): HttpStatus {
+export function grpcStatusToHttpStatus(code?: GrpcStatusCode): HttpStatus {
   switch (code) {
     case GrpcStatusCode.OK:
       return HttpStatus.OK;

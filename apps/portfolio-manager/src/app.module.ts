@@ -14,7 +14,7 @@ import { PortfolioModule } from './portfolio/portfolio.module';
 import { RiskPipelineModule } from './risk-pipeline/risk-pipeline.module';
 
 const rootEnvPath = join(process.cwd(), '.env');
-const appEnvPath = join(__dirname, '../.env');
+const appEnvPath = join(process.cwd(), 'apps/portfolio-manager/.env');
 
 @Module({
   imports: [

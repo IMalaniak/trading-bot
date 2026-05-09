@@ -1,0 +1,85 @@
+import '@testing-library/jest-dom/vitest';
+
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import {
+  getStoredThemePreference,
+  resolveThemePreference,
+  ThemeProvider,
+  ThemeToggle,
+} from './theme';
+
+const installMatchMedia = (matches = false) => {
+  window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+    matches,
+    media: query,
+    onchange: null,
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  }));
+};
+
+const makeLocalStorageMock = () => {
+  const store: Record<string, string> = {};
+  return {
+    getItem: (key: string) => store[key] ?? null,
+    setItem: (key: string, value: string) => {
+      store[key] = value;
+    },
+    removeItem: (key: string) => {
+      delete store[key];
+    },
+    clear: () => {
+      Object.keys(store).forEach((k) => delete store[k]);
+    },
+  };
+};
+
+describe('theme handling', () => {
+  beforeEach(() => {
+    vi.stubGlobal('localStorage', makeLocalStorageMock());
+    document.documentElement.className = '';
+    installMatchMedia();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('defaults to system preference', () => {
+    expect(getStoredThemePreference()).toBe('system');
+    expect(resolveThemePreference('light')).toBe('light');
+  });
+
+  it('applies dark class from system theme and stores overrides', async () => {
+    installMatchMedia(true);
+    render(
+      <ThemeProvider>
+        <ThemeToggle />
+      </ThemeProvider>,
+    );
+
+    await waitFor(() => expect(document.documentElement).toHaveClass('dark'));
+
+    await userEvent.click(
+      screen.getByRole('button', { name: /theme settings: system/i }),
+    );
+    await userEvent.click(
+      screen.getByRole('menuitemradio', { name: /light/i }),
+    );
+    expect(document.documentElement).not.toHaveClass('dark');
+    expect(localStorage.getItem('trading-bot-dashboard-theme')).toBe('light');
+
+    await userEvent.click(
+      screen.getByRole('button', { name: /theme settings: light/i }),
+    );
+    await userEvent.click(screen.getByRole('menuitemradio', { name: /dark/i }));
+    expect(document.documentElement).toHaveClass('dark');
+    expect(localStorage.getItem('trading-bot-dashboard-theme')).toBe('dark');
+  });
+});

@@ -1,9 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { RpcException } from '@nestjs/microservices';
-import { GrpcStatusCode } from '@trading-bot/common';
+import { AppResponseCode, GrpcStatusCode } from '@trading-bot/common';
 import {
   GetPortfolioResponse,
   ListInstrumentsResponse,
+  ListPortfoliosResponse,
 } from '@trading-bot/common/proto';
 
 import { PortfolioReadMapper } from '../mapper/portfolio-read.mapper';
@@ -23,10 +24,17 @@ export class PortfolioQueryService {
       throw new RpcException({
         message: `Portfolio '${portfolioId}' was not found`,
         code: GrpcStatusCode.NOT_FOUND,
+        appCode: AppResponseCode.PORTFOLIO_NOT_FOUND,
       });
     }
 
     return this.mapper.mapPortfolio(state);
+  }
+
+  async listPortfolios(): Promise<ListPortfoliosResponse> {
+    const summaries = await this.repository.listPortfolioSummaries();
+
+    return this.mapper.mapPortfolioSummaries(summaries);
   }
 
   async listInstruments(

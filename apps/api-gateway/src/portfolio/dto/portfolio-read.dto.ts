@@ -2,6 +2,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   ExecutionFill,
   ExecutionOrder,
+  PortfolioInstrumentConfig,
   PortfolioSummary,
   Position,
 } from '@trading-bot/common/proto';
@@ -71,6 +72,67 @@ export class PortfolioSummaryDto implements PortfolioSummary {
 
   static fromGRPC(summary: PortfolioSummary): PortfolioSummaryDto {
     return { ...summary };
+  }
+}
+
+export class ListPortfoliosResponseDto {
+  @ApiProperty({ type: [PortfolioSummaryDto] })
+  portfolios: PortfolioSummaryDto[];
+
+  static fromGRPC(response: {
+    portfolios: PortfolioSummary[];
+  }): ListPortfoliosResponseDto {
+    return {
+      portfolios: response.portfolios.map((portfolio) =>
+        PortfolioSummaryDto.fromGRPC(portfolio),
+      ),
+    };
+  }
+}
+
+export class PortfolioInstrumentConfigDto implements Omit<
+  PortfolioInstrumentConfig,
+  'instrument'
+> {
+  @ApiProperty({ example: 'portfolio-alpha' })
+  portfolioId: string;
+
+  @ApiProperty({ type: InstrumentDto })
+  instrument: InstrumentDto;
+
+  @ApiProperty({ example: true })
+  enabled: boolean;
+
+  @ApiProperty({ example: '100' })
+  targetNotional: string;
+
+  @ApiProperty({ example: '150' })
+  maxTradeNotional: string;
+
+  @ApiProperty({ example: '400' })
+  maxPositionNotional: string;
+
+  @ApiProperty({ example: '2026-03-25T12:00:05.000Z' })
+  updatedAt: string;
+
+  static fromGRPC(
+    config: PortfolioInstrumentConfig,
+  ): PortfolioInstrumentConfigDto {
+    if (!config.instrument) {
+      throw new Error(
+        `Portfolio instrument config for '${config.portfolioId}' is missing instrument details`,
+      );
+    }
+
+    return {
+      portfolioId: config.portfolioId,
+      instrument: InstrumentDto.fromGRPC(config.instrument),
+      enabled: config.enabled,
+      targetNotional: config.targetNotional,
+      maxTradeNotional: config.maxTradeNotional,
+      maxPositionNotional: config.maxPositionNotional,
+      updatedAt: config.updatedAt,
+    };
   }
 }
 
@@ -260,6 +322,9 @@ export class PortfolioReadResponseDto {
 
   @ApiProperty({ type: [PortfolioPositionDto] })
   positions: PortfolioPositionDto[];
+
+  @ApiProperty({ type: [PortfolioInstrumentConfigDto] })
+  configuredInstruments: PortfolioInstrumentConfigDto[];
 
   @ApiProperty({ type: [ExecutionOrderDto] })
   recentOrders: ExecutionOrderDto[];

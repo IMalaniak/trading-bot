@@ -1,6 +1,11 @@
+import { AppResponseCode } from '../const/app-response-code.enum';
+import { GrpcStatusCode } from '../const/grpc-status-code.enum';
+
 export interface GrpcServiceError {
-  code: number;
+  code: GrpcStatusCode;
   details?: string;
+  message?: string;
+  appCode?: AppResponseCode | string;
   metadata?: unknown;
 }
 

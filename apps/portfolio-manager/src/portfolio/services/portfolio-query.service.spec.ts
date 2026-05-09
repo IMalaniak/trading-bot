@@ -15,6 +15,9 @@ describe('PortfolioQueryService', () => {
     listInstruments: jest.MockedFunction<
       PortfolioQueryRepository['listInstruments']
     >;
+    listPortfolioSummaries: jest.MockedFunction<
+      PortfolioQueryRepository['listPortfolioSummaries']
+    >;
   };
   let service: PortfolioQueryService;
 
@@ -22,6 +25,7 @@ describe('PortfolioQueryService', () => {
     repository = {
       findPortfolio: jest.fn(),
       listInstruments: jest.fn(),
+      listPortfolioSummaries: jest.fn(),
     };
     service = new PortfolioQueryService(
       repository as unknown as PortfolioQueryRepository,
@@ -44,6 +48,7 @@ describe('PortfolioQueryService', () => {
       openPositionCount: 0,
       updatedAt,
       positions: [],
+      configuredInstruments: [],
     });
 
     await expect(service.getPortfolio('portfolio-alpha')).resolves.toEqual({
@@ -57,6 +62,7 @@ describe('PortfolioQueryService', () => {
         updatedAt: '2026-03-25T12:00:00.000Z',
       },
       positions: [],
+      configuredInstruments: [],
     });
   });
 
@@ -74,6 +80,28 @@ describe('PortfolioQueryService', () => {
       aggregateExposureNotional: toPrismaDecimal('150.5'),
       openPositionCount: 1,
       updatedAt,
+      configuredInstruments: [
+        {
+          id: 'config-1',
+          portfolioId: 'portfolio-alpha',
+          instrumentId: 'instrument-1',
+          enabled: true,
+          targetNotional: toPrismaDecimal('100'),
+          maxTradeNotional: toPrismaDecimal('150'),
+          maxPositionNotional: toPrismaDecimal('400'),
+          createdAt: updatedAt,
+          updatedAt,
+          instrument: {
+            id: 'instrument-1',
+            assetClass: AssetClass.CRYPTO,
+            symbol: 'BTC/USDT',
+            venue: 'BINANCE',
+            externalSymbol: 'BTCUSDT',
+            createdAt: updatedAt,
+            updatedAt,
+          },
+        },
+      ],
       positions: [
         {
           id: 'position-1',
@@ -100,6 +128,23 @@ describe('PortfolioQueryService', () => {
 
     const response = await service.getPortfolio('portfolio-alpha');
 
+    expect(response.configuredInstruments).toEqual([
+      {
+        portfolioId: 'portfolio-alpha',
+        instrument: {
+          id: 'instrument-1',
+          assetClass: AssetClass.CRYPTO,
+          symbol: 'BTC/USDT',
+          venue: 'BINANCE',
+          externalSymbol: 'BTCUSDT',
+        },
+        enabled: true,
+        targetNotional: '100',
+        maxTradeNotional: '150',
+        maxPositionNotional: '400',
+        updatedAt: '2026-03-25T12:00:05.000Z',
+      },
+    ]);
     expect(response.positions).toEqual([
       {
         portfolioId: 'portfolio-alpha',
@@ -117,6 +162,39 @@ describe('PortfolioQueryService', () => {
         updatedAt: '2026-03-25T12:00:05.000Z',
       },
     ]);
+  });
+
+  it('lists portfolio summaries', async () => {
+    const updatedAt = new Date('2026-03-25T12:00:00.000Z');
+    repository.listPortfolioSummaries.mockResolvedValue([
+      {
+        portfolio: {
+          id: 'portfolio-alpha',
+          name: 'Alpha Portfolio',
+          isActive: true,
+          exposureCapNotional: toPrismaDecimal('1000'),
+          createdAt: updatedAt,
+          updatedAt,
+        },
+        aggregateExposureNotional: toPrismaDecimal('25'),
+        openPositionCount: 2,
+        updatedAt,
+      },
+    ]);
+
+    await expect(service.listPortfolios()).resolves.toEqual({
+      portfolios: [
+        {
+          portfolioId: 'portfolio-alpha',
+          name: 'Alpha Portfolio',
+          isActive: true,
+          exposureCapNotional: '1000',
+          aggregateExposureNotional: '25',
+          openPositionCount: 2,
+          updatedAt: '2026-03-25T12:00:00.000Z',
+        },
+      ],
+    });
   });
 
   it('throws NOT_FOUND for missing portfolios', async () => {

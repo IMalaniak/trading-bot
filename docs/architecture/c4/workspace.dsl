@@ -76,9 +76,9 @@ workspace "Trading Bot System" {
             }
 
             group "Risk & Portfolio Manager Service" {
-                portfolioManager = container "Risk & Portfolio Manager" "Implements instrument registration, the current two-stage risk pipeline, fill reconciliation, exposure state, and portfolio update publishing today." "Nest.js" {
+                portfolioManager = container "Risk & Portfolio Manager" "Implements instrument registration, portfolio-scoped instrument configuration, the current two-stage risk pipeline, fill reconciliation, exposure state, and portfolio update publishing today." "Nest.js" {
                     tags "Implemented"
-                    gRPC = component "Risk & Portfolio API" "Exposes instrument registration, portfolio read queries, and instrument resolution today; remains the planned gRPC surface for broader risk/strategy configuration workflows." "gRPC" "API"
+                    gRPC = component "Risk & Portfolio API" "Exposes portfolio listing, portfolio-scoped instrument configuration, portfolio read queries, and instrument resolution today; remains the planned gRPC surface for broader risk/strategy configuration workflows." "gRPC" "API"
 
                     riskRules = component "Risk Rules Engine" "Applies the current deterministic portfolio-stage checks in order, using exact decimals: subscription enabled, per-trade cap, per-instrument reserved exposure cap, then per-portfolio reserved exposure cap." "TypeScript" {
                         tags "Implemented"
@@ -86,7 +86,7 @@ workspace "Trading Bot System" {
                     strategyConfigManager = component "Strategy Config Manager" "Receives strategy updates and start/stop commands from API Gateway and manages rule sets." "TypeScript" {
                         tags "Planned"
                     }
-                    portfolioManager = component "Portfolio Manager" "Handles instrument registration and portfolio-facing workflows inside the service." "TypeScript" {
+                    portfolioManager = component "Portfolio Manager" "Handles instrument registration, portfolio instrument configuration, and portfolio-facing workflows inside the service." "TypeScript" {
                         tags "Implemented"
                     }
                     portfolioQueryService = component "Portfolio Query Service" "Reads portfolio summary exposure state, open positions, and instrument summaries for API Gateway visibility requests." "TypeScript" {
@@ -142,7 +142,7 @@ workspace "Trading Bot System" {
                     }
 
                     gRPC -> strategyConfigManager "Handles planned risk/strategy config updates via"
-                    gRPC -> portfolioManager "Handles instrument registration via"
+                    gRPC -> portfolioManager "Handles portfolio listing and instrument configuration via"
                     gRPC -> portfolioQueryService "Handles portfolio read and instrument resolution requests via"
                     portfolioQueryService -> portfolioStateRepository "Reads summary, positions, orders/fills-derived state, and instruments via"
                     instrumentStageConsumer -> instrumentStageService "Feeds trading.signals into"
@@ -238,15 +238,15 @@ workspace "Trading Bot System" {
             }
 
             group "API Gateway Service" {
-                apiGateway = container "API Gateway" "Routes instrument registration today and is the planned coordination layer for broader dashboard-facing workflows." "Nest.js" {
+                apiGateway = container "API Gateway" "Routes portfolio listing, selected portfolio reads, and portfolio-scoped instrument configuration today; planned coordination layer for broader dashboard-facing workflows." "Nest.js" {
                     tags "Implemented"
-                    REST = component "API" "Exposes instrument registration today and will later expand to strategy, portfolio, and market-data endpoints." "REST" "API"
+                    REST = component "API" "Exposes portfolio listing, portfolio reads, and portfolio-scoped instrument configuration today; will later expand to strategy and market-data endpoints." "REST" "API"
                     gRPC_Client = component "gRPC Client" "Handles internal service-to-service communication." "gRPC"
 
                     core = component "Core Orchestration" "Coordinates the current registration workflow and portfolio visibility aggregation." "TypeScript"
 
                     marketDataProxy = component "Market Data Proxy" "Forwards dashboard queries to Data Ingestion (Market Data API)." "TypeScript"
-                    portfolioProxy = component "Portfolio Proxy" "Forwards instrument registration, portfolio reads, and instrument resolution to Risk & Portfolio Manager." "TypeScript"
+                    portfolioProxy = component "Portfolio Proxy" "Forwards portfolio listing, portfolio-scoped instrument configuration, portfolio reads, and instrument resolution to Risk & Portfolio Manager." "TypeScript"
                     executionProxy = component "Execution Proxy" "Fetches recent execution-owned orders and fills from Execution Engine." "TypeScript" {
                         tags "Implemented"
                     }
@@ -261,7 +261,7 @@ workspace "Trading Bot System" {
 
                     REST -> core "Handles API requests via"
                     core -> marketDataProxy "Sends market data requests to"
-                    core -> portfolioProxy "Sends instrument registration, portfolio reads, and instrument resolution requests to"
+                    core -> portfolioProxy "Sends portfolio listing, instrument configuration, portfolio reads, and instrument resolution requests to"
                     core -> portfolioReadAggregator "Builds portfolio visibility responses via"
                     core -> metricsEndpoint "Exposes operational metrics via"
                     portfolioReadAggregator -> portfolioProxy "Reads portfolio summary, positions, and instruments via"
@@ -289,19 +289,25 @@ workspace "Trading Bot System" {
                 core -> binanceClient "Sends requests to Binance via"
             }
 
-            dashboard = container "Dashboard" "React" "Planned user interface. MVP scope is a demo console for portfolio visibility and instrument registration through existing API Gateway endpoints." "Single Page Application" {
-                tags "Planned"
-                router = component "Router" "Routes the MVP demo console and later dashboard sections." "TypeScript/React" {
-                    tags "MVP Planned"
+            dashboard = container "Dashboard" "React, Vite, Tailwind CSS" "Implemented portfolio dashboard for portfolio selection, portfolio visibility, and portfolio-scoped instrument configuration through API Gateway." "Single Page Application" {
+                tags "Implemented"
+                router = component "Router" "Routes portfolio list, portfolio details, and later dashboard sections." "TypeScript/React" {
+                    tags "Implemented"
                 }
-                portfolioUI = component "MVP Portfolio Demo Console" "Displays the selected portfolio summary, open positions, recent simulated orders, and nested fills. Defaults to seeded portfolio-alpha with an editable portfolio ID." "TypeScript/React" {
-                    tags "MVP Planned"
+                portfolioListUI = component "Portfolio List" "Displays available portfolios and navigates to selected portfolio details." "TypeScript/React" {
+                    tags "Implemented"
                 }
-                instrumentRegistrationUI = component "MVP Instrument Registration Form" "Submits instrument registration through API Gateway and shows success, validation, loading, and upstream error states." "TypeScript/React" {
-                    tags "MVP Planned"
+                portfolioUI = component "Portfolio Details" "Displays the selected portfolio summary, configured instruments, open positions, recent simulated orders, and nested fills." "TypeScript/React" {
+                    tags "Implemented"
                 }
-                refreshStateUI = component "MVP Refresh and Empty States" "Handles refresh, loading, empty, and error states for the demo console." "TypeScript/React" {
-                    tags "MVP Planned"
+                instrumentRegistrationUI = component "Portfolio Instrument Form" "Adds an instrument and risk config to the selected portfolio and shows success, validation, loading, and upstream error states." "TypeScript/React" {
+                    tags "Implemented"
+                }
+                refreshStateUI = component "Refresh and Empty States" "Handles refresh, loading, empty, and error states for portfolio list and details." "TypeScript/React" {
+                    tags "Implemented"
+                }
+                themeUI = component "Theme Controller" "Uses system preference by default and cycles System/Light/Dark with a compact control." "TypeScript/React" {
+                    tags "Implemented"
                 }
                 strategyConfigUI = component "Future Strategy Config UI" "Lets users define and edit strategy preferences after MVP." "TypeScript/React" {
                     tags "Planned"
@@ -316,18 +322,24 @@ workspace "Trading Bot System" {
                     tags "Planned"
                 }
 
-                apiClient = component "API Client" "REST client for communicating with API Gateway." "REST"
+                apiClient = component "API Client" "REST client for communicating with API Gateway using the configured VITE_API_BASE_URL." "REST" {
+                    tags "Implemented"
+                }
 
-                router -> portfolioUI "Routes MVP portfolio visibility via"
-                router -> instrumentRegistrationUI "Routes MVP instrument registration via"
-                router -> refreshStateUI "Routes MVP request states via"
+                router -> portfolioListUI "Routes portfolio selection via"
+                router -> portfolioUI "Routes selected portfolio visibility via"
+                router -> instrumentRegistrationUI "Routes portfolio instrument configuration via"
+                router -> refreshStateUI "Routes request states via"
+                router -> themeUI "Routes theme shell via"
                 router -> controlPanelUI "Will route start/stop trading actions via"
                 router -> strategyConfigUI "Will route strategy preferences configuration via"
                 router -> marketChartsUI "Will route market data and indicators via"
                 router -> signalMonitorUI "Will route buy/sell signals via"
 
-                portfolioUI -> apiClient "Fetches GET /api/portfolio/:portfolioId via"
-                instrumentRegistrationUI -> apiClient "Posts POST /api/portfolio/register-instrument via"
+                portfolioListUI -> apiClient "Fetches GET /api/portfolios via"
+                portfolioUI -> apiClient "Fetches GET /api/portfolios/:portfolioId via"
+                instrumentRegistrationUI -> apiClient "Posts POST /api/portfolios/:portfolioId/instrument via"
+                refreshStateUI -> apiClient "Normalizes loading and upstream errors from"
                 refreshStateUI -> portfolioUI "Displays request state for"
                 controlPanelUI -> apiClient "Will send start/stop commands via"
                 strategyConfigUI -> apiClient "Will send strategy config updates via"
@@ -364,7 +376,7 @@ workspace "Trading Bot System" {
         }
 
         // Container-level relationships
-        trader -> tradingBot.dashboard.router "Monitors demo portfolio state and later configures strategies"
+        trader -> tradingBot.dashboard.router "Selects portfolios, monitors portfolio state, and later configures strategies"
         operator -> tradingBot.messageBus "Inspects DLQ topics and replays repaired events"
         operator -> tradingBot.portfolioManager.metricsEndpoint "Inspects portfolio-manager metrics"
         operator -> tradingBot.executionEngine.metricsEndpoint "Inspects execution-engine metrics"
@@ -373,7 +385,7 @@ workspace "Trading Bot System" {
         prometheus -> tradingBot.executionEngine.metricsEndpoint "Will scrape metrics from"
         prometheus -> tradingBot.apiGateway.metricsEndpoint "Will scrape metrics from"
 
-        tradingBot.dashboard.apiClient -> tradingBot.apiGateway.REST "Uses existing portfolio read and instrument registration endpoints"
+        tradingBot.dashboard.apiClient -> tradingBot.apiGateway.REST "Uses portfolio list, portfolio read, and portfolio instrument endpoints"
         tradingBot.apiGateway.gRPC_Client -> tradingBot.dataIngestion.gRPC "Requests market data and subscription updates (Market Data API)"
         tradingBot.apiGateway.gRPC_Client -> tradingBot.predictionEngine.gRPC "Requests current signals / triggers (Signal API)"
         tradingBot.apiGateway.gRPC_Client -> tradingBot.portfolioManager.gRPC "Registers instruments, reads portfolio state, resolves instruments, and later sends risk/strategy updates"
@@ -554,6 +566,7 @@ workspace "Trading Bot System" {
             include tradingBot.dashboard.portfolioUI
             include tradingBot.dashboard.instrumentRegistrationUI
             include tradingBot.dashboard.refreshStateUI
+            include tradingBot.dashboard.themeUI
             include tradingBot.dashboard.strategyConfigUI
             include tradingBot.dashboard.marketChartsUI
             include tradingBot.dashboard.signalMonitorUI

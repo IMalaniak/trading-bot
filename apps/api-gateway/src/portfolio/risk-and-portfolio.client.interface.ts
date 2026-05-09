@@ -3,15 +3,21 @@ import {
   GetPortfolioResponse,
   ListInstrumentsRequest,
   ListInstrumentsResponse,
-  RegisterInstrumentRequest,
-  RegisterInstrumentResponse,
+  ListPortfoliosRequest,
+  ListPortfoliosResponse,
+  RegisterPortfolioInstrumentRequest,
+  RegisterPortfolioInstrumentResponse,
 } from '@trading-bot/common/proto';
 import { Observable } from 'rxjs';
 
 export interface IRiskAndPortfolioManager {
-  registerInstrument(
-    data: RegisterInstrumentRequest,
-  ): Observable<RegisterInstrumentResponse>;
+  registerPortfolioInstrument(
+    data: RegisterPortfolioInstrumentRequest,
+  ): Observable<RegisterPortfolioInstrumentResponse>;
+
+  listPortfolios(
+    data: ListPortfoliosRequest,
+  ): Observable<ListPortfoliosResponse>;
 
   getPortfolio(data: GetPortfolioRequest): Observable<GetPortfolioResponse>;
 

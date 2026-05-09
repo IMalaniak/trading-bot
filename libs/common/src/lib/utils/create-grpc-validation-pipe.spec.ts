@@ -3,7 +3,7 @@ import { RpcException } from '@nestjs/microservices';
 import { Type } from 'class-transformer';
 import { IsInt, IsNotEmpty, IsString } from 'class-validator';
 
-import { GrpcStatusCode } from '../const/grpc-status-code.enum';
+import { AppResponseCode, GrpcStatusCode } from '../const';
 import { createGrpcValidationPipe } from './create-grpc-validation-pipe';
 
 class RequiredStringDto {
@@ -34,6 +34,7 @@ describe('createGrpcValidationPipe', () => {
     } catch (err) {
       expect(err).toBeInstanceOf(RpcException);
       expect((err as RpcException).getError()).toMatchObject({
+        appCode: AppResponseCode.VALIDATION_FAILED,
         code: GrpcStatusCode.INVALID_ARGUMENT,
         message: 'Validation failed',
       });

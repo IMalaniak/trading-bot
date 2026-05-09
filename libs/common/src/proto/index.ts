@@ -6,7 +6,11 @@ export {
   Instrument,
   protobufPackage as PROTOBUF_COMMON_PACKAGE,
 } from './common/instrument';
-export { PortfolioSummary, Position } from './common/portfolio';
+export {
+  PortfolioInstrumentConfig,
+  PortfolioSummary,
+  Position,
+} from './common/portfolio';
 export { Signal, SignalSide } from './common/signal';
 export {
   DeadLetterEvent,
@@ -34,9 +38,11 @@ export {
   GetPortfolioResponse,
   ListInstrumentsRequest,
   ListInstrumentsResponse,
+  ListPortfoliosRequest,
+  ListPortfoliosResponse,
   protobufPackage as PROTOBUF_SERVICES_PORTFOLIO_MANAGER_PACKAGE,
-  RegisterInstrumentRequest,
-  RegisterInstrumentResponse,
+  RegisterPortfolioInstrumentRequest,
+  RegisterPortfolioInstrumentResponse,
 } from './services/portfolio_manager';
 export {
   GetLatestSignalsRequest,
