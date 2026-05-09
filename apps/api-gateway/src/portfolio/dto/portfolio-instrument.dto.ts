@@ -1,11 +1,10 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty } from '@nestjs/swagger';
 import { RegisterPortfolioInstrumentRequest } from '@trading-bot/common/proto';
 import { DECIMAL_STRING_PATTERN } from '@trading-bot/common/validation';
 import {
   IsBoolean,
   IsEnum,
   IsNotEmpty,
-  IsOptional,
   IsString,
   Matches,
 } from 'class-validator';
@@ -32,9 +31,9 @@ export class RegisterPortfolioInstrumentRequestDto implements Omit<
   @IsNotEmpty()
   venue: string;
 
-  @ApiPropertyOptional({ example: 'AAPL' })
-  @IsOptional()
+  @ApiProperty({ example: 'AAPL' })
   @IsString()
+  @IsNotEmpty()
   externalSymbol: string;
 
   @ApiProperty({ example: true })

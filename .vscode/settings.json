@@ -2,11 +2,7 @@
     "jest.runMode": "on-demand",
     "js/ts.tsdk.path": "node_modules/typescript/lib",
     "js/ts.tsdk.promptToUseWorkspaceVersion": true,
-    // Ensure Prettier extension resolves the workspace installation when used elsewhere
     "prettier.prettierPath": "./node_modules/prettier",
     "prettier.requireConfig": true,
-    "eslint.format.enable": true,
-    "chat.tools.terminal.autoApprove": {
-        "npx nx": true
-    }
+    "eslint.format.enable": true
 }

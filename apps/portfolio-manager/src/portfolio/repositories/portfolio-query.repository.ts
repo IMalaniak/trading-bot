@@ -47,9 +47,77 @@ export class PortfolioQueryRepository {
       orderBy: [{ isActive: 'desc' }, { name: 'asc' }, { id: 'asc' }],
     });
 
-    return await Promise.all(
-      portfolios.map((portfolio) => this.buildPortfolioSummary(portfolio)),
+    if (portfolios.length === 0) {
+      return [];
+    }
+
+    const portfolioIds = portfolios.map((p) => p.id);
+
+    const [
+      exposureAggregates,
+      openPositionGroups,
+      snapshotMaxDates,
+      configMaxDates,
+    ] = await Promise.all([
+      this.prisma.portfolioPosition.groupBy({
+        by: ['portfolioId'],
+        where: { portfolioId: { in: portfolioIds } },
+        _sum: { exposureNotional: true },
+        _max: { updatedAt: true },
+      }),
+      this.prisma.portfolioPosition.groupBy({
+        by: ['portfolioId'],
+        where: {
+          portfolioId: { in: portfolioIds },
+          quantity: { not: zeroPrismaDecimal() },
+        },
+        _count: { portfolioId: true },
+      }),
+      this.prisma.portfolioSummarySnapshot.groupBy({
+        by: ['portfolioId'],
+        where: { portfolioId: { in: portfolioIds } },
+        _max: { updatedAt: true },
+      }),
+      this.prisma.portfolioInstrumentConfig.groupBy({
+        by: ['portfolioId'],
+        where: { portfolioId: { in: portfolioIds } },
+        _max: { updatedAt: true },
+      }),
+    ]);
+
+    const exposureMap = new Map(
+      exposureAggregates.map((agg) => [agg.portfolioId, agg]),
     );
+    const countMap = new Map(
+      openPositionGroups.map((g) => [g.portfolioId, g._count.portfolioId]),
+    );
+    const snapshotMap = new Map(
+      snapshotMaxDates.map((s) => [s.portfolioId, s._max.updatedAt]),
+    );
+    const configMap = new Map(
+      configMaxDates.map((c) => [c.portfolioId, c._max.updatedAt]),
+    );
+
+    return portfolios.map((portfolio) => {
+      const agg = exposureMap.get(portfolio.id);
+      const latestPositionDate = agg?._max.updatedAt;
+      const latestSnapshotDate = snapshotMap.get(portfolio.id);
+      const latestConfigDate = configMap.get(portfolio.id);
+
+      return {
+        portfolio,
+        aggregateExposureNotional: agg?._sum.exposureNotional
+          ? toPrismaDecimal(agg._sum.exposureNotional)
+          : zeroPrismaDecimal(),
+        openPositionCount: countMap.get(portfolio.id) ?? 0,
+        updatedAt: maxDate([
+          portfolio.updatedAt,
+          ...(latestSnapshotDate ? [latestSnapshotDate] : []),
+          ...(latestPositionDate ? [latestPositionDate] : []),
+          ...(latestConfigDate ? [latestConfigDate] : []),
+        ]),
+      };
+    });
   }
 
   async findPortfolio(portfolioId: string): Promise<PortfolioReadModel | null> {

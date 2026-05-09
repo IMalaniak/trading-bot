@@ -12,13 +12,16 @@ describe('PortfolioQueryRepository', () => {
       aggregate: jest.Mock;
       findFirst: jest.Mock;
       count: jest.Mock;
+      groupBy: jest.Mock;
     };
     portfolioSummarySnapshot: {
       findFirst: jest.Mock;
+      groupBy: jest.Mock;
     };
     portfolioInstrumentConfig: {
       findMany: jest.Mock;
       findFirst: jest.Mock;
+      groupBy: jest.Mock;
     };
     instrument: {
       findMany: jest.Mock;
@@ -37,13 +40,16 @@ describe('PortfolioQueryRepository', () => {
         aggregate: jest.fn(),
         findFirst: jest.fn(),
         count: jest.fn(),
+        groupBy: jest.fn(),
       },
       portfolioSummarySnapshot: {
         findFirst: jest.fn(),
+        groupBy: jest.fn(),
       },
       portfolioInstrumentConfig: {
         findMany: jest.fn(),
         findFirst: jest.fn(),
+        groupBy: jest.fn(),
       },
       instrument: {
         findMany: jest.fn(),
@@ -96,13 +102,9 @@ describe('PortfolioQueryRepository', () => {
         updatedAt,
       },
     ]);
-    prisma.portfolioPosition.aggregate.mockResolvedValue({
-      _sum: { exposureNotional: null },
-    });
-    prisma.portfolioPosition.count.mockResolvedValue(0);
-    prisma.portfolioSummarySnapshot.findFirst.mockResolvedValue(null);
-    prisma.portfolioPosition.findFirst.mockResolvedValue(null);
-    prisma.portfolioInstrumentConfig.findFirst.mockResolvedValue(null);
+    prisma.portfolioPosition.groupBy.mockResolvedValue([]);
+    prisma.portfolioSummarySnapshot.groupBy.mockResolvedValue([]);
+    prisma.portfolioInstrumentConfig.groupBy.mockResolvedValue([]);
 
     await expect(repository.listPortfolioSummaries()).resolves.toHaveLength(1);
     expect(prisma.portfolio.findMany).toHaveBeenCalledWith({

@@ -7,6 +7,7 @@ import {
 } from '@trading-bot/common/proto';
 
 import { EventDispatcherService } from '../event-dispatcher/event-dispatcher.service';
+import { InstrumentModel } from '../prisma/generated/models';
 import { PrismaService } from '../prisma/prisma.service';
 import { InstrumentRegisteredEventFactory } from './events/instrument-registered-event.factory';
 import { PortfolioReadMapper } from './mapper/portfolio-read.mapper';
@@ -51,18 +52,46 @@ export class PortfolioService {
         },
       });
 
-      const instrument =
-        existingInstrument ??
-        (await tx.instrument.create({
-          data: {
-            symbol: data.symbol,
-            assetClass: data.assetClass,
-            venue: data.venue,
-            externalSymbol: requestedExternalSymbol,
-          },
-        }));
+      let isNewInstrument = false;
+      let instrument: InstrumentModel;
 
-      if (!existingInstrument) {
+      if (existingInstrument) {
+        instrument = existingInstrument;
+      } else {
+        try {
+          instrument = await tx.instrument.create({
+            data: {
+              symbol: data.symbol,
+              assetClass: data.assetClass,
+              venue: data.venue,
+              externalSymbol: requestedExternalSymbol,
+            },
+          });
+          isNewInstrument = true;
+        } catch (err: unknown) {
+          // Two concurrent registrations for the same (symbol, venue) can both
+          // pass the findFirst check and race to create. The loser hits the DB
+          // unique-index (P2002); re-fetch the winner's row and continue.
+          if (
+            typeof err === 'object' &&
+            err !== null &&
+            'code' in err &&
+            err.code === 'P2002'
+          ) {
+            const found = await tx.instrument.findFirst({
+              where: { symbol: data.symbol, venue: data.venue },
+            });
+
+            if (!found) throw err;
+
+            instrument = found;
+          } else {
+            throw err;
+          }
+        }
+      }
+
+      if (isNewInstrument) {
         const registrationEvent =
           this.instrumentRegisteredEventFactory.create(instrument);
 
@@ -72,9 +101,9 @@ export class PortfolioService {
           registrationEvent.message,
         );
       } else if (
-        existingInstrument.assetClass !== Number(data.assetClass) ||
+        instrument.assetClass !== Number(data.assetClass) ||
         (requestedExternalSymbol !== undefined &&
-          existingInstrument.externalSymbol !== requestedExternalSymbol)
+          instrument.externalSymbol !== requestedExternalSymbol)
       ) {
         throw new RpcException({
           message: INSTRUMENT_METADATA_CONFLICT_ERROR,

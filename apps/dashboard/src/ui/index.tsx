@@ -136,7 +136,7 @@ export function Metric({ label, value }: { label: string; value: string }) {
       <dt className="text-xs uppercase tracking-normal text-zinc-500 dark:text-zinc-400">
         {label}
       </dt>
-      <dd className="mt-1 break-words font-medium text-zinc-950 dark:text-white">
+      <dd className="mt-1 wrap-break-word font-medium text-zinc-950 dark:text-white">
         {value}
       </dd>
     </div>
