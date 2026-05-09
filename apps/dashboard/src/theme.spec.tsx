@@ -2,7 +2,7 @@ import '@testing-library/jest-dom/vitest';
 
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   getStoredThemePreference,
@@ -24,11 +24,31 @@ const installMatchMedia = (matches = false) => {
   }));
 };
 
+const makeLocalStorageMock = () => {
+  const store: Record<string, string> = {};
+  return {
+    getItem: (key: string) => store[key] ?? null,
+    setItem: (key: string, value: string) => {
+      store[key] = value;
+    },
+    removeItem: (key: string) => {
+      delete store[key];
+    },
+    clear: () => {
+      Object.keys(store).forEach((k) => delete store[k]);
+    },
+  };
+};
+
 describe('theme handling', () => {
   beforeEach(() => {
-    localStorage.removeItem('trading-bot-dashboard-theme');
+    vi.stubGlobal('localStorage', makeLocalStorageMock());
     document.documentElement.className = '';
     installMatchMedia();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it('defaults to system preference', () => {
