@@ -104,8 +104,10 @@ jobs:
         if: steps.skip_push.outputs.skip != 'true'
         uses: actions/cache@v5
         with:
-          path: node_modules
-          key: node-modules-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json') }}
+          path: |
+            node_modules
+            apps/*/src/prisma/generated
+          key: node-modules-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json', 'apps/**/prisma/schema.prisma') }}
 
       - name: Exit early for redundant push run
         if: steps.skip_push.outputs.skip == 'true'
@@ -144,8 +146,10 @@ jobs:
         id: nm-cache
         uses: actions/cache/restore@v5
         with:
-          path: node_modules
-          key: node-modules-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json') }}
+          path: |
+            node_modules
+            apps/*/src/prisma/generated
+          key: node-modules-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json', 'apps/**/prisma/schema.prisma') }}
 
       - name: Install dependencies
         if: steps.nm-cache.outputs.cache-hit != 'true'
@@ -203,8 +207,10 @@ jobs:
         id: nm-cache
         uses: actions/cache/restore@v5
         with:
-          path: node_modules
-          key: node-modules-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json') }}
+          path: |
+            node_modules
+            apps/*/src/prisma/generated
+          key: node-modules-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json', 'apps/**/prisma/schema.prisma') }}
 
       - name: Install dependencies
         if: steps.nm-cache.outputs.cache-hit != 'true'
@@ -260,8 +266,10 @@ jobs:
         id: nm-cache
         uses: actions/cache/restore@v5
         with:
-          path: node_modules
-          key: node-modules-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json') }}
+          path: |
+            node_modules
+            apps/*/src/prisma/generated
+          key: node-modules-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json', 'apps/**/prisma/schema.prisma') }}
 
       - name: Install dependencies
         if: steps.nm-cache.outputs.cache-hit != 'true'
@@ -319,8 +327,10 @@ jobs:
         id: nm-cache
         uses: actions/cache/restore@v5
         with:
-          path: node_modules
-          key: node-modules-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json') }}
+          path: |
+            node_modules
+            apps/*/src/prisma/generated
+          key: node-modules-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json', 'apps/**/prisma/schema.prisma') }}
 
       - name: Install dependencies
         if: steps.nm-cache.outputs.cache-hit != 'true'
@@ -382,8 +392,10 @@ jobs:
         id: nm-cache
         uses: actions/cache/restore@v5
         with:
-          path: node_modules
-          key: node-modules-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json') }}
+          path: |
+            node_modules
+            apps/*/src/prisma/generated
+          key: node-modules-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json', 'apps/**/prisma/schema.prisma') }}
 
       - name: Install dependencies
         if: steps.nm-cache.outputs.cache-hit != 'true'
