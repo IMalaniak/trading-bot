@@ -36,9 +36,18 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ~/.cache/nx
-          key: nx-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          key: nx-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json') }}
           restore-keys: |
-            nx-${{ runner.os }}-
+            nx-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Cache node_modules
+        uses: actions/cache@v5
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json') }}
 
       - name: Determine base and head shas
         id: vars
@@ -92,17 +101,24 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
-          cache: npm
 
       - name: Cache Nx
         uses: actions/cache@v5
         with:
           path: ~/.cache/nx
-          key: nx-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          key: nx-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json') }}
           restore-keys: |
-            nx-${{ runner.os }}-
+            nx-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Restore node_modules
+        id: nm-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json') }}
 
       - name: Install dependencies
+        if: steps.nm-cache.outputs.cache-hit != 'true'
         run: npm ci
 
       - name: "Full Run: Lint"
@@ -144,17 +160,24 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
-          cache: npm
 
       - name: Cache Nx
         uses: actions/cache@v5
         with:
           path: ~/.cache/nx
-          key: nx-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          key: nx-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json') }}
           restore-keys: |
-            nx-${{ runner.os }}-
+            nx-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Restore node_modules
+        id: nm-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json') }}
 
       - name: Install dependencies
+        if: steps.nm-cache.outputs.cache-hit != 'true'
         run: npm ci
 
       - name: "Full Run: Typecheck"
@@ -194,17 +217,24 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
-          cache: npm
 
       - name: Cache Nx
         uses: actions/cache@v5
         with:
           path: ~/.cache/nx
-          key: nx-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          key: nx-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json') }}
           restore-keys: |
-            nx-${{ runner.os }}-
+            nx-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Restore node_modules
+        id: nm-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json') }}
 
       - name: Install dependencies
+        if: steps.nm-cache.outputs.cache-hit != 'true'
         run: npm ci
 
       - name: "Full Run: Test"
@@ -246,17 +276,24 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
-          cache: npm
 
       - name: Cache Nx
         uses: actions/cache@v5
         with:
           path: ~/.cache/nx
-          key: nx-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          key: nx-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json') }}
           restore-keys: |
-            nx-${{ runner.os }}-
+            nx-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Restore node_modules
+        id: nm-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json') }}
 
       - name: Install dependencies
+        if: steps.nm-cache.outputs.cache-hit != 'true'
         run: npm ci
 
       - name: "Full Run: Integration Test"
@@ -269,7 +306,7 @@ jobs:
 
       - name: Tear down isolated integration infra
         if: always()
-        run: npx nx run portfolio-manager:integration-infra-down:test-integration || true
+        run: npx nx run-many --target=integration-infra-down --configuration=test-integration --all || true
 
       - name: Upload artifacts on failure
         if: failure()
@@ -302,17 +339,24 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
-          cache: npm
 
       - name: Cache Nx
         uses: actions/cache@v5
         with:
           path: ~/.cache/nx
-          key: nx-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          key: nx-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json') }}
           restore-keys: |
-            nx-${{ runner.os }}-
+            nx-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Restore node_modules
+        id: nm-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json') }}
 
       - name: Install dependencies
+        if: steps.nm-cache.outputs.cache-hit != 'true'
         run: npm ci
 
       - name: "Full Run: Build"
