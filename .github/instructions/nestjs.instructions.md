@@ -12,6 +12,7 @@ As GitHub Copilot, you are an expert in NestJS development with deep knowledge o
 ## Core NestJS Principles
 
 ### **1. Dependency Injection (DI)**
+
 - **Principle:** NestJS uses a powerful DI container that manages the instantiation and lifetime of providers.
 - **Guidance for Copilot:**
   - Use `@Injectable()` decorator for services, repositories, and other providers
@@ -20,6 +21,7 @@ As GitHub Copilot, you are an expert in NestJS development with deep knowledge o
   - Use custom providers when you need specific instantiation logic
 
 ### **2. Modular Architecture**
+
 - **Principle:** Organize code into feature modules that encapsulate related functionality.
 - **Guidance for Copilot:**
   - Create feature modules with `@Module()` decorator
@@ -28,6 +30,7 @@ As GitHub Copilot, you are an expert in NestJS development with deep knowledge o
   - Implement shared modules for common functionality
 
 ### **3. Decorators and Metadata**
+
 - **Principle:** Leverage decorators to define routes, middleware, guards, and other framework features.
 - **Guidance for Copilot:**
   - Use appropriate decorators: `@Controller()`, `@Get()`, `@Post()`, `@Injectable()`
@@ -38,6 +41,7 @@ As GitHub Copilot, you are an expert in NestJS development with deep knowledge o
 ## Project Structure Best Practices
 
 ### **Recommended Directory Structure**
+
 ```
 src/
 ├── app.module.ts
@@ -60,6 +64,7 @@ src/
 ```
 
 ### **File Naming Conventions**
+
 - **Controllers:** `*.controller.ts` (e.g., `users.controller.ts`)
 - **Services:** `*.service.ts` (e.g., `users.service.ts`)
 - **Modules:** `*.module.ts` (e.g., `users.module.ts`)
@@ -73,6 +78,7 @@ src/
 ## API Development Patterns
 
 ### **1. Controllers**
+
 - Keep controllers thin - delegate business logic to services
 - Use proper HTTP methods and status codes
 - Implement comprehensive input validation with DTOs
@@ -99,6 +105,7 @@ export class UsersController {
 ```
 
 ### **2. Services**
+
 - Implement business logic in services, not controllers
 - Use constructor-based dependency injection
 - Create focused, single-responsibility services
@@ -123,6 +130,7 @@ export class UsersService {
 ```
 
 ### **3. DTOs and Validation**
+
 - Use class-validator decorators for input validation
 - Create separate DTOs for different operations (create, update, query)
 - Implement proper transformation with class-transformer
@@ -149,6 +157,7 @@ export class CreateUserDto {
 ## Database Integration
 
 ### **TypeORM Integration**
+
 - Use TypeORM as the primary ORM for database operations
 - Define entities with proper decorators and relationships
 - Implement repository pattern for data access
@@ -169,7 +178,7 @@ export class User {
   @Column({ select: false })
   password: string;
 
-  @OneToMany(() => Post, post => post.author)
+  @OneToMany(() => Post, (post) => post.author)
   posts: Post[];
 
   @CreateDateColumn()
@@ -181,6 +190,7 @@ export class User {
 ```
 
 ### **Custom Repositories**
+
 - Extend base repository functionality when needed
 - Implement complex queries in repository methods
 - Use query builders for dynamic queries
@@ -188,6 +198,7 @@ export class User {
 ## Authentication and Authorization
 
 ### **JWT Authentication**
+
 - Implement JWT-based authentication with Passport
 - Use guards to protect routes
 - Create custom decorators for user context
@@ -209,6 +220,7 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
 ```
 
 ### **Role-Based Access Control**
+
 - Implement RBAC using custom guards and decorators
 - Use metadata to define required roles
 - Create flexible permission systems
@@ -225,6 +237,7 @@ async remove(@Param('id') id: string): Promise<void> {
 ## Error Handling and Logging
 
 ### **Exception Filters**
+
 - Create global exception filters for consistent error responses
 - Handle different types of exceptions appropriately
 - Log errors with proper context
@@ -239,9 +252,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request>();
 
-    const status = exception instanceof HttpException 
-      ? exception.getStatus() 
-      : HttpStatus.INTERNAL_SERVER_ERROR;
+    const status = exception instanceof HttpException ? exception.getStatus() : HttpStatus.INTERNAL_SERVER_ERROR;
 
     this.logger.error(`${request.method} ${request.url}`, exception);
 
@@ -249,15 +260,14 @@ export class AllExceptionsFilter implements ExceptionFilter {
       statusCode: status,
       timestamp: new Date().toISOString(),
       path: request.url,
-      message: exception instanceof HttpException 
-        ? exception.message 
-        : 'Internal server error',
+      message: exception instanceof HttpException ? exception.message : 'Internal server error',
     });
   }
 }
 ```
 
 ### **Logging**
+
 - Use built-in Logger class for consistent logging
 - Implement proper log levels (error, warn, log, debug, verbose)
 - Add contextual information to logs
@@ -265,8 +275,9 @@ export class AllExceptionsFilter implements ExceptionFilter {
 ## Testing Strategies
 
 ### **Unit Testing**
+
 - Test services independently using mocks
-- Use Jest as the testing framework
+- Use Vitest as the testing framework
 - Create comprehensive test suites for business logic
 
 ```typescript
@@ -281,9 +292,9 @@ describe('UsersService', () => {
         {
           provide: getRepositoryToken(User),
           useValue: {
-            create: jest.fn(),
-            save: jest.fn(),
-            find: jest.fn(),
+            create: vi.fn(),
+            save: vi.fn(),
+            find: vi.fn(),
           },
         },
       ],
@@ -297,8 +308,8 @@ describe('UsersService', () => {
     const createUserDto = { name: 'John', email: 'john@example.com' };
     const user = { id: '1', ...createUserDto };
 
-    jest.spyOn(repository, 'create').mockReturnValue(user as User);
-    jest.spyOn(repository, 'save').mockResolvedValue(user as User);
+    vi.spyOn(repository, 'create').mockReturnValue(user as User);
+    vi.spyOn(repository, 'save').mockResolvedValue(user as User);
 
     expect(await service.create(createUserDto)).toEqual(user);
   });
@@ -306,11 +317,13 @@ describe('UsersService', () => {
 ```
 
 ### **Integration Testing**
+
 - Use TestingModule for integration tests
 - Test complete request/response cycles
 - Mock external dependencies appropriately
 
 ### **E2E Testing**
+
 - Test complete application flows
 - Use supertest for HTTP testing
 - Test authentication and authorization flows
@@ -318,12 +331,14 @@ describe('UsersService', () => {
 ## Performance and Security
 
 ### **Performance Optimization**
+
 - Implement caching strategies with Redis
 - Use interceptors for response transformation
 - Optimize database queries with proper indexing
 - Implement pagination for large datasets
 
 ### **Security Best Practices**
+
 - Validate all inputs using class-validator
 - Implement rate limiting to prevent abuse
 - Use CORS appropriately for cross-origin requests
@@ -346,6 +361,7 @@ export class AuthController {
 ## Configuration Management
 
 ### **Environment Configuration**
+
 - Use @nestjs/config for configuration management
 - Validate configuration at startup
 - Use different configs for different environments
@@ -381,6 +397,7 @@ export class ConfigService {
 ## Development Workflow
 
 ### **Development Setup**
+
 1. Use NestJS CLI for scaffolding: `nest generate module users`
 2. Follow consistent file organization
 3. Use TypeScript strict mode
@@ -388,6 +405,7 @@ export class ConfigService {
 5. Use Prettier for code formatting
 
 ### **Code Review Checklist**
+
 - [ ] Proper use of decorators and dependency injection
 - [ ] Input validation with DTOs and class-validator
 - [ ] Appropriate error handling and exception filters

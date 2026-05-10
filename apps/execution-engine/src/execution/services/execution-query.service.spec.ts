@@ -1,4 +1,5 @@
 import { OrderStatus, SignalSide } from '@trading-bot/common/proto';
+import type { MockedFunction } from 'vitest';
 
 import { ExecutionOrderStatus } from '../../prisma/generated/enums';
 import { toPrismaDecimal } from '../../prisma/prisma-decimal';
@@ -8,7 +9,7 @@ import { ExecutionQueryService } from './execution-query.service';
 
 describe('ExecutionQueryService', () => {
   let repository: {
-    listPortfolioOrders: jest.MockedFunction<
+    listPortfolioOrders: MockedFunction<
       ExecutionQueryRepository['listPortfolioOrders']
     >;
   };
@@ -16,7 +17,7 @@ describe('ExecutionQueryService', () => {
 
   beforeEach(() => {
     repository = {
-      listPortfolioOrders: jest.fn(),
+      listPortfolioOrders: vi.fn(),
     };
     service = new ExecutionQueryService(
       repository as unknown as ExecutionQueryRepository,

@@ -31,8 +31,9 @@
       "description": "Generate TypeScript types from .proto files into libs/common/src/proto using ts-proto"
     },
     "test": {
+      "executor": "@nx/vitest:test",
       "options": {
-        "passWithNoTests": true
+        "configFile": "libs/common/vitest.config.mts"
       }
     },
     "typecheck": {

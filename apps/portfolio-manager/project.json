@@ -64,11 +64,6 @@
         }
       }
     },
-    "test": {
-      "options": {
-        "passWithNoTests": true
-      }
-    },
     "integration-infra-up": {
       "executor": "nx:run-commands",
       "cache": false,
@@ -108,15 +103,12 @@
       "options": {
         "cwd": "{workspaceRoot}",
         "parallel": false,
-        "env": {
-          "NODE_OPTIONS": "--experimental-vm-modules"
-        },
         "commands": [
           {
             "command": "npx nx run portfolio-manager:migrate:test-integration"
           },
           {
-            "command": "jest --config apps/portfolio-manager/jest.integration.config.ts --runInBand"
+            "command": "vitest run --config apps/portfolio-manager/vitest.integration.config.mts"
           }
         ]
       }
@@ -163,6 +155,12 @@
             "command": "npx nx run portfolio-manager:lint --fix"
           }
         ]
+      }
+    },
+    "test": {
+      "executor": "@nx/vitest:test",
+      "options": {
+        "configFile": "apps/portfolio-manager/vitest.config.mts"
       }
     },
     "typecheck": {

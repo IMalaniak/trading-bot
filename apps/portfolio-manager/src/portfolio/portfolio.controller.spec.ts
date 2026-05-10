@@ -1,20 +1,20 @@
+import type { MockedFunction } from 'vitest';
+
 import { PortfolioController } from './portfolio.controller';
 import { PortfolioService } from './portfolio.service';
 import { PortfolioQueryService } from './services/portfolio-query.service';
 
 describe('PortfolioController', () => {
   let portfolioQueryService: {
-    getPortfolio: jest.MockedFunction<PortfolioQueryService['getPortfolio']>;
-    listInstruments: jest.MockedFunction<
-      PortfolioQueryService['listInstruments']
-    >;
+    getPortfolio: MockedFunction<PortfolioQueryService['getPortfolio']>;
+    listInstruments: MockedFunction<PortfolioQueryService['listInstruments']>;
   };
   let controller: PortfolioController;
 
   beforeEach(() => {
     portfolioQueryService = {
-      getPortfolio: jest.fn().mockResolvedValue({ positions: [] }),
-      listInstruments: jest.fn().mockResolvedValue({ instruments: [] }),
+      getPortfolio: vi.fn().mockResolvedValue({ positions: [] }),
+      listInstruments: vi.fn().mockResolvedValue({ instruments: [] }),
     };
     controller = new PortfolioController(
       {} as PortfolioService,

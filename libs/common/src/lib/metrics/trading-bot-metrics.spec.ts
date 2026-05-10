@@ -98,7 +98,7 @@ describe('TradingBotMetrics', () => {
       const controller = moduleRef.get(PrometheusController, {
         strict: false,
       });
-      const response = { header: jest.fn() };
+      const response = { header: vi.fn() };
 
       await expect(controller.index(response)).resolves.toContain(
         'trading_bot_kafka_consumer_retries_total{service="portfolio-manager",topic="orders.fills",consumer_group="portfolio-manager-order-fills"} 1',

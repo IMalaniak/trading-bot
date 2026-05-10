@@ -4,6 +4,7 @@ import {
   Signal,
   SignalSide,
 } from '@trading-bot/common/proto';
+import type { MockedFunction } from 'vitest';
 
 import { EventDispatcherService } from '../../event-dispatcher/event-dispatcher.service';
 import {
@@ -26,61 +27,59 @@ type TransactionMethod = <T>(
   callback: (tx: object) => Promise<T>,
 ) => Promise<T>;
 type MockCandidateRepository = {
-  create: jest.MockedFunction<CandidateRepository['create']>;
-  findByIdempotencyKey: jest.MockedFunction<
+  create: MockedFunction<CandidateRepository['create']>;
+  findByIdempotencyKey: MockedFunction<
     CandidateRepository['findByIdempotencyKey']
   >;
-  markDecided: jest.MockedFunction<CandidateRepository['markDecided']>;
+  markDecided: MockedFunction<CandidateRepository['markDecided']>;
 };
 type MockDecisionRepository = {
-  findByCandidateIdempotencyKey: jest.MockedFunction<
+  findByCandidateIdempotencyKey: MockedFunction<
     DecisionRepository['findByCandidateIdempotencyKey']
   >;
-  create: jest.MockedFunction<DecisionRepository['create']>;
+  create: MockedFunction<DecisionRepository['create']>;
 };
 type MockReservationRepository = {
-  sumActivePortfolioReservedNotional: jest.MockedFunction<
+  sumActivePortfolioReservedNotional: MockedFunction<
     ReservationRepository['sumActivePortfolioReservedNotional']
   >;
-  sumActiveInstrumentReservedNotional: jest.MockedFunction<
+  sumActiveInstrumentReservedNotional: MockedFunction<
     ReservationRepository['sumActiveInstrumentReservedNotional']
   >;
-  create: jest.MockedFunction<ReservationRepository['create']>;
+  create: MockedFunction<ReservationRepository['create']>;
 };
 type MockPositionExposureRepository = {
-  sumPortfolioPositionExposure: jest.MockedFunction<
+  sumPortfolioPositionExposure: MockedFunction<
     PositionExposureRepository['sumPortfolioPositionExposure']
   >;
-  sumInstrumentPositionExposure: jest.MockedFunction<
+  sumInstrumentPositionExposure: MockedFunction<
     PositionExposureRepository['sumInstrumentPositionExposure']
   >;
 };
 type MockRiskConfigRepository = {
-  instrumentExists: jest.MockedFunction<
-    RiskConfigRepository['instrumentExists']
-  >;
-  findConfigsByInstrumentId: jest.MockedFunction<
+  instrumentExists: MockedFunction<RiskConfigRepository['instrumentExists']>;
+  findConfigsByInstrumentId: MockedFunction<
     RiskConfigRepository['findConfigsByInstrumentId']
   >;
-  findConfig: jest.MockedFunction<RiskConfigRepository['findConfig']>;
+  findConfig: MockedFunction<RiskConfigRepository['findConfig']>;
 };
 type MockTradeSizingService = {
-  sizeTrade: jest.MockedFunction<TradeSizingService['sizeTrade']>;
+  sizeTrade: MockedFunction<TradeSizingService['sizeTrade']>;
 };
 type MockRiskRuleEngine = {
-  evaluate: jest.MockedFunction<RiskRuleEngine['evaluate']>;
+  evaluate: MockedFunction<RiskRuleEngine['evaluate']>;
 };
 type MockTradeDecisionEventFactory = {
-  create: jest.MockedFunction<TradeDecisionEventFactory['create']>;
+  create: MockedFunction<TradeDecisionEventFactory['create']>;
 };
 type MockEventDispatcher = {
-  enqueueEvent: jest.MockedFunction<EventDispatcherService['enqueueEvent']>;
+  enqueueEvent: MockedFunction<EventDispatcherService['enqueueEvent']>;
 };
 
 describe('PortfolioStageService', () => {
   let service: PortfolioStageService;
   let prisma: { $transaction: TransactionMethod };
-  let transactionMock: jest.MockedFunction<
+  let transactionMock: MockedFunction<
     (callback: (tx: object) => Promise<unknown>) => Promise<unknown>
   >;
   let candidateRepository: MockCandidateRepository;
@@ -130,44 +129,44 @@ describe('PortfolioStageService', () => {
   };
 
   beforeEach(() => {
-    transactionMock = jest.fn((callback) => callback({}));
+    transactionMock = vi.fn((callback) => callback({}));
     prisma = {
       $transaction: transactionMock as unknown as TransactionMethod,
     };
     candidateRepository = {
-      create: jest.fn(),
-      findByIdempotencyKey: jest.fn(),
-      markDecided: jest.fn(),
+      create: vi.fn(),
+      findByIdempotencyKey: vi.fn(),
+      markDecided: vi.fn(),
     };
     decisionRepository = {
-      findByCandidateIdempotencyKey: jest.fn(),
-      create: jest.fn(),
+      findByCandidateIdempotencyKey: vi.fn(),
+      create: vi.fn(),
     };
     positionExposureRepository = {
-      sumPortfolioPositionExposure: jest.fn(),
-      sumInstrumentPositionExposure: jest.fn(),
+      sumPortfolioPositionExposure: vi.fn(),
+      sumInstrumentPositionExposure: vi.fn(),
     };
     reservationRepository = {
-      sumActivePortfolioReservedNotional: jest.fn(),
-      sumActiveInstrumentReservedNotional: jest.fn(),
-      create: jest.fn(),
+      sumActivePortfolioReservedNotional: vi.fn(),
+      sumActiveInstrumentReservedNotional: vi.fn(),
+      create: vi.fn(),
     };
     riskConfigRepository = {
-      instrumentExists: jest.fn(),
-      findConfigsByInstrumentId: jest.fn(),
-      findConfig: jest.fn(),
+      instrumentExists: vi.fn(),
+      findConfigsByInstrumentId: vi.fn(),
+      findConfig: vi.fn(),
     };
     tradeSizingService = {
-      sizeTrade: jest.fn(),
+      sizeTrade: vi.fn(),
     };
     riskRuleEngine = {
-      evaluate: jest.fn(),
+      evaluate: vi.fn(),
     };
     eventFactory = {
-      create: jest.fn(),
+      create: vi.fn(),
     };
     eventDispatcher = {
-      enqueueEvent: jest.fn(),
+      enqueueEvent: vi.fn(),
     };
     positionExposureRepository.sumInstrumentPositionExposure.mockResolvedValue(
       toPrismaDecimal('0'),

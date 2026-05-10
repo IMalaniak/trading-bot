@@ -1,30 +1,32 @@
+import type { Mock } from 'vitest';
+
 import { PrismaService } from '../../prisma/prisma.service';
 import { PortfolioQueryRepository } from './portfolio-query.repository';
 
 describe('PortfolioQueryRepository', () => {
   let prisma: {
     portfolio: {
-      findUnique: jest.Mock;
-      findMany: jest.Mock;
+      findUnique: Mock;
+      findMany: Mock;
     };
     portfolioPosition: {
-      findMany: jest.Mock;
-      aggregate: jest.Mock;
-      findFirst: jest.Mock;
-      count: jest.Mock;
-      groupBy: jest.Mock;
+      findMany: Mock;
+      aggregate: Mock;
+      findFirst: Mock;
+      count: Mock;
+      groupBy: Mock;
     };
     portfolioSummarySnapshot: {
-      findFirst: jest.Mock;
-      groupBy: jest.Mock;
+      findFirst: Mock;
+      groupBy: Mock;
     };
     portfolioInstrumentConfig: {
-      findMany: jest.Mock;
-      findFirst: jest.Mock;
-      groupBy: jest.Mock;
+      findMany: Mock;
+      findFirst: Mock;
+      groupBy: Mock;
     };
     instrument: {
-      findMany: jest.Mock;
+      findMany: Mock;
     };
   };
   let repository: PortfolioQueryRepository;
@@ -32,27 +34,27 @@ describe('PortfolioQueryRepository', () => {
   beforeEach(() => {
     prisma = {
       portfolio: {
-        findUnique: jest.fn(),
-        findMany: jest.fn(),
+        findUnique: vi.fn(),
+        findMany: vi.fn(),
       },
       portfolioPosition: {
-        findMany: jest.fn(),
-        aggregate: jest.fn(),
-        findFirst: jest.fn(),
-        count: jest.fn(),
-        groupBy: jest.fn(),
+        findMany: vi.fn(),
+        aggregate: vi.fn(),
+        findFirst: vi.fn(),
+        count: vi.fn(),
+        groupBy: vi.fn(),
       },
       portfolioSummarySnapshot: {
-        findFirst: jest.fn(),
-        groupBy: jest.fn(),
+        findFirst: vi.fn(),
+        groupBy: vi.fn(),
       },
       portfolioInstrumentConfig: {
-        findMany: jest.fn(),
-        findFirst: jest.fn(),
-        groupBy: jest.fn(),
+        findMany: vi.fn(),
+        findFirst: vi.fn(),
+        groupBy: vi.fn(),
       },
       instrument: {
-        findMany: jest.fn(),
+        findMany: vi.fn(),
       },
     };
     repository = new PortfolioQueryRepository(

@@ -74,8 +74,7 @@ npx nx run portfolio-manager:test-integration
 The integration target uses the isolated `infra/docker-compose.test.yml` stack,
 not the shared local development stack. It starts Redpanda on `19092` and
 Postgres on `15432`, bootstraps topics via `redpanda-init`, runs migrations,
-and then executes the integration Jest suite with the required Node runtime
-flags.
+and then executes the integration Vitest suite.
 
 Portfolio-manager isolated integration stack
 
@@ -91,7 +90,7 @@ npx nx run portfolio-manager:integration-infra-up
 npx nx run portfolio-manager:migrate:test-integration
 ```
 
-- Run only the integration Jest suite against the isolated test infra:
+- Run only the integration Vitest suite against the isolated test infra:
 
 ```bash
 npx nx run portfolio-manager:test-integration
@@ -104,7 +103,7 @@ npx nx run portfolio-manager:integration-infra-down
 ```
 
 `portfolio-manager:test-integration` depends on `integration-infra-up`, then
-runs `migrate:test-integration` before the integration Jest suite. It does not
+runs `migrate:test-integration` before the integration Vitest suite. It does not
 tear the stack down automatically.
 
 Why topic provisioning lives in infra

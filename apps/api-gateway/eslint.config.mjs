@@ -1,4 +1,6 @@
-import baseConfig, { nestjsTypedConfigForProject } from '../../eslint.config.mjs';
+import baseConfig, {
+  nestjsTypedConfigForProject,
+} from '../../eslint.config.mjs';
 import globals from 'globals';
 
 export default [
@@ -8,7 +10,7 @@ export default [
     languageOptions: {
       globals: {
         ...globals.node,
-        ...globals.jest,
+        ...globals.vitest,
       },
       parserOptions: {
         projectService: {

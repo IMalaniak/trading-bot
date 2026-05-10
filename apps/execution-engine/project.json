@@ -64,11 +64,6 @@
         }
       }
     },
-    "test": {
-      "options": {
-        "passWithNoTests": true
-      }
-    },
     "integration-infra-up": {
       "executor": "nx:run-commands",
       "cache": false,
@@ -108,15 +103,12 @@
       "options": {
         "cwd": "{workspaceRoot}",
         "parallel": false,
-        "env": {
-          "NODE_OPTIONS": "--experimental-vm-modules"
-        },
         "commands": [
           {
             "command": "npx nx run execution-engine:migrate:test-integration"
           },
           {
-            "command": "jest --config apps/execution-engine/jest.integration.config.ts --runInBand"
+            "command": "vitest run --config apps/execution-engine/vitest.integration.config.mts"
           }
         ]
       }
@@ -155,6 +147,12 @@
             "command": "npx nx run execution-engine:lint --fix"
           }
         ]
+      }
+    },
+    "test": {
+      "executor": "@nx/vitest:test",
+      "options": {
+        "configFile": "apps/execution-engine/vitest.config.mts"
       }
     },
     "typecheck": {

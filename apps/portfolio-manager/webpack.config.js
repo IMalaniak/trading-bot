@@ -2,6 +2,10 @@
 const { NxAppWebpackPlugin } = require('@nx/webpack/app-plugin');
 const { join } = require('path');
 
+const {
+  ConfigureSwcLoaderPlugin,
+} = require('../../tools/webpack/configure-swc-loader');
+
 module.exports = {
   output: {
     path: join(__dirname, '../../dist/apps/portfolio-manager'),
@@ -12,7 +16,7 @@ module.exports = {
   plugins: [
     new NxAppWebpackPlugin({
       target: 'node',
-      compiler: 'tsc',
+      compiler: 'swc',
       main: './src/main.ts',
       tsConfig: './tsconfig.app.json',
       optimization: false,
@@ -20,5 +24,6 @@ module.exports = {
       generatePackageJson: true,
       sourceMaps: true,
     }),
+    new ConfigureSwcLoaderPlugin(),
   ],
 };

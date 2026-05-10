@@ -4,5 +4,6 @@
     "js/ts.tsdk.promptToUseWorkspaceVersion": true,
     "prettier.prettierPath": "./node_modules/prettier",
     "prettier.requireConfig": true,
-    "eslint.format.enable": true
+    "eslint.format.enable": true,
+    "vitest.configSearchPatternExclude": "{dist,node_modules}/**"
 }

@@ -21,9 +21,9 @@ describe('PortfolioController', () => {
         {
           provide: PortfolioService,
           useValue: {
-            listPortfolios: jest.fn(),
-            getPortfolio: jest.fn(),
-            registerPortfolioInstrument: jest.fn(),
+            listPortfolios: vi.fn(),
+            getPortfolio: vi.fn(),
+            registerPortfolioInstrument: vi.fn(),
           },
         },
       ],

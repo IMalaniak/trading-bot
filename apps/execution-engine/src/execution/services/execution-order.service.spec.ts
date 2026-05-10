@@ -5,6 +5,7 @@ import {
   TradeDecision,
   TradeDecisionKind,
 } from '@trading-bot/common/proto';
+import type { Mock, MockedFunction } from 'vitest';
 
 import { EventDispatcherService } from '../../event-dispatcher/event-dispatcher.service';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -21,22 +22,22 @@ type TransactionMethod = (
 
 const txMock = {
   executionOrder: {
-    findFirst: jest.fn(),
-    create: jest.fn(),
+    findFirst: vi.fn(),
+    create: vi.fn(),
   },
   executionFill: {
-    createMany: jest.fn(),
+    createMany: vi.fn(),
   },
 };
 
 describe('ExecutionOrderService', () => {
   let service: ExecutionOrderService;
   let prisma: {
-    executionOrder: { findFirst: jest.Mock };
-    $transaction: jest.MockedFunction<TransactionMethod>;
+    executionOrder: { findFirst: Mock };
+    $transaction: MockedFunction<TransactionMethod>;
   };
   let eventDispatcher: {
-    enqueueEvent: jest.MockedFunction<EventDispatcherService['enqueueEvent']>;
+    enqueueEvent: MockedFunction<EventDispatcherService['enqueueEvent']>;
   };
 
   const decision = TradeDecision.fromPartial({
@@ -67,12 +68,12 @@ describe('ExecutionOrderService', () => {
 
     prisma = {
       executionOrder: {
-        findFirst: jest.fn().mockResolvedValue(null),
+        findFirst: vi.fn().mockResolvedValue(null),
       },
-      $transaction: jest.fn((callback) => callback(txMock)),
+      $transaction: vi.fn((callback) => callback(txMock)),
     };
     eventDispatcher = {
-      enqueueEvent: jest.fn().mockResolvedValue('event-id'),
+      enqueueEvent: vi.fn().mockResolvedValue('event-id'),
     };
 
     service = new ExecutionOrderService(

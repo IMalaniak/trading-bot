@@ -6,8 +6,9 @@
   "tags": [],
   "targets": {
     "test": {
+      "executor": "@nx/vitest:test",
       "options": {
-        "passWithNoTests": true
+        "configFile": "libs/testing/vitest.config.mts"
       }
     },
     "typecheck": {

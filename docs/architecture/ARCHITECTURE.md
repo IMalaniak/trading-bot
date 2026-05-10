@@ -54,24 +54,24 @@ Everything else in this document should be read as either:
 
 ## Current Implementation Status
 
-| Area                             | Status               | Notes                                                                                                  |
-| -------------------------------- | -------------------- | ------------------------------------------------------------------------------------------------------ |
+| Area                             | Status               | Notes                                                                                                                                                                                                           |
+| -------------------------------- | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | API Gateway                      | Implemented          | REST entrypoint lists portfolios, forwards portfolio-scoped instrument configuration to `portfolio-manager`, aggregates portfolio/execution visibility over gRPC, and allows configured dashboard CORS origins. |
-| Risk & Portfolio Manager         | Implemented          | Instrument registration, the two-stage risk pipeline, fill reconciliation, portfolio read queries, and instrument resolution are implemented in `portfolio-manager`. |
-| Outbox Dispatcher                | Implemented          | Kafka publish happens from the outbox, not inline with the DB write; shared dispatch mechanics live in `common`. |
-| Shared Contracts (`common`)      | Implemented          | Proto types, topic constants, key builders, Kafka header helpers, and reusable outbox dispatch ports live here. |
-| Message Bus (Redpanda/Kafka API) | Implemented          | Local development uses Redpanda.                                                                       |
-| Portfolio DB (Postgres)          | Implemented          | Source of truth for instruments, outbox rows, portfolios, risk decisions, exposure reservations, reconciled orders/fills, positions, and portfolio summary snapshots. |
-| Market Data Store (TimescaleDB)  | Implemented in infra | Provisioned locally, but not yet exercised by application code in this repo.                           |
-| Data Ingestion Service           | Planned              | Not implemented in this repo yet.                                                                      |
-| Feature Engineering Service      | Planned              | Not implemented in this repo yet.                                                                      |
-| Prediction Engine                | Planned              | Not implemented in this repo yet.                                                                      |
-| Execution Engine                 | Implemented          | Event simulator consumes approved trades, emits deterministic placed/fill lifecycle events, and exposes execution-owned order/fill read queries over gRPC. |
-| Execution DB (Postgres schema)   | Implemented          | Source of truth for simulated orders, fills, and execution outbox rows.                                |
-| Reliability & Operability        | Implemented          | Implemented consumers use bounded retry, per-topic DLQs, correlation/causation headers, structured logs, and Prometheus metrics endpoints. |
-| External API Facade              | Planned              | Not implemented in this repo yet.                                                                      |
-| Dashboard                        | Implemented          | Nx React/Vite/Tailwind dashboard lists portfolios, reads selected portfolio state, and adds instruments to the selected portfolio through API Gateway only. |
-| Schema Registry                  | Planned              | Documented as a future capability; not provisioned in local infra.                                     |
+| Risk & Portfolio Manager         | Implemented          | Instrument registration, the two-stage risk pipeline, fill reconciliation, portfolio read queries, and instrument resolution are implemented in `portfolio-manager`.                                            |
+| Outbox Dispatcher                | Implemented          | Kafka publish happens from the outbox, not inline with the DB write; shared dispatch mechanics live in `common`.                                                                                                |
+| Shared Contracts (`common`)      | Implemented          | Proto types, topic constants, key builders, Kafka header helpers, and reusable outbox dispatch ports live here.                                                                                                 |
+| Message Bus (Redpanda/Kafka API) | Implemented          | Local development uses Redpanda.                                                                                                                                                                                |
+| Portfolio DB (Postgres)          | Implemented          | Source of truth for instruments, outbox rows, portfolios, risk decisions, exposure reservations, reconciled orders/fills, positions, and portfolio summary snapshots.                                           |
+| Market Data Store (TimescaleDB)  | Implemented in infra | Provisioned locally, but not yet exercised by application code in this repo.                                                                                                                                    |
+| Data Ingestion Service           | Planned              | Not implemented in this repo yet.                                                                                                                                                                               |
+| Feature Engineering Service      | Planned              | Not implemented in this repo yet.                                                                                                                                                                               |
+| Prediction Engine                | Planned              | Not implemented in this repo yet.                                                                                                                                                                               |
+| Execution Engine                 | Implemented          | Event simulator consumes approved trades, emits deterministic placed/fill lifecycle events, and exposes execution-owned order/fill read queries over gRPC.                                                      |
+| Execution DB (Postgres schema)   | Implemented          | Source of truth for simulated orders, fills, and execution outbox rows.                                                                                                                                         |
+| Reliability & Operability        | Implemented          | Implemented consumers use bounded retry, per-topic DLQs, correlation/causation headers, structured logs, and Prometheus metrics endpoints.                                                                      |
+| External API Facade              | Planned              | Not implemented in this repo yet.                                                                                                                                                                               |
+| Dashboard                        | Implemented          | Nx React/Vite/Tailwind dashboard lists portfolios, reads selected portfolio state, and adds instruments to the selected portfolio through API Gateway only.                                                     |
+| Schema Registry                  | Planned              | Documented as a future capability; not provisioned in local infra.                                                                                                                                              |
 
 ## Remaining MVP Gaps
 
@@ -302,22 +302,22 @@ service-specific ordering column such as execution lifecycle sequence.
 
 Local development bootstraps all documented topics explicitly and disables broker auto-creation so topic-name mistakes fail fast.
 
-| Topic                       | Status                | Producer                                                 | Main consumers                                          | Partition key    | Ordering guarantee |
-| --------------------------- | --------------------- | -------------------------------------------------------- | ------------------------------------------------------- | ---------------- | ------------------ |
-| `instrument.registered`     | Implemented           | Risk & Portfolio Manager                                 | Planned Data Ingestion                                  | `instrument_key` | Per instrument     |
-| `market.raw.data`           | Planned               | Planned External API Facade                              | Planned Data Ingestion, Feature Engineering             | `instrument_key` | Per instrument     |
-| `features.indicators`       | Planned               | Planned Feature Engineering                              | Planned Prediction Engine, Data Ingestion               | `instrument_key` | Per instrument     |
-| `trading.signals`           | Partially implemented | Planned Prediction Engine                                | Implemented Risk & Portfolio Manager (instrument stage) | `instrument_key` | Per instrument     |
-| `trading.signals.portfolio` | Implemented           | Implemented Risk & Portfolio Manager (repartition stage) | Implemented Risk & Portfolio Manager (portfolio stage)  | `portfolio_key`  | Per portfolio      |
-| `trades.approved`           | Implemented           | Implemented Risk & Portfolio Manager                     | Implemented Execution Engine                            | `portfolio_key`  | Per portfolio      |
-| `trades.rejected`           | Implemented           | Implemented Risk & Portfolio Manager                     | Planned downstream adapters                             | `portfolio_key`  | Per portfolio      |
-| `orders.placed`             | Implemented           | Implemented Execution Engine simulator                   | Planned Risk & Portfolio Manager                        | `portfolio_key`  | Per portfolio      |
-| `orders.fills`              | Implemented           | Implemented Execution Engine simulator                   | Implemented Risk & Portfolio Manager                    | `portfolio_key`  | Per portfolio      |
-| `portfolio.updated`         | Implemented           | Implemented Risk & Portfolio Manager                     | Planned downstream adapters and analytics               | `portfolio_key`  | Per portfolio      |
-| `trading.signals.dlq`       | Implemented           | Implemented Risk & Portfolio Manager consumer wrapper    | Operator replay workflow                                | original key     | Per original key   |
-| `trading.signals.portfolio.dlq` | Implemented        | Implemented Risk & Portfolio Manager consumer wrapper    | Operator replay workflow                                | original key     | Per original key   |
-| `trades.approved.dlq`       | Implemented           | Implemented Execution Engine consumer wrapper            | Operator replay workflow                                | original key     | Per original key   |
-| `orders.fills.dlq`          | Implemented           | Implemented Risk & Portfolio Manager consumer wrapper    | Operator replay workflow                                | original key     | Per original key   |
+| Topic                           | Status                | Producer                                                 | Main consumers                                          | Partition key    | Ordering guarantee |
+| ------------------------------- | --------------------- | -------------------------------------------------------- | ------------------------------------------------------- | ---------------- | ------------------ |
+| `instrument.registered`         | Implemented           | Risk & Portfolio Manager                                 | Planned Data Ingestion                                  | `instrument_key` | Per instrument     |
+| `market.raw.data`               | Planned               | Planned External API Facade                              | Planned Data Ingestion, Feature Engineering             | `instrument_key` | Per instrument     |
+| `features.indicators`           | Planned               | Planned Feature Engineering                              | Planned Prediction Engine, Data Ingestion               | `instrument_key` | Per instrument     |
+| `trading.signals`               | Partially implemented | Planned Prediction Engine                                | Implemented Risk & Portfolio Manager (instrument stage) | `instrument_key` | Per instrument     |
+| `trading.signals.portfolio`     | Implemented           | Implemented Risk & Portfolio Manager (repartition stage) | Implemented Risk & Portfolio Manager (portfolio stage)  | `portfolio_key`  | Per portfolio      |
+| `trades.approved`               | Implemented           | Implemented Risk & Portfolio Manager                     | Implemented Execution Engine                            | `portfolio_key`  | Per portfolio      |
+| `trades.rejected`               | Implemented           | Implemented Risk & Portfolio Manager                     | Planned downstream adapters                             | `portfolio_key`  | Per portfolio      |
+| `orders.placed`                 | Implemented           | Implemented Execution Engine simulator                   | Planned Risk & Portfolio Manager                        | `portfolio_key`  | Per portfolio      |
+| `orders.fills`                  | Implemented           | Implemented Execution Engine simulator                   | Implemented Risk & Portfolio Manager                    | `portfolio_key`  | Per portfolio      |
+| `portfolio.updated`             | Implemented           | Implemented Risk & Portfolio Manager                     | Planned downstream adapters and analytics               | `portfolio_key`  | Per portfolio      |
+| `trading.signals.dlq`           | Implemented           | Implemented Risk & Portfolio Manager consumer wrapper    | Operator replay workflow                                | original key     | Per original key   |
+| `trading.signals.portfolio.dlq` | Implemented           | Implemented Risk & Portfolio Manager consumer wrapper    | Operator replay workflow                                | original key     | Per original key   |
+| `trades.approved.dlq`           | Implemented           | Implemented Execution Engine consumer wrapper            | Operator replay workflow                                | original key     | Per original key   |
+| `orders.fills.dlq`              | Implemented           | Implemented Risk & Portfolio Manager consumer wrapper    | Operator replay workflow                                | original key     | Per original key   |
 
 Local bootstrap defaults:
 
@@ -385,7 +385,7 @@ npx nx run execution-engine:test-integration
 `portfolio-manager:test-integration` and `execution-engine:test-integration` use the isolated
 `infra/docker-compose.test.yml` stack, bootstraps topics via `redpanda-init`,
 runs the owning service's `migrate:test-integration` target, and then executes
-the integration Jest suite. They do not require the shared local development
+the integration Vitest suite. They do not require the shared local development
 stack to be running first.
 
 Manual portfolio instrument smoke:

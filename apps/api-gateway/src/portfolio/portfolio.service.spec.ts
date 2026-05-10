@@ -10,6 +10,7 @@ import {
 } from '@trading-bot/common/proto';
 import { lastValueFrom, of, throwError } from 'rxjs';
 import { TimeoutError } from 'rxjs';
+import type { Mocked } from 'vitest';
 
 import { OrderStatusName } from './dto/order-status-name.enum';
 import { RegisterPortfolioInstrumentRequestDto } from './dto/portfolio-instrument.dto';
@@ -20,18 +21,18 @@ import { IRiskAndPortfolioManager } from './risk-and-portfolio.client.interface'
 
 describe('PortfolioService', () => {
   let service: PortfolioService;
-  let portfolioClient: jest.Mocked<IRiskAndPortfolioManager>;
-  let executionClient: jest.Mocked<IExecutionEngine>;
+  let portfolioClient: Mocked<IRiskAndPortfolioManager>;
+  let executionClient: Mocked<IExecutionEngine>;
 
   beforeEach(async () => {
     portfolioClient = {
-      registerPortfolioInstrument: jest.fn(),
-      listPortfolios: jest.fn(),
-      getPortfolio: jest.fn(),
-      listInstruments: jest.fn(),
+      registerPortfolioInstrument: vi.fn(),
+      listPortfolios: vi.fn(),
+      getPortfolio: vi.fn(),
+      listInstruments: vi.fn(),
     };
     executionClient = {
-      listPortfolioExecutionOrders: jest.fn(),
+      listPortfolioExecutionOrders: vi.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -40,13 +41,13 @@ describe('PortfolioService', () => {
         {
           provide: PORTFOLIO_MANAGER_CLIENT,
           useValue: {
-            getService: jest.fn().mockReturnValue(portfolioClient),
+            getService: vi.fn().mockReturnValue(portfolioClient),
           },
         },
         {
           provide: EXECUTION_ENGINE_CLIENT,
           useValue: {
-            getService: jest.fn().mockReturnValue(executionClient),
+            getService: vi.fn().mockReturnValue(executionClient),
           },
         },
       ],

@@ -23,13 +23,13 @@ describe('InstrumentRegisteredEventFactory', () => {
   } as PrismaInstrument;
 
   beforeEach(() => {
-    jest.useFakeTimers().setSystemTime(new Date('2026-03-22T12:34:56.789Z'));
+    vi.useFakeTimers().setSystemTime(new Date('2026-03-22T12:34:56.789Z'));
     factory = new InstrumentRegisteredEventFactory(new InstrumentMapper());
   });
 
   afterEach(() => {
-    jest.useRealTimers();
-    jest.restoreAllMocks();
+    vi.useRealTimers();
+    vi.restoreAllMocks();
   });
 
   it('builds a registration event with shared topic, key, payload, and headers', () => {

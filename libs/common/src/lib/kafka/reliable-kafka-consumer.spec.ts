@@ -1,3 +1,5 @@
+import type { Mock, MockedFunction } from 'vitest';
+
 import { DeadLetterEvent } from '../../proto';
 import {
   KAFKA_EVENT_HEADER_NAMES,
@@ -10,15 +12,15 @@ import {
 } from './reliable-kafka-consumer';
 
 describe('ReliableKafkaConsumer', () => {
-  let commitOffset: jest.Mock;
+  let commitOffset: Mock;
   let dlqProducer: {
-    send: jest.MockedFunction<ReliableKafkaDlqProducer['send']>;
+    send: MockedFunction<ReliableKafkaDlqProducer['send']>;
   };
-  let logger: { debug: jest.Mock; warn: jest.Mock; error: jest.Mock };
+  let logger: { debug: Mock; warn: Mock; error: Mock };
   let metrics: {
-    recordConsumerMessage: jest.Mock;
-    recordConsumerRetry: jest.Mock;
-    recordDeadLetter: jest.Mock;
+    recordConsumerMessage: Mock;
+    recordConsumerRetry: Mock;
+    recordDeadLetter: Mock;
   };
   let sleeps: number[];
   let nowIndex: number;
@@ -34,26 +36,26 @@ describe('ReliableKafkaConsumer', () => {
   const fallbackNow = new Date('2026-03-22T12:00:05.000Z');
 
   beforeEach(() => {
-    commitOffset = jest.fn();
+    commitOffset = vi.fn();
     dlqProducer = {
-      send: jest.fn() as jest.MockedFunction<ReliableKafkaDlqProducer['send']>,
+      send: vi.fn(),
     };
     logger = {
-      debug: jest.fn(),
-      warn: jest.fn(),
-      error: jest.fn(),
+      debug: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
     };
     metrics = {
-      recordConsumerMessage: jest.fn(),
-      recordConsumerRetry: jest.fn(),
-      recordDeadLetter: jest.fn(),
+      recordConsumerMessage: vi.fn(),
+      recordConsumerRetry: vi.fn(),
+      recordDeadLetter: vi.fn(),
     };
     sleeps = [];
     nowIndex = 0;
   });
 
   const createConsumer = (
-    handle: jest.Mock,
+    handle: Mock,
     decode: (value: Buffer) => string = (value) => value.toString('utf8'),
   ) =>
     new ReliableKafkaConsumer({
@@ -94,7 +96,7 @@ describe('ReliableKafkaConsumer', () => {
   };
 
   it('processes and commits successful messages', async () => {
-    const handle = jest.fn().mockResolvedValue(undefined);
+    const handle = vi.fn().mockResolvedValue(undefined);
 
     await createConsumer(handle).handleMessage(message);
 
@@ -126,7 +128,7 @@ describe('ReliableKafkaConsumer', () => {
   });
 
   it('retries failed messages, publishes DLQ, then commits the source offset', async () => {
-    const handle = jest.fn().mockRejectedValue(new Error('poison message'));
+    const handle = vi.fn().mockRejectedValue(new Error('poison message'));
 
     await createConsumer(handle).handleMessage(message);
 
@@ -177,7 +179,7 @@ describe('ReliableKafkaConsumer', () => {
   });
 
   it('recovers from transient handler failures before DLQ', async () => {
-    const handle = jest
+    const handle = vi
       .fn()
       .mockRejectedValueOnce(new Error('transient db failure'))
       .mockRejectedValueOnce(new Error('transient db failure'))
@@ -204,7 +206,7 @@ describe('ReliableKafkaConsumer', () => {
   });
 
   it('does not commit when DLQ publishing fails', async () => {
-    const handle = jest.fn().mockRejectedValue(new Error('poison message'));
+    const handle = vi.fn().mockRejectedValue(new Error('poison message'));
     dlqProducer.send.mockRejectedValue(new Error('dlq unavailable'));
 
     await expect(createConsumer(handle).handleMessage(message)).rejects.toThrow(
@@ -215,7 +217,7 @@ describe('ReliableKafkaConsumer', () => {
   });
 
   it('does not let error message serialization crash retry and DLQ handling', async () => {
-    const handle = jest.fn().mockRejectedValue(1n);
+    const handle = vi.fn().mockRejectedValue(1n);
 
     await createConsumer(handle).handleMessage(message);
 
@@ -250,7 +252,7 @@ describe('ReliableKafkaConsumer', () => {
         throw new Error('string failed');
       },
     };
-    const handle = jest.fn().mockRejectedValue(unsafeError);
+    const handle = vi.fn().mockRejectedValue(unsafeError);
 
     await createConsumer(handle).handleMessage(message);
 
