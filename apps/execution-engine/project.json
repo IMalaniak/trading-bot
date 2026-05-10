@@ -149,6 +149,12 @@
         ]
       }
     },
+    "test": {
+      "executor": "@nx/vitest:test",
+      "options": {
+        "configFile": "apps/execution-engine/vitest.config.mts"
+      }
+    },
     "typecheck": {
       "executor": "nx:run-commands",
       "options": {

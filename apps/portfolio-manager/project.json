@@ -157,6 +157,12 @@
         ]
       }
     },
+    "test": {
+      "executor": "@nx/vitest:test",
+      "options": {
+        "configFile": "apps/portfolio-manager/vitest.config.mts"
+      }
+    },
     "typecheck": {
       "executor": "nx:run-commands",
       "options": {
