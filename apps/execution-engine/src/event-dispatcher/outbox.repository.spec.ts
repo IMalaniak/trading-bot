@@ -1,22 +1,23 @@
 import { KAFKA_EVENT_HEADER_NAMES } from '@trading-bot/common';
+import type { Mock } from 'vitest';
 
 import { OutboxEventStatus } from '../prisma/generated/client';
 import { OutboxRepository } from './outbox.repository';
 
 describe('OutboxRepository', () => {
   let prisma: {
-    $queryRaw: jest.Mock;
+    $queryRaw: Mock;
     outboxEvent: {
-      update: jest.Mock;
+      update: Mock;
     };
   };
   let repository: OutboxRepository;
 
   beforeEach(() => {
     prisma = {
-      $queryRaw: jest.fn(),
+      $queryRaw: vi.fn(),
       outboxEvent: {
-        update: jest.fn(),
+        update: vi.fn(),
       },
     };
     repository = new OutboxRepository(prisma as never);
@@ -25,7 +26,7 @@ describe('OutboxRepository', () => {
   it('stores outbox events with stable event id headers and lifecycle sequence', async () => {
     const tx = {
       outboxEvent: {
-        create: jest.fn(),
+        create: vi.fn(),
       },
     };
 
@@ -59,7 +60,7 @@ describe('OutboxRepository', () => {
   it('falls back to an existing event-id header', async () => {
     const tx = {
       outboxEvent: {
-        create: jest.fn(),
+        create: vi.fn(),
       },
     };
 

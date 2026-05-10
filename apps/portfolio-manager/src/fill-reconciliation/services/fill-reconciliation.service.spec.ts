@@ -1,5 +1,6 @@
 import { KAFKA_TOPICS } from '@trading-bot/common';
 import { OrderFill, OrderStatus, SignalSide } from '@trading-bot/common/proto';
+import type { MockedFunction } from 'vitest';
 
 import { EventDispatcherService } from '../../event-dispatcher/event-dispatcher.service';
 import { PortfolioOrderStatus } from '../../prisma/generated/enums';
@@ -22,51 +23,49 @@ type TransactionMethod = <T>(
   callback: (tx: object) => Promise<T>,
 ) => Promise<T>;
 type MockRepository = {
-  findFillById: jest.MockedFunction<
+  findFillById: MockedFunction<
     PortfolioReconciliationRepository['findFillById']
   >;
-  upsertOrderFromFill: jest.MockedFunction<
+  upsertOrderFromFill: MockedFunction<
     PortfolioReconciliationRepository['upsertOrderFromFill']
   >;
-  createFill: jest.MockedFunction<
-    PortfolioReconciliationRepository['createFill']
-  >;
-  findPositionFills: jest.MockedFunction<
+  createFill: MockedFunction<PortfolioReconciliationRepository['createFill']>;
+  findPositionFills: MockedFunction<
     PortfolioReconciliationRepository['findPositionFills']
   >;
-  upsertPosition: jest.MockedFunction<
+  upsertPosition: MockedFunction<
     PortfolioReconciliationRepository['upsertPosition']
   >;
-  sumPortfolioExposure: jest.MockedFunction<
+  sumPortfolioExposure: MockedFunction<
     PortfolioReconciliationRepository['sumPortfolioExposure']
   >;
-  countOpenPositions: jest.MockedFunction<
+  countOpenPositions: MockedFunction<
     PortfolioReconciliationRepository['countOpenPositions']
   >;
-  createSnapshot: jest.MockedFunction<
+  createSnapshot: MockedFunction<
     PortfolioReconciliationRepository['createSnapshot']
   >;
-  orderHasCompleteFinalSequence: jest.MockedFunction<
+  orderHasCompleteFinalSequence: MockedFunction<
     PortfolioReconciliationRepository['orderHasCompleteFinalSequence']
   >;
-  releaseActiveReservation: jest.MockedFunction<
+  releaseActiveReservation: MockedFunction<
     PortfolioReconciliationRepository['releaseActiveReservation']
   >;
 };
 type MockPositionAccounting = {
-  calculate: jest.MockedFunction<PositionAccountingService['calculate']>;
+  calculate: MockedFunction<PositionAccountingService['calculate']>;
 };
 type MockEventFactory = {
-  create: jest.MockedFunction<PortfolioUpdatedEventFactory['create']>;
+  create: MockedFunction<PortfolioUpdatedEventFactory['create']>;
 };
 type MockEventDispatcher = {
-  enqueueEvent: jest.MockedFunction<EventDispatcherService['enqueueEvent']>;
+  enqueueEvent: MockedFunction<EventDispatcherService['enqueueEvent']>;
 };
 
 describe('FillReconciliationService', () => {
   let service: FillReconciliationService;
   let prisma: { $transaction: TransactionMethod };
-  let transactionMock: jest.MockedFunction<
+  let transactionMock: MockedFunction<
     (callback: (tx: object) => Promise<unknown>) => Promise<unknown>
   >;
   let repository: MockRepository;
@@ -132,30 +131,30 @@ describe('FillReconciliationService', () => {
   };
 
   beforeEach(() => {
-    transactionMock = jest.fn((callback) => callback({}));
+    transactionMock = vi.fn((callback) => callback({}));
     prisma = {
       $transaction: transactionMock as unknown as TransactionMethod,
     };
     repository = {
-      findFillById: jest.fn(),
-      upsertOrderFromFill: jest.fn(),
-      createFill: jest.fn(),
-      findPositionFills: jest.fn(),
-      upsertPosition: jest.fn(),
-      sumPortfolioExposure: jest.fn(),
-      countOpenPositions: jest.fn(),
-      createSnapshot: jest.fn(),
-      orderHasCompleteFinalSequence: jest.fn(),
-      releaseActiveReservation: jest.fn(),
+      findFillById: vi.fn(),
+      upsertOrderFromFill: vi.fn(),
+      createFill: vi.fn(),
+      findPositionFills: vi.fn(),
+      upsertPosition: vi.fn(),
+      sumPortfolioExposure: vi.fn(),
+      countOpenPositions: vi.fn(),
+      createSnapshot: vi.fn(),
+      orderHasCompleteFinalSequence: vi.fn(),
+      releaseActiveReservation: vi.fn(),
     };
     positionAccounting = {
-      calculate: jest.fn(),
+      calculate: vi.fn(),
     };
     eventFactory = {
-      create: jest.fn(),
+      create: vi.fn(),
     };
     eventDispatcher = {
-      enqueueEvent: jest.fn(),
+      enqueueEvent: vi.fn(),
     };
 
     repository.findFillById.mockResolvedValue(null);

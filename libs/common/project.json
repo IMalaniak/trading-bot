@@ -30,11 +30,6 @@
       },
       "description": "Generate TypeScript types from .proto files into libs/common/src/proto using ts-proto"
     },
-    "test": {
-      "options": {
-        "passWithNoTests": true
-      }
-    },
     "typecheck": {
       "executor": "nx:run-commands",
       "options": {

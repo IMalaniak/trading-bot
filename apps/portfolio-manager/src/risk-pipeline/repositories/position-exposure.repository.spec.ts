@@ -52,7 +52,7 @@ describe('PositionExposureRepository', () => {
 
     return {
       exposureReservation: {
-        findMany: jest.fn().mockResolvedValue(
+        findMany: vi.fn().mockResolvedValue(
           activeReservationKeys.map((candidateIdempotencyKey) => ({
             candidateIdempotencyKey,
             status: ExposureReservationStatus.ACTIVE,
@@ -60,7 +60,7 @@ describe('PositionExposureRepository', () => {
         ),
       },
       portfolioFill: {
-        findMany: jest.fn(({ where }: PortfolioFillFindManyArgs) =>
+        findMany: vi.fn(({ where }: PortfolioFillFindManyArgs) =>
           Promise.resolve(
             fills.filter((fill) => {
               const excludedKeys: string[] =

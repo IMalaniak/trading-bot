@@ -1,5 +1,6 @@
 import { KAFKA_TOPICS } from '@trading-bot/common';
 import { Signal, SignalSide } from '@trading-bot/common/proto';
+import type { MockedFunction } from 'vitest';
 
 import { EventDispatcherService } from '../../event-dispatcher/event-dispatcher.service';
 import { SignalReceiptStatus } from '../../prisma/generated/enums';
@@ -15,38 +16,36 @@ type TransactionMethod = <T>(
   callback: (tx: object) => Promise<T>,
 ) => Promise<T>;
 type MockRiskConfigRepository = {
-  instrumentExists: jest.MockedFunction<
-    RiskConfigRepository['instrumentExists']
-  >;
-  findConfigsByInstrumentId: jest.MockedFunction<
+  instrumentExists: MockedFunction<RiskConfigRepository['instrumentExists']>;
+  findConfigsByInstrumentId: MockedFunction<
     RiskConfigRepository['findConfigsByInstrumentId']
   >;
-  findConfig: jest.MockedFunction<RiskConfigRepository['findConfig']>;
+  findConfig: MockedFunction<RiskConfigRepository['findConfig']>;
 };
 type MockSignalReceiptRepository = {
-  findBySourceEventId: jest.MockedFunction<
+  findBySourceEventId: MockedFunction<
     SignalReceiptRepository['findBySourceEventId']
   >;
-  create: jest.MockedFunction<SignalReceiptRepository['create']>;
+  create: MockedFunction<SignalReceiptRepository['create']>;
 };
 type MockCandidateRepository = {
-  create: jest.MockedFunction<CandidateRepository['create']>;
-  findByIdempotencyKey: jest.MockedFunction<
+  create: MockedFunction<CandidateRepository['create']>;
+  findByIdempotencyKey: MockedFunction<
     CandidateRepository['findByIdempotencyKey']
   >;
-  markDecided: jest.MockedFunction<CandidateRepository['markDecided']>;
+  markDecided: MockedFunction<CandidateRepository['markDecided']>;
 };
 type MockPortfolioSignalCandidateEventFactory = {
-  create: jest.MockedFunction<PortfolioSignalCandidateEventFactory['create']>;
+  create: MockedFunction<PortfolioSignalCandidateEventFactory['create']>;
 };
 type MockEventDispatcher = {
-  enqueueEvent: jest.MockedFunction<EventDispatcherService['enqueueEvent']>;
+  enqueueEvent: MockedFunction<EventDispatcherService['enqueueEvent']>;
 };
 
 describe('InstrumentStageService', () => {
   let service: InstrumentStageService;
   let prisma: { $transaction: TransactionMethod };
-  let transactionMock: jest.MockedFunction<
+  let transactionMock: MockedFunction<
     (callback: (tx: object) => Promise<unknown>) => Promise<unknown>
   >;
   let riskConfigRepository: MockRiskConfigRepository;
@@ -64,29 +63,29 @@ describe('InstrumentStageService', () => {
   });
 
   beforeEach(() => {
-    transactionMock = jest.fn((callback) => callback({}));
+    transactionMock = vi.fn((callback) => callback({}));
     prisma = {
       $transaction: transactionMock as unknown as TransactionMethod,
     };
     riskConfigRepository = {
-      instrumentExists: jest.fn(),
-      findConfigsByInstrumentId: jest.fn(),
-      findConfig: jest.fn(),
+      instrumentExists: vi.fn(),
+      findConfigsByInstrumentId: vi.fn(),
+      findConfig: vi.fn(),
     };
     signalReceiptRepository = {
-      findBySourceEventId: jest.fn(),
-      create: jest.fn(),
+      findBySourceEventId: vi.fn(),
+      create: vi.fn(),
     };
     candidateRepository = {
-      create: jest.fn(),
-      findByIdempotencyKey: jest.fn(),
-      markDecided: jest.fn(),
+      create: vi.fn(),
+      findByIdempotencyKey: vi.fn(),
+      markDecided: vi.fn(),
     };
     eventFactory = {
-      create: jest.fn(),
+      create: vi.fn(),
     };
     eventDispatcher = {
-      enqueueEvent: jest.fn(),
+      enqueueEvent: vi.fn(),
     };
 
     service = new InstrumentStageService(

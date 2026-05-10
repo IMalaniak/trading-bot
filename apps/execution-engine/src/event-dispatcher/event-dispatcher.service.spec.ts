@@ -1,49 +1,50 @@
 import { KAFKA_TOPICS } from '@trading-bot/common';
+import type { Mock, MockedFunction } from 'vitest';
 
 import { EventDispatcherService } from './event-dispatcher.service';
 
 describe('EventDispatcherService', () => {
   let outboxRepository: {
-    enqueue: jest.Mock;
-    claimBatch: jest.Mock;
-    markDispatched: jest.Mock;
-    markFailed: jest.Mock;
-    getBacklogMetrics: jest.Mock;
+    enqueue: Mock;
+    claimBatch: Mock;
+    markDispatched: Mock;
+    markFailed: Mock;
+    getBacklogMetrics: Mock;
   };
   let kafkaClient: {
-    connect: jest.MockedFunction<() => Promise<void>>;
-    close: jest.MockedFunction<() => Promise<void>>;
-    emit: jest.Mock;
+    connect: MockedFunction<() => Promise<void>>;
+    close: MockedFunction<() => Promise<void>>;
+    emit: Mock;
   };
   let service: EventDispatcherService;
   let metrics: {
-    recordOutboxDispatch: jest.Mock;
-    setOutboxBacklog: jest.Mock;
-    setOutboxBacklogSnapshot: jest.Mock;
-    setOldestOutboxAgeSeconds: jest.Mock;
+    recordOutboxDispatch: Mock;
+    setOutboxBacklog: Mock;
+    setOutboxBacklogSnapshot: Mock;
+    setOldestOutboxAgeSeconds: Mock;
   };
 
   beforeEach(() => {
     outboxRepository = {
-      enqueue: jest.fn(),
-      claimBatch: jest.fn(),
-      markDispatched: jest.fn(),
-      markFailed: jest.fn(),
-      getBacklogMetrics: jest.fn().mockResolvedValue({
+      enqueue: vi.fn(),
+      claimBatch: vi.fn(),
+      markDispatched: vi.fn(),
+      markFailed: vi.fn(),
+      getBacklogMetrics: vi.fn().mockResolvedValue({
         rows: [],
         oldestPendingAt: null,
       }),
     };
     kafkaClient = {
-      connect: jest.fn(),
-      close: jest.fn(),
-      emit: jest.fn(),
+      connect: vi.fn(),
+      close: vi.fn(),
+      emit: vi.fn(),
     };
     metrics = {
-      recordOutboxDispatch: jest.fn(),
-      setOutboxBacklog: jest.fn(),
-      setOutboxBacklogSnapshot: jest.fn(),
-      setOldestOutboxAgeSeconds: jest.fn(),
+      recordOutboxDispatch: vi.fn(),
+      setOutboxBacklog: vi.fn(),
+      setOutboxBacklogSnapshot: vi.fn(),
+      setOldestOutboxAgeSeconds: vi.fn(),
     };
     service = new EventDispatcherService(
       outboxRepository as never,
@@ -54,7 +55,7 @@ describe('EventDispatcherService', () => {
   });
 
   afterEach(() => {
-    jest.useRealTimers();
+    vi.useRealTimers();
   });
 
   it('connects and closes the Kafka client', async () => {
@@ -66,8 +67,8 @@ describe('EventDispatcherService', () => {
   });
 
   it('starts the dispatcher interval when enabled', async () => {
-    jest.useFakeTimers();
-    const setIntervalSpy = jest.spyOn(global, 'setInterval');
+    vi.useFakeTimers();
+    const setIntervalSpy = vi.spyOn(global, 'setInterval');
     service = new EventDispatcherService(
       outboxRepository as never,
       kafkaClient as never,

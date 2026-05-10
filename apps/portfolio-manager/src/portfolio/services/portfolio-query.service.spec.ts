@@ -1,5 +1,6 @@
 import { RpcException } from '@nestjs/microservices';
 import { AssetClass } from '@trading-bot/common/proto';
+import type { MockedFunction } from 'vitest';
 
 import { toPrismaDecimal } from '../../prisma/prisma-decimal';
 import { InstrumentMapper } from '../mapper/instrument.mapper';
@@ -9,13 +10,11 @@ import { PortfolioQueryService } from './portfolio-query.service';
 
 describe('PortfolioQueryService', () => {
   let repository: {
-    findPortfolio: jest.MockedFunction<
-      PortfolioQueryRepository['findPortfolio']
-    >;
-    listInstruments: jest.MockedFunction<
+    findPortfolio: MockedFunction<PortfolioQueryRepository['findPortfolio']>;
+    listInstruments: MockedFunction<
       PortfolioQueryRepository['listInstruments']
     >;
-    listPortfolioSummaries: jest.MockedFunction<
+    listPortfolioSummaries: MockedFunction<
       PortfolioQueryRepository['listPortfolioSummaries']
     >;
   };
@@ -23,9 +22,9 @@ describe('PortfolioQueryService', () => {
 
   beforeEach(() => {
     repository = {
-      findPortfolio: jest.fn(),
-      listInstruments: jest.fn(),
-      listPortfolioSummaries: jest.fn(),
+      findPortfolio: vi.fn(),
+      listInstruments: vi.fn(),
+      listPortfolioSummaries: vi.fn(),
     };
     service = new PortfolioQueryService(
       repository as unknown as PortfolioQueryRepository,

@@ -1,18 +1,19 @@
 import { of, throwError } from 'rxjs';
+import type { Mock, Mocked, MockedFunction } from 'vitest';
 
 import type { OutboxDispatcherRepository } from './outbox-dispatcher';
 import type { OutboxKafkaEmitter } from './outbox-dispatcher';
 import { KafkaOutboxDispatcher } from './outbox-dispatcher';
 
 describe('KafkaOutboxDispatcher', () => {
-  let repository: jest.Mocked<OutboxDispatcherRepository>;
-  let kafkaEmitter: { emit: jest.MockedFunction<OutboxKafkaEmitter['emit']> };
+  let repository: Mocked<OutboxDispatcherRepository>;
+  let kafkaEmitter: { emit: MockedFunction<OutboxKafkaEmitter['emit']> };
   let logger: {
-    debug: jest.Mock;
-    warn: jest.Mock;
-    error: jest.Mock;
+    debug: Mock;
+    warn: Mock;
+    error: Mock;
   };
-  let metrics: { recordOutboxDispatch: jest.Mock };
+  let metrics: { recordOutboxDispatch: Mock };
 
   const createDispatcher = () =>
     new KafkaOutboxDispatcher({
@@ -29,20 +30,20 @@ describe('KafkaOutboxDispatcher', () => {
 
   beforeEach(() => {
     repository = {
-      claimBatch: jest.fn(),
-      markDispatched: jest.fn(),
-      markFailed: jest.fn(),
+      claimBatch: vi.fn(),
+      markDispatched: vi.fn(),
+      markFailed: vi.fn(),
     };
     kafkaEmitter = {
-      emit: jest.fn(),
+      emit: vi.fn(),
     };
     logger = {
-      debug: jest.fn(),
-      warn: jest.fn(),
-      error: jest.fn(),
+      debug: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
     };
     metrics = {
-      recordOutboxDispatch: jest.fn(),
+      recordOutboxDispatch: vi.fn(),
     };
   });
 

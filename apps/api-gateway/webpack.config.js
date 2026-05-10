@@ -2,6 +2,10 @@
 const { NxAppWebpackPlugin } = require('@nx/webpack/app-plugin');
 const { join } = require('path');
 
+const {
+  ConfigureSwcLoaderPlugin,
+} = require('../../tools/webpack/configure-swc-loader');
+
 module.exports = {
   output: {
     path: join(__dirname, '../../dist/apps/api-gateway'),
@@ -12,18 +16,14 @@ module.exports = {
   plugins: [
     new NxAppWebpackPlugin({
       target: 'node',
-      compiler: 'tsc',
+      compiler: 'swc',
       main: './src/main.ts',
       tsConfig: './tsconfig.app.json',
       optimization: false,
       outputHashing: 'none',
       generatePackageJson: true,
       sourceMaps: true,
-      transformers: [
-        {
-          name: '@nestjs/swagger/plugin',
-        },
-      ],
     }),
+    new ConfigureSwcLoaderPlugin(),
   ],
 };

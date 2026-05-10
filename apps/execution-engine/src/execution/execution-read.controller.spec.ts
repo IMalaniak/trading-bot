@@ -1,10 +1,12 @@
+import type { MockedFunction } from 'vitest';
+
 import { ListPortfolioExecutionOrdersRequestDto } from './dto/list-portfolio-execution-orders-request.dto';
 import { ExecutionReadController } from './execution-read.controller';
 import { ExecutionQueryService } from './services/execution-query.service';
 
 describe('ExecutionReadController', () => {
   let executionQueryService: {
-    listPortfolioExecutionOrders: jest.MockedFunction<
+    listPortfolioExecutionOrders: MockedFunction<
       ExecutionQueryService['listPortfolioExecutionOrders']
     >;
   };
@@ -12,7 +14,7 @@ describe('ExecutionReadController', () => {
 
   beforeEach(() => {
     executionQueryService = {
-      listPortfolioExecutionOrders: jest.fn().mockResolvedValue({ orders: [] }),
+      listPortfolioExecutionOrders: vi.fn().mockResolvedValue({ orders: [] }),
     };
     controller = new ExecutionReadController(
       executionQueryService as unknown as ExecutionQueryService,

@@ -4,6 +4,7 @@ import {
   AssetClass,
   RegisterPortfolioInstrumentRequest,
 } from '@trading-bot/common/proto';
+import type { Mock, MockedFunction } from 'vitest';
 
 import { EventDispatcherService } from '../event-dispatcher/event-dispatcher.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -19,15 +20,13 @@ import {
 describe('PortfolioService', () => {
   let service: PortfolioService;
   let prismaService: PrismaService;
-  let enqueueEventMock: jest.MockedFunction<
-    EventDispatcherService['enqueueEvent']
-  >;
+  let enqueueEventMock: MockedFunction<EventDispatcherService['enqueueEvent']>;
   let eventDispatcher: {
     enqueueEvent: EventDispatcherService['enqueueEvent'];
   };
 
   beforeEach(async () => {
-    enqueueEventMock = jest.fn().mockResolvedValue('event-1');
+    enqueueEventMock = vi.fn().mockResolvedValue('event-1');
     eventDispatcher = {
       enqueueEvent: enqueueEventMock,
     };
@@ -39,17 +38,17 @@ describe('PortfolioService', () => {
           provide: PrismaService,
           useValue: {
             portfolio: {
-              findUnique: jest.fn(),
+              findUnique: vi.fn(),
             },
             instrument: {
-              create: jest.fn(),
-              findFirst: jest.fn(),
+              create: vi.fn(),
+              findFirst: vi.fn(),
             },
             portfolioInstrumentConfig: {
-              create: jest.fn(),
-              findUnique: jest.fn(),
+              create: vi.fn(),
+              findUnique: vi.fn(),
             },
-            $transaction: jest.fn(),
+            $transaction: vi.fn(),
           },
         },
         {
@@ -124,19 +123,19 @@ describe('PortfolioService', () => {
       };
       const tx = {
         portfolio: {
-          findUnique: jest.fn().mockResolvedValue({ id: 'portfolio-alpha' }),
+          findUnique: vi.fn().mockResolvedValue({ id: 'portfolio-alpha' }),
         },
         instrument: {
-          findFirst: jest.fn().mockResolvedValue(null),
-          create: jest.fn().mockResolvedValue(createdInstrument),
+          findFirst: vi.fn().mockResolvedValue(null),
+          create: vi.fn().mockResolvedValue(createdInstrument),
         },
         portfolioInstrumentConfig: {
-          findUnique: jest.fn().mockResolvedValue(null),
-          create: jest.fn().mockResolvedValue(createdConfig),
+          findUnique: vi.fn().mockResolvedValue(null),
+          create: vi.fn().mockResolvedValue(createdConfig),
         },
-        $executeRaw: jest.fn(),
+        $executeRaw: vi.fn(),
       };
-      (prismaService.$transaction as jest.Mock).mockImplementation(
+      (prismaService.$transaction as Mock).mockImplementation(
         (cb: (client: typeof tx) => unknown) => cb(tx),
       );
 
@@ -187,15 +186,15 @@ describe('PortfolioService', () => {
       };
       const tx = {
         portfolio: {
-          findUnique: jest.fn().mockResolvedValue({ id: 'portfolio-alpha' }),
+          findUnique: vi.fn().mockResolvedValue({ id: 'portfolio-alpha' }),
         },
         instrument: {
-          findFirst: jest.fn().mockResolvedValue(existingInstrument),
-          create: jest.fn(),
+          findFirst: vi.fn().mockResolvedValue(existingInstrument),
+          create: vi.fn(),
         },
         portfolioInstrumentConfig: {
-          findUnique: jest.fn().mockResolvedValue(null),
-          create: jest.fn().mockResolvedValue({
+          findUnique: vi.fn().mockResolvedValue(null),
+          create: vi.fn().mockResolvedValue({
             id: 'config-1',
             portfolioId: 'portfolio-alpha',
             instrumentId: 'instrument-aapl',
@@ -209,7 +208,7 @@ describe('PortfolioService', () => {
           }),
         },
       };
-      (prismaService.$transaction as jest.Mock).mockImplementation(
+      (prismaService.$transaction as Mock).mockImplementation(
         (cb: (client: typeof tx) => unknown) => cb(tx),
       );
 
@@ -228,18 +227,18 @@ describe('PortfolioService', () => {
     it('rejects missing portfolios with a portfolio not found app code', async () => {
       const tx = {
         portfolio: {
-          findUnique: jest.fn().mockResolvedValue(null),
+          findUnique: vi.fn().mockResolvedValue(null),
         },
         instrument: {
-          findFirst: jest.fn(),
-          create: jest.fn(),
+          findFirst: vi.fn(),
+          create: vi.fn(),
         },
         portfolioInstrumentConfig: {
-          findUnique: jest.fn(),
-          create: jest.fn(),
+          findUnique: vi.fn(),
+          create: vi.fn(),
         },
       };
-      (prismaService.$transaction as jest.Mock).mockImplementation(
+      (prismaService.$transaction as Mock).mockImplementation(
         (cb: (client: typeof tx) => unknown) => cb(tx),
       );
 
@@ -260,18 +259,18 @@ describe('PortfolioService', () => {
       };
       const tx = {
         portfolio: {
-          findUnique: jest.fn().mockResolvedValue({ id: 'portfolio-alpha' }),
+          findUnique: vi.fn().mockResolvedValue({ id: 'portfolio-alpha' }),
         },
         instrument: {
-          findFirst: jest.fn().mockResolvedValue(existingInstrument),
-          create: jest.fn(),
+          findFirst: vi.fn().mockResolvedValue(existingInstrument),
+          create: vi.fn(),
         },
         portfolioInstrumentConfig: {
-          findUnique: jest.fn().mockResolvedValue({ id: 'config-1' }),
-          create: jest.fn(),
+          findUnique: vi.fn().mockResolvedValue({ id: 'config-1' }),
+          create: vi.fn(),
         },
       };
-      (prismaService.$transaction as jest.Mock).mockImplementation(
+      (prismaService.$transaction as Mock).mockImplementation(
         (cb: (client: typeof tx) => unknown) => cb(tx),
       );
 
@@ -290,24 +289,24 @@ describe('PortfolioService', () => {
     it('rejects existing instruments with conflicting metadata', async () => {
       const tx = {
         portfolio: {
-          findUnique: jest.fn().mockResolvedValue({ id: 'portfolio-alpha' }),
+          findUnique: vi.fn().mockResolvedValue({ id: 'portfolio-alpha' }),
         },
         instrument: {
-          findFirst: jest.fn().mockResolvedValue({
+          findFirst: vi.fn().mockResolvedValue({
             id: 'instrument-aapl',
             assetClass: AssetClass.CRYPTO,
             symbol: 'AAPL',
             venue: 'NASDAQ',
             externalSymbol: 'AAPL',
           }),
-          create: jest.fn(),
+          create: vi.fn(),
         },
         portfolioInstrumentConfig: {
-          findUnique: jest.fn(),
-          create: jest.fn(),
+          findUnique: vi.fn(),
+          create: vi.fn(),
         },
       };
-      (prismaService.$transaction as jest.Mock).mockImplementation(
+      (prismaService.$transaction as Mock).mockImplementation(
         (cb: (client: typeof tx) => unknown) => cb(tx),
       );
 
