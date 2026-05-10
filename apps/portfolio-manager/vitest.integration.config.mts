@@ -1,6 +1,7 @@
 /// <reference types="vitest" />
 import { nxViteTsPaths } from '@nx/vite/plugins/nx-tsconfig-paths.plugin';
 import swc from 'unplugin-swc';
+import { loadEnv } from 'vite';
 import { defineConfig } from 'vitest/config';
 
 const nestSwcPlugin = swc.vite({
@@ -23,24 +24,29 @@ const nestSwcPlugin = swc.vite({
   sourceMaps: true,
 });
 
-export default defineConfig(() => ({
-  root: import.meta.dirname,
-  oxc: false as const,
-  cacheDir: '../../node_modules/.vite/apps/portfolio-manager-integration',
-  plugins: [nxViteTsPaths(), nestSwcPlugin],
-  test: {
-    name: 'portfolio-manager-integration',
-    watch: false,
-    globals: true,
-    environment: 'node',
-    include: ['src/**/*.integration.spec.ts'],
-    passWithNoTests: true,
-    testTimeout: 20000,
-    fileParallelism: false,
-    reporters: ['default'],
-    coverage: {
-      reportsDirectory: '../../coverage/apps/portfolio-manager-integration',
-      provider: 'v8' as const,
+export default defineConfig(() => {
+  const env = loadEnv('test-integration', import.meta.dirname, '');
+  Object.assign(process.env, env);
+
+  return {
+    root: import.meta.dirname,
+    oxc: false as const,
+    cacheDir: '../../node_modules/.vite/apps/portfolio-manager-integration',
+    plugins: [nxViteTsPaths(), nestSwcPlugin],
+    test: {
+      name: 'portfolio-manager-integration',
+      watch: false,
+      globals: true,
+      environment: 'node',
+      include: ['src/**/*.integration.spec.ts'],
+      passWithNoTests: true,
+      testTimeout: 20000,
+      fileParallelism: false,
+      reporters: ['default'],
+      coverage: {
+        reportsDirectory: '../../coverage/apps/portfolio-manager-integration',
+        provider: 'v8' as const,
+      },
     },
-  },
-}));
+  };
+});
