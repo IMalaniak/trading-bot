@@ -72,12 +72,13 @@ jobs:
         id: vars
         if: steps.skip_push.outputs.skip != 'true'
         run: |
-          # Push events: if before is available and not the zero SHA, use it. Otherwise fallback to origin/main
-          if [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
+          # Push events: use github.event.before only if it's a real SHA that still exists in the repo
+          # (force-pushed branches like Renovate rebases will have orphaned SHAs that no longer exist)
+          if [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ] && git cat-file -e "${{ github.event.before }}" 2>/dev/null; then
             echo "base=${{ github.event.before }}" >> $GITHUB_OUTPUT
           else
-            echo "base=origin/${{ github.event.repository.default_branch }}" >> $GITHUB_OUTPUT
             git fetch origin ${{ github.event.repository.default_branch }} --depth=1 || true
+            echo "base=origin/${{ github.event.repository.default_branch }}" >> $GITHUB_OUTPUT
           fi
           echo "head=${{ github.sha }}" >> $GITHUB_OUTPUT
 
