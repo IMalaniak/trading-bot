@@ -22,7 +22,7 @@
     - [Current: Execution Simulator](#current-execution-simulator)
     - [Current: Fill Reconciliation](#current-fill-reconciliation)
     - [Current: Portfolio Read API and Execution Visibility](#current-portfolio-read-api-and-execution-visibility)
-    - [Planned: MVP Demo Flow](#planned-mvp-demo-flow)
+    - [Current: Signal-To-Portfolio E2E Flow](#current-signal-to-portfolio-e2e-flow)
     - [Planned: End-to-End Trading Flow](#planned-end-to-end-trading-flow)
 
 ## Architecture Summary
@@ -71,20 +71,46 @@ Everything else in this document should be read as either:
 | Reliability & Operability        | Implemented          | Implemented consumers use bounded retry, per-topic DLQs, correlation/causation headers, structured logs, and Prometheus metrics endpoints.                                                                      |
 | External API Facade              | Planned              | Not implemented in this repo yet.                                                                                                                                                                               |
 | Dashboard                        | Implemented          | Nx React/Vite/Tailwind dashboard lists portfolios, reads selected portfolio state, and adds instruments to the selected portfolio through API Gateway only.                                                     |
+| Full-System E2E                  | Implemented          | Dedicated `trading-bot-e2e` Nx/Playwright project depends on the shared `infra` Nx project for isolated Docker lifecycle, runs both service migrations, seeds portfolio data, starts backend services and dashboard, publishes synthetic Kafka events from the test harness, and verifies REST plus browser-visible state. |
 | Schema Registry                  | Planned              | Documented as a future capability; not provisioned in local infra.                                                                                                                                              |
 
 ## Remaining MVP Gaps
 
-The backend event chain is implemented through portfolio read visibility. The
-remaining MVP work is about making that chain usable and reproducible:
+The backend event chain, dashboard visibility, and full-system e2e
+coverage are implemented through portfolio read visibility. The remaining MVP
+work is about making that chain more polished and reproducible for a clean
+checkout:
 
-- Add full demo-path e2e coverage that starts isolated local infrastructure,
-  runs migrations and seed data, starts services and dashboard, publishes a
-  synthetic `common.Signal` directly to `trading.signals` from the test harness,
-  waits for reconciliation, checks the REST response, and verifies browser UI
-  rendering.
-- Polish local demo documentation and env examples so the MVP is reproducible
+- Polish local setup documentation and env examples so the MVP is reproducible
   from a clean checkout.
+
+Implemented full-system e2e boundary:
+
+- `npx nx run trading-bot-e2e:e2e` starts an isolated Docker Compose project
+  through `infra:serve-e2e`, runs both Prisma migration sets, seeds
+  `portfolio-alpha`, starts
+  `portfolio-manager`, `execution-engine`, `api-gateway`, and `dashboard`,
+  publishes a synthetic `common.Signal` directly to `trading.signals`, verifies
+  the REST read response, and verifies the rendered Dashboard in Chromium.
+- The e2e suite includes replay checks for both duplicate source signal
+  `event-id` handling and duplicate final fill replay.
+- Runtime values for Docker Compose e2e lifecycle live in `infra/.env.e2e`.
+  Harness values live in `apps/trading-bot-e2e/.env.e2e`, and app
+  `serve:e2e`, `migrate:e2e`, and `seed:e2e` target configurations load
+  app-scoped `.env.e2e` files. The project JSON keeps command wiring, not
+  duplicated env blocks.
+- The `infra` project exposes `infra:clean-e2e:e2e` as the explicit Docker
+  Compose cleanup target. `infra:serve-e2e:e2e` cleans stale e2e state before
+  startup, and CI runs `infra:clean-e2e:e2e` again in an `always()` step after
+  Nx has stopped continuous service targets.
+- Synthetic signal and fill publishing are test-harness behavior only; they are
+  not product APIs and are not exposed in the Dashboard.
+
+Documentation correction:
+
+- Older roadmap text for Iteration 7 uses stale singular `/api/portfolio...`
+  paths. The implemented and documented API Gateway surface uses plural
+  `/api/portfolios...` paths.
 
 Implemented Dashboard boundary:
 
@@ -95,7 +121,7 @@ Implemented Dashboard boundary:
 - The dashboard has no hardcoded default portfolio. Users select a portfolio
   before portfolio details are loaded.
 - Keep synthetic signal publishing out of product APIs. Until the Prediction
-  Engine exists, direct Kafka signal publishing is test/demo harness behavior,
+  Engine exists, direct Kafka signal publishing is test harness behavior,
   not a Dashboard or API Gateway feature.
 - The dashboard intentionally has no signal injection, strategy editor, trading
   controls, market charts, websocket stream, or auth.
@@ -353,6 +379,31 @@ Expected env files:
 - `apps/execution-engine/.env.test-integration`
   - isolated integration-test `EXECUTION_ENGINE_DATABASE_URL`
   - isolated integration-test `KAFKA_BROKERS`
+- `infra/.env.test-integration`
+  - isolated integration-test Docker Compose host ports loaded by
+    `infra:serve-integration:test-integration`
+- `infra/.env.e2e`
+  - isolated e2e Docker Compose project name and host ports loaded by
+    `infra:serve-e2e:e2e`, `infra:stop-e2e:e2e`, and `infra:clean-e2e:e2e`
+- `apps/trading-bot-e2e/.env.e2e`
+  - isolated full-system e2e harness ports and Kafka broker defaults loaded by
+    Nx for test harness behavior
+  - the test harness Kafka producer reads `KAFKA_BROKERS`, or derives the
+    broker from `KAFKA_HOST:KAFKA_PORT`
+- `apps/portfolio-manager/.env.e2e`
+  - e2e service process `DATABASE_URL`, `KAFKA_BROKERS`, gRPC URL, and metrics
+    port loaded by Nx for `portfolio-manager:serve:e2e`, plus seed/migration
+    access for `portfolio-manager` e2e targets
+- `apps/execution-engine/.env.e2e`
+  - e2e service process database URL, `KAFKA_BROKERS`, gRPC URL, and metrics
+    port loaded by Nx for `execution-engine:serve:e2e` and migration access for
+    `execution-engine:migrate:e2e`
+- `apps/api-gateway/.env.e2e`
+  - e2e API Gateway port, CORS origins, and backend gRPC URLs loaded by Nx for
+    `api-gateway:serve:e2e`
+- `apps/dashboard/.env.e2e`
+  - e2e Vite host, dashboard port, and `VITE_API_BASE_URL` loaded by Nx for
+    `dashboard:serve:e2e`
 - `infra/.env`
   - Postgres and Timescale credentials for Docker Compose
 
@@ -380,13 +431,71 @@ Useful validation commands:
 ```bash
 npx nx run portfolio-manager:test-integration
 npx nx run execution-engine:test-integration
+npx nx run trading-bot-e2e:e2e
 ```
 
-`portfolio-manager:test-integration` and `execution-engine:test-integration` use the isolated
-`infra/docker-compose.test.yml` stack, bootstraps topics via `redpanda-init`,
-runs the owning service's `migrate:test-integration` target, and then executes
-the integration Vitest suite. They do not require the shared local development
-stack to be running first.
+`portfolio-manager:test-integration` and `execution-engine:test-integration`
+depend on the shared `infra:serve-integration:test-integration` task through
+`nx.json` target defaults. Nx runs that infra task once per command invocation
+even when both integration suites run together. The app targets then run the
+owning service's `migrate:test-integration` target and execute the integration
+Vitest suite. They do not require the shared local development stack to be
+running first.
+
+Full-system e2e:
+
+```bash
+npx nx run trading-bot-e2e:e2e
+```
+
+`trading-bot-e2e:e2e` is the canonical full-system regression path. It uses the
+shared `infra` Nx project for Docker lifecycle and owns the remaining local
+system lifecycle through Nx targets:
+
+1. remove the e2e Docker Compose project and volumes from any prior run,
+2. start isolated Redpanda and Postgres from `infra/docker-compose.test.yml`,
+3. bootstrap Redpanda topics with `redpanda-init`,
+4. run `portfolio-manager:migrate:e2e`,
+5. run `execution-engine:migrate:e2e`,
+6. run `portfolio-manager:seed`,
+7. start `portfolio-manager`, `execution-engine`, `api-gateway`, and
+   `dashboard` as Nx continuous targets,
+8. wait for service readiness from the Nx `e2e-ready` target,
+9. publish synthetic protobuf events from the test harness,
+10. assert both REST API state and browser-visible Dashboard state.
+
+The `e2e` target uses the `@nx/playwright:playwright` executor with the
+workspace Playwright plugin configured in `nx.json`. App-owned `serve-e2e`
+continuous targets depend on `trading-bot-e2e:e2e-seed`, so migrations and seed
+complete before service startup. Backend `serve-e2e` targets use `@nx/js:node`
+with production build targets instead of raw `node dist/...` commands, and
+`dashboard:serve-e2e` uses `@nx/vite:dev-server`. CI intentionally runs the
+serial `e2e` target rather than atomizing this suite because the target owns one
+shared local infrastructure stack.
+
+Nx stops continuous service targets when the e2e task exits. `infra:clean-e2e`
+is a plain Nx `run-commands` target that removes the isolated Docker stack and
+volumes. CI runs this cleanup target after every e2e job; local runs can invoke
+it explicitly when immediate Docker teardown is needed:
+
+```bash
+npx nx run infra:clean-e2e:e2e
+```
+
+Default full e2e ports:
+
+- Kafka: `127.0.0.1:19092`
+- Postgres: `127.0.0.1:15432`
+- Portfolio Manager gRPC: `127.0.0.1:15051`
+- Execution Engine gRPC: `127.0.0.1:15052`
+- Portfolio Manager metrics: `19101`
+- Execution Engine metrics: `19102`
+- API Gateway: `13000`
+- Dashboard: `14200`
+
+The e2e suite depends on Docker and a local Chromium browser install managed by
+Playwright. It should not run in parallel with the existing service integration
+targets because they use the same host Kafka and Postgres ports.
 
 Manual portfolio instrument smoke:
 
@@ -617,11 +726,11 @@ Current read semantics:
 - `recentOrdersLimit` defaults to `20` and is capped at `100`.
 - API Gateway fails the whole request if either upstream read fails; partial portfolio/execution responses are intentionally not returned.
 
-### Planned: MVP Demo Flow
+### Current: Signal-To-Portfolio E2E Flow
 
-This is the remaining MVP demo shape. It uses the implemented backend path, adds
-a minimal Dashboard, and keeps synthetic signal publishing in the e2e/manual
-test harness rather than product APIs.
+This is the implemented full-system e2e shape. It uses the implemented backend
+path, the React Dashboard, and keeps synthetic signal publishing in the
+e2e/manual test harness rather than product APIs.
 
 ```mermaid
 sequenceDiagram
@@ -662,10 +771,10 @@ sequenceDiagram
     APIGateway-->>Dashboard: Updated summary, configured instrument, position, order, and fill state
 ```
 
-MVP demo boundaries:
+E2E boundaries:
 
 - The Dashboard calls only API Gateway product endpoints.
-- Synthetic `trading.signals` publishing is owned by e2e/manual demo tooling.
+- Synthetic `trading.signals` publishing is owned by e2e/manual test tooling.
 - The Dashboard does not expose signal injection, strategy editing,
   start/stop trading, market charts, websocket streaming, or auth.
 

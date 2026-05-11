@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "forceConsistentCasingInFileNames": true,
+    "strict": true,
+    "importHelpers": true,
+    "noImplicitOverride": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "types": ["node", "@playwright/test"],
+    "outDir": "../../dist/out-tsc/apps/trading-bot-e2e"
+  },
+  "include": ["playwright.config.ts", "vitest.config.mts", "src/**/*.ts"]
+}

@@ -6,6 +6,24 @@
   "tags": [],
   "// targets": "to see all targets run: nx show project dashboard --web",
   "targets": {
+    "serve-e2e": {
+      "continuous": true,
+      "executor": "@nx/vite:dev-server",
+      "cache": false,
+      "defaultConfiguration": "e2e",
+      "dependsOn": [
+        {
+          "projects": "trading-bot-e2e",
+          "target": "e2e-seed"
+        }
+      ],
+      "options": {
+        "buildTarget": "dashboard:build"
+      },
+      "configurations": {
+        "e2e": {}
+      }
+    },
     "test": {
       "executor": "@nx/vitest:test",
       "options": {

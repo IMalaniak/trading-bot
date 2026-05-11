@@ -1,0 +1,122 @@
+{
+  "name": "trading-bot-e2e",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/trading-bot-e2e/src",
+  "projectType": "application",
+  "tags": ["type:e2e"],
+  "implicitDependencies": [
+    "api-gateway",
+    "dashboard",
+    "execution-engine",
+    "portfolio-manager",
+    "common",
+    "testing"
+  ],
+  "targets": {
+    "e2e": {
+      "executor": "@nx/playwright:playwright",
+      "cache": false,
+      "defaultConfiguration": "e2e",
+      "dependsOn": [
+        {
+          "projects": "portfolio-manager",
+          "target": "serve-e2e"
+        },
+        {
+          "projects": "execution-engine",
+          "target": "serve-e2e"
+        },
+        {
+          "projects": "api-gateway",
+          "target": "serve-e2e"
+        },
+        {
+          "projects": "dashboard",
+          "target": "serve-e2e"
+        },
+        "e2e-ready"
+      ],
+      "options": {
+        "config": "apps/trading-bot-e2e/playwright.config.ts",
+        "skipInstall": true
+      },
+      "configurations": {
+        "e2e": {}
+      }
+    },
+    "e2e-migrate": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "defaultConfiguration": "e2e",
+      "dependsOn": [
+        {
+          "projects": "infra",
+          "target": "serve-e2e"
+        }
+      ],
+      "options": {
+        "cwd": "{workspaceRoot}",
+        "command": "npx nx run-many --target=migrate --all --configuration=e2e --parallel=1 --outputStyle=static"
+      },
+      "configurations": {
+        "e2e": {}
+      }
+    },
+    "e2e-seed": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "defaultConfiguration": "e2e",
+      "dependsOn": ["e2e-migrate"],
+      "options": {
+        "cwd": "{workspaceRoot}",
+        "command": "npx nx run-many --target=seed --all --configuration=e2e --parallel=1 --outputStyle=static"
+      },
+      "configurations": {
+        "e2e": {}
+      }
+    },
+    "e2e-ready": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "defaultConfiguration": "e2e",
+      "dependsOn": [
+        {
+          "projects": "portfolio-manager",
+          "target": "serve-e2e"
+        },
+        {
+          "projects": "execution-engine",
+          "target": "serve-e2e"
+        },
+        {
+          "projects": "api-gateway",
+          "target": "serve-e2e"
+        },
+        {
+          "projects": "dashboard",
+          "target": "serve-e2e"
+        }
+      ],
+      "options": {
+        "cwd": "{workspaceRoot}",
+        "command": "npx tsx --tsconfig tsconfig.base.json apps/trading-bot-e2e/src/support/wait-for-readiness.ts"
+      },
+      "configurations": {
+        "e2e": {}
+      }
+    },
+    "test": {
+      "executor": "@nx/vitest:test",
+      "options": {
+        "configFile": "apps/trading-bot-e2e/vitest.config.mts"
+      }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "{workspaceRoot}",
+        "command": "tsc -p apps/trading-bot-e2e/tsconfig.json --noEmit --pretty false"
+      }
+    }
+  }
+}

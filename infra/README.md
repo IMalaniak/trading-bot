@@ -27,6 +27,10 @@ Environment files
 
 - `infra/.env`
   - Docker Compose credentials for Postgres and TimescaleDB
+- `infra/.env.test-integration`
+  - Nx-loaded isolated integration Docker Compose ports
+- `infra/.env.e2e`
+  - Nx-loaded isolated e2e Docker Compose project and ports
 - `infra/.env.example`
   - Example values for the infra credentials
 - root `.env`
@@ -36,14 +40,16 @@ Environment files
 - `apps/portfolio-manager/.env`
   - `DATABASE_URL`
 - `apps/portfolio-manager/.env.test-integration`
-  - Nx-loaded env for the isolated integration targets and `--env-file` source for manual isolated-stack Compose commands
+  - Nx-loaded app env for portfolio-manager integration migrations and tests
+- `apps/execution-engine/.env.test-integration`
+  - Nx-loaded app env for execution-engine integration migrations and tests
 
 Recommended local workflow
 
 1. Start infra:
 
 ```bash
-docker compose -f infra/docker-compose.yml up -d
+npx nx run infra:serve
 ```
 
 2. Apply database migrations:
@@ -55,7 +61,7 @@ npx nx run portfolio-manager:migrate
 3. Topics are bootstrapped automatically by the one-shot `redpanda-init` service. If you need to rerun that provisioning manually:
 
 ```bash
-docker compose -f infra/docker-compose.yml run --rm redpanda-init
+npx nx run infra:serve
 ```
 
 4. Start the apps:
@@ -71,17 +77,19 @@ npx nx serve api-gateway
 npx nx run portfolio-manager:test-integration
 ```
 
-The integration target uses the isolated `infra/docker-compose.test.yml` stack,
-not the shared local development stack. It starts Redpanda on `19092` and
-Postgres on `15432`, bootstraps topics via `redpanda-init`, runs migrations,
-and then executes the integration Vitest suite.
+The integration target depends on the shared `infra:serve-integration` Nx task.
+Nx runs that task once per command invocation even when multiple projects run
+`test-integration`. The task uses the isolated `infra/docker-compose.test.yml`
+stack, not the shared local development stack. It starts Redpanda on `19092`
+and Postgres on `15432`, bootstraps topics via `redpanda-init`, runs the owning
+service's migrations, and then executes the integration Vitest suite.
 
-Portfolio-manager isolated integration stack
+Isolated integration stack
 
 - Start only the isolated test infra:
 
 ```bash
-npx nx run portfolio-manager:integration-infra-up
+npx nx run infra:serve-integration:test-integration
 ```
 
 - Run migrations against the isolated test Postgres:
@@ -99,12 +107,13 @@ npx nx run portfolio-manager:test-integration
 - Tear the isolated stack down manually:
 
 ```bash
-npx nx run portfolio-manager:integration-infra-down
+npx nx run infra:stop-integration:test-integration
 ```
 
-`portfolio-manager:test-integration` depends on `integration-infra-up`, then
-runs `migrate:test-integration` before the integration Vitest suite. It does not
-tear the stack down automatically.
+`portfolio-manager:test-integration` and `execution-engine:test-integration`
+depend on `infra:serve-integration` through `nx.json` target defaults, then run
+their own `migrate:test-integration` targets before the integration Vitest
+suites. They do not tear the stack down automatically.
 
 Why topic provisioning lives in infra
 
@@ -193,10 +202,10 @@ To inspect or wipe Kafka history in the isolated integration stack instead, use
 the test compose file:
 
 ```bash
-docker compose --env-file apps/portfolio-manager/.env.test-integration -f infra/docker-compose.test.yml exec -T redpanda \
+docker compose --env-file infra/.env.test-integration -f infra/docker-compose.test.yml exec -T redpanda \
   rpk topic consume instrument.registered -o -1 -n 1
 
-docker compose --env-file apps/portfolio-manager/.env.test-integration -f infra/docker-compose.test.yml exec -T redpanda \
+docker compose --env-file infra/.env.test-integration -f infra/docker-compose.test.yml exec -T redpanda \
   rpk topic trim-prefix instrument.registered -o end --no-confirm
 ```
 
