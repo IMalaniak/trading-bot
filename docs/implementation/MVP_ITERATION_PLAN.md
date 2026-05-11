@@ -263,6 +263,25 @@ iterations.
 - Authentication, authorization, secrets management, and production security
   posture.
 
+### Future e2e tests candidates:
+
+- `instrument-registration.spec.ts`: drive the dashboard/API Gateway instrument
+  registration flow, assert the selected portfolio reflects the registered
+  instrument, and keep Kafka assertions behind existing read APIs or test
+  harness utilities.
+- `risk-rejection.spec.ts`: publish a signal that breaches portfolio risk
+  limits, assert no execution order, fill, or position mutation is created, and
+  verify the browser-visible portfolio state remains unchanged.
+- `sell-reconciliation.spec.ts`: seed or create an existing long position,
+  publish a SELL signal, and assert quantity, exposure, recent order, fills, and
+  dashboard state all decrease consistently.
+- `portfolio-read-navigation.spec.ts`: keep a lightweight browser/API smoke for
+  portfolio list, select, refresh, loading, and upstream error states without
+  publishing Kafka events.
+- `service-restart-idempotency.spec.ts`: after the reconciliation flow is
+  stable, restart one consumer service through Nx-owned targets, replay a
+  relevant event, and assert the read model does not duplicate mutations.
+
 ## Roadmap Working Rules
 
 1. Keep the remaining MVP focused on proving the implemented backend path.

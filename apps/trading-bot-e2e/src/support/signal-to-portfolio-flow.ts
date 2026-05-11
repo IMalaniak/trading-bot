@@ -10,11 +10,7 @@ import { OrderFill, Signal, SignalSide } from '@trading-bot/common/proto';
 import { waitForCondition } from '@trading-bot/testing';
 import { Kafka, logLevel, type Producer } from 'kafkajs';
 
-import {
-  ApiClient,
-  type ExecutionOrderDto,
-  type PortfolioReadResponseDto,
-} from './api-client';
+import { ApiClient, type PortfolioReadResponseDto } from './api-client';
 import { KAFKA_BROKERS, TIMEOUTS } from './e2e-env';
 
 export const SEEDED_PORTFOLIO_ID = 'portfolio-alpha';
@@ -116,62 +112,4 @@ export const waitForPortfolioReconciliationState = async (
   }
 
   return latest;
-};
-
-export interface PortfolioSnapshot {
-  aggregateExposureNotional: string;
-  openPositionCount: number;
-  positions: Array<{
-    exposureNotional: string;
-    instrumentId: string;
-    lastFillId: string;
-    quantity: string;
-  }>;
-  recentOrders: Array<{
-    fillIds: string[];
-    orderId: string;
-    status: string;
-  }>;
-}
-
-export const summarizePortfolio = (
-  portfolio: PortfolioReadResponseDto,
-): PortfolioSnapshot => ({
-  aggregateExposureNotional: portfolio.summary.aggregateExposureNotional,
-  openPositionCount: portfolio.summary.openPositionCount,
-  positions: portfolio.positions
-    .map((position) => ({
-      exposureNotional: position.exposureNotional,
-      instrumentId: position.instrument.id,
-      lastFillId: position.lastFillId,
-      quantity: position.quantity,
-    }))
-    .sort((left, right) => left.instrumentId.localeCompare(right.instrumentId)),
-  recentOrders: portfolio.recentOrders
-    .map((order) => ({
-      fillIds: order.fills.map((fill) => fill.fillId).sort(),
-      orderId: order.orderId,
-      status: order.status,
-    }))
-    .sort((left, right) => left.orderId.localeCompare(right.orderId)),
-});
-
-export const findSignalOrder = (
-  portfolio: PortfolioReadResponseDto,
-): ExecutionOrderDto => {
-  const order = portfolio.recentOrders.find(
-    (candidate) =>
-      candidate.instrumentId === SEEDED_INSTRUMENT_ID &&
-      candidate.signalId === SIGNAL_ID,
-  );
-
-  if (!order) {
-    throw new Error('Expected a recent execution order for the e2e signal.');
-  }
-
-  return order;
-};
-
-export const sleep = async (durationMs: number): Promise<void> => {
-  await new Promise((resolve) => setTimeout(resolve, durationMs));
 };
