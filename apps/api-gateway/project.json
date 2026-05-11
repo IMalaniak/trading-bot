@@ -58,7 +58,32 @@
         },
         "production": {
           "buildTarget": "api-gateway:build:production"
+        },
+        "e2e": {
+          "buildTarget": "api-gateway:build:production",
+          "runBuildTargetDependencies": false,
+          "watch": false
         }
+      }
+    },
+    "serve-e2e": {
+      "continuous": true,
+      "executor": "@nx/js:node",
+      "cache": false,
+      "defaultConfiguration": "e2e",
+      "dependsOn": [
+        {
+          "projects": "trading-bot-e2e",
+          "target": "e2e-seed"
+        }
+      ],
+      "options": {
+        "buildTarget": "api-gateway:build:production",
+        "runBuildTargetDependencies": false,
+        "watch": false
+      },
+      "configurations": {
+        "e2e": {}
       }
     },
     "test": {

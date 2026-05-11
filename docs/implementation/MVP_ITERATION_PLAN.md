@@ -2,13 +2,13 @@
 
 ## Purpose
 
-This document tracks what remains before the trading bot is a demo-able MVP. It
+This document tracks what remains before the trading bot is a usable MVP. It
 replaces the original implementation iteration plan now that Iterations 1-6 are
 complete.
 
 The backend MVP foundation is already in place. The remaining MVP work should
 make that foundation visible to a user, prove the full local flow with e2e
-automation, and leave one reproducible demo path for future contributors.
+automation, and leave one reproducible validation path for future contributors.
 
 ## Completed Backend Baseline
 
@@ -47,7 +47,7 @@ Implemented baseline:
   - `portfolio-manager` portfolio read gRPC API
   - `execution-engine` recent execution order gRPC API
   - `api-gateway` REST aggregation endpoint:
-    `GET /api/portfolio/:portfolioId?recentOrdersLimit=20`
+    `GET /api/portfolios/:portfolioId?recentOrdersLimit=20`
 - Reliability and operability:
   - shared Kafka consumer retry/DLQ wrapper
   - per-topic DLQs for implemented consumers
@@ -69,7 +69,7 @@ npx nx run-many -t test -p common,api-gateway,portfolio-manager,execution-engine
 
 ## Remaining MVP Iterations
 
-### Iteration 7: React Dashboard Demo Console
+### Iteration 7: React Dashboard Operations Console
 
 Goal: add a minimal user-facing console that makes the implemented backend
 flow observable without expanding the product API surface.
@@ -87,9 +87,9 @@ Scope:
   - order status, side, requested size, reference price, timestamps, nested
     fills, and instrument enrichment when present
 - Register instrument form using:
-  - `POST /api/portfolio/register-instrument`
+  - `POST /api/portfolios/:portfolioId/instrument`
 - Portfolio refresh using:
-  - `GET /api/portfolio/:portfolioId?recentOrdersLimit=20`
+  - `GET /api/portfolios/:portfolioId?recentOrdersLimit=20`
 - Loading, empty, validation, and upstream error states.
 
 Out of scope:
@@ -118,10 +118,10 @@ npx nx run dashboard:typecheck
 npx nx run dashboard:build
 ```
 
-### Iteration 8: Full Demo-Path E2E Tests
+### Iteration 8: Full-System E2E Tests
 
-Goal: prove the MVP as one local system, from synthetic signal input through
-backend reconciliation and browser-visible dashboard state.
+Goal: prove the trading system as one local system, from synthetic signal input
+through backend reconciliation and browser-visible dashboard state.
 
 Scope:
 
@@ -151,7 +151,7 @@ Important boundary:
 
 Acceptance criteria:
 
-- One command can run the full local demo-path e2e suite.
+- One command can run the full local e2e suite.
 - The e2e suite uses shared proto encoders and Kafka topic/key helpers.
 - The e2e suite fails if the backend event chain works but the dashboard cannot
   render the resulting state.
@@ -163,18 +163,18 @@ Suggested validation command:
 npx nx run trading-bot-e2e:e2e
 ```
 
-### Iteration 9: MVP Demo Polish and Documentation
+### Iteration 9: MVP Operational Polish and Documentation
 
 Goal: make the MVP reproducible for a developer or reviewer starting from a
 clean checkout.
 
 Scope:
 
-- Add one canonical local demo walkthrough:
+- Add one canonical local validation walkthrough:
   - install dependencies
   - start infra
   - migrate databases
-  - seed demo data
+  - seed baseline portfolio data
   - start services
   - start dashboard
   - run full e2e or manual signal publish
@@ -202,7 +202,7 @@ Known MVP limitations to document:
 
 Acceptance criteria:
 
-- A clean local setup can reproduce the demo without relying on undocumented
+- A clean local setup can reproduce the flow without relying on undocumented
   commands.
 - Docs distinguish product APIs from test harness signal publishing.
 - Docs link the roadmap, architecture, C4 model, infra notes, and reliability
@@ -263,11 +263,30 @@ iterations.
 - Authentication, authorization, secrets management, and production security
   posture.
 
+### Future e2e tests candidates:
+
+- `instrument-registration.spec.ts`: drive the dashboard/API Gateway instrument
+  registration flow, assert the selected portfolio reflects the registered
+  instrument, and keep Kafka assertions behind existing read APIs or test
+  harness utilities.
+- `risk-rejection.spec.ts`: publish a signal that breaches portfolio risk
+  limits, assert no execution order, fill, or position mutation is created, and
+  verify the browser-visible portfolio state remains unchanged.
+- `sell-reconciliation.spec.ts`: seed or create an existing long position,
+  publish a SELL signal, and assert quantity, exposure, recent order, fills, and
+  dashboard state all decrease consistently.
+- `portfolio-read-navigation.spec.ts`: keep a lightweight browser/API smoke for
+  portfolio list, select, refresh, loading, and upstream error states without
+  publishing Kafka events.
+- `service-restart-idempotency.spec.ts`: after the reconciliation flow is
+  stable, restart one consumer service through Nx-owned targets, replay a
+  relevant event, and assert the read model does not duplicate mutations.
+
 ## Roadmap Working Rules
 
 1. Keep the remaining MVP focused on proving the implemented backend path.
 2. Prefer existing API Gateway product endpoints for UI work.
-3. Keep synthetic signal publishing inside e2e/manual demo tooling until a real
+3. Keep synthetic signal publishing inside e2e/manual test tooling until a real
    Prediction Engine exists.
 4. Continue using shared proto contracts, topic constants, and key helpers.
 5. Every new event-producing feature must preserve deterministic keys,

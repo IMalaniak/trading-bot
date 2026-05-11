@@ -348,6 +348,36 @@ workspace "Trading Bot System" {
 
             }
 
+            group "Test Tooling" {
+                localInfraProject = container "Local Infrastructure Nx Project" "Nx project in infra/ that owns Docker Compose lifecycle targets for local development, integration, and full-system e2e stacks." "Nx/Docker Compose" "Test Tooling" {
+                    tags "Implemented" "Test Tooling"
+                }
+
+                e2eTestHarness = container "E2E Test Harness" "Test-only Nx/Playwright project that starts the isolated trading system through Nx targets, publishes synthetic Kafka events, verifies API state, and verifies browser-visible Dashboard state." "TypeScript/Playwright" "Test Tooling" {
+                    tags "Implemented" "Test Tooling"
+                    orchestrator = component "System Lifecycle Targets" "Nx targets load apps/trading-bot-e2e/.env.e2e plus app-scoped .env.e2e files, depend on infra:serve-e2e for isolated Redpanda/Postgres lifecycle, run migrations and seed data, start app-owned serve-e2e targets as continuous tasks, and wait for readiness." "Nx Project Configuration" {
+                        tags "Implemented"
+                    }
+                    signalPublisher = component "Synthetic Signal Publisher" "Publishes common.Signal protobuf messages directly to trading.signals using shared topic, key, and metadata helpers." "KafkaJS" {
+                        tags "Implemented"
+                    }
+                    fillReplayPublisher = component "Duplicate Fill Replay Publisher" "Reconstructs and republishes a final OrderFill from the REST order/fill read model to verify fill idempotency." "KafkaJS" {
+                        tags "Implemented"
+                    }
+                    restProbe = component "REST State Probe" "Polls API Gateway portfolio reads until the full risk, execution, and reconciliation chain is visible." "TypeScript" {
+                        tags "Implemented"
+                    }
+                    browserAssertions = component "Browser Assertions" "Runs Chromium against the Dashboard and verifies the summary, position, recent order, and nested fill state." "Playwright" {
+                        tags "Implemented"
+                    }
+
+                    orchestrator -> signalPublisher "Initializes"
+                    orchestrator -> fillReplayPublisher "Initializes"
+                    orchestrator -> restProbe "Initializes"
+                    orchestrator -> browserAssertions "Runs"
+                }
+            }
+
             // Databases (each owned/isolated to one service)
             redis = container "Signal Cache" "Owned by Prediction Engine. Stores recent signals for fast access." "Redis" "Datastore" {
                 tags "Planned"
@@ -386,6 +416,14 @@ workspace "Trading Bot System" {
         prometheus -> tradingBot.apiGateway.metricsEndpoint "Will scrape metrics from"
 
         tradingBot.dashboard.apiClient -> tradingBot.apiGateway.REST "Uses portfolio list, portfolio read, and portfolio instrument endpoints"
+        tradingBot.e2eTestHarness.orchestrator -> tradingBot.portfolioManager "Starts through Nx target with isolated e2e env"
+        tradingBot.e2eTestHarness.orchestrator -> tradingBot.executionEngine "Starts through Nx target with isolated e2e env"
+        tradingBot.e2eTestHarness.orchestrator -> tradingBot.apiGateway "Starts through Nx target with isolated e2e env"
+        tradingBot.e2eTestHarness.orchestrator -> tradingBot.dashboard "Starts through Nx/Vite with VITE_API_BASE_URL pointed at the e2e API Gateway"
+        tradingBot.e2eTestHarness.signalPublisher -> tradingBot.messageBus "Publishes synthetic common.Signal to trading.signals"
+        tradingBot.e2eTestHarness.fillReplayPublisher -> tradingBot.messageBus "Publishes duplicate OrderFill to orders.fills"
+        tradingBot.e2eTestHarness.restProbe -> tradingBot.apiGateway.REST "Polls GET /api/portfolios/{portfolioId}"
+        tradingBot.e2eTestHarness.browserAssertions -> tradingBot.dashboard.router "Verifies rendered portfolio state in Chromium"
         tradingBot.apiGateway.gRPC_Client -> tradingBot.dataIngestion.gRPC "Requests market data and subscription updates (Market Data API)"
         tradingBot.apiGateway.gRPC_Client -> tradingBot.predictionEngine.gRPC "Requests current signals / triggers (Signal API)"
         tradingBot.apiGateway.gRPC_Client -> tradingBot.portfolioManager.gRPC "Registers instruments, reads portfolio state, resolves instruments, and later sends risk/strategy updates"
@@ -422,6 +460,10 @@ workspace "Trading Bot System" {
 
         tradingBot.executionEngine.executionStateRepository -> tradingBot.executionPostgres "Writes simulated orders, fills, and outbox rows to"
         tradingBot.executionEngine.executionQueryService -> tradingBot.executionPostgres "Reads recent execution orders and fills from"
+        tradingBot.localInfraProject -> tradingBot.messageBus "Starts and stops local Redpanda via"
+        tradingBot.localInfraProject -> tradingBot.postgres "Starts and stops local Portfolio DB via"
+        tradingBot.localInfraProject -> tradingBot.executionPostgres "Provides execution-owned schema in the isolated Postgres stack for"
+        tradingBot.e2eTestHarness -> tradingBot.localInfraProject "Depends on infra:serve-e2e and infra:clean-e2e for Docker lifecycle"
         tradingBot.executionEngine.gRPC_Client -> tradingBot.externalAPIFacade.gRPC "Will place real orders on"
         tradingBot.dataIngestion.gRPC_Client -> tradingBot.externalAPIFacade.gRPC "Asks to start/stop fetching market data"
         tradingBot.externalAPIFacade.binanceClient -> binance "Places orders on"
@@ -442,6 +484,19 @@ workspace "Trading Bot System" {
         container tradingBot "ContainerView-TradingBot" {
             include *
             autolayout
+        }
+
+        container tradingBot "SignalToPortfolioE2E" {
+            include tradingBot.localInfraProject
+            include tradingBot.e2eTestHarness
+            include tradingBot.dashboard
+            include tradingBot.apiGateway
+            include tradingBot.portfolioManager
+            include tradingBot.executionEngine
+            include tradingBot.messageBus
+            include tradingBot.postgres
+            include tradingBot.executionPostgres
+            autolayout lr
         }
 
         // Component views for each container: explicitly include component IDs to be safe
@@ -576,6 +631,21 @@ workspace "Trading Bot System" {
             autolayout lr
         }
 
+        component tradingBot.e2eTestHarness "E2EHarness-Components" {
+            include tradingBot.e2eTestHarness.orchestrator
+            include tradingBot.e2eTestHarness.signalPublisher
+            include tradingBot.e2eTestHarness.fillReplayPublisher
+            include tradingBot.e2eTestHarness.restProbe
+            include tradingBot.e2eTestHarness.browserAssertions
+            include tradingBot.localInfraProject
+            include tradingBot.messageBus
+            include tradingBot.apiGateway.REST
+            include tradingBot.dashboard.router
+            include tradingBot.portfolioManager
+            include tradingBot.executionEngine
+            autolayout lr
+        }
+
         component tradingBot.externalAPIFacade "ExternalAPIFacade-Components" {
             include tradingBot.executionEngine.gRPC_Client
             include tradingBot.dataIngestion.gRPC_Client
@@ -633,6 +703,11 @@ workspace "Trading Bot System" {
             element "MVP Planned" {
                 background #6c8ebf
                 color #ffffff
+            }
+            element "Test Tooling" {
+                background #6c8ebf
+                color #ffffff
+                border dashed
             }
         }
     }

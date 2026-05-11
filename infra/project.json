@@ -1,0 +1,177 @@
+{
+  "name": "infra",
+  "$schema": "../node_modules/nx/schemas/project-schema.json",
+  "projectType": "application",
+  "tags": ["type:infra"],
+  "targets": {
+    "serve": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "parallelism": false,
+      "defaultConfiguration": "development",
+      "metadata": {
+        "description": "Starts the local development infrastructure stack and bootstraps Kafka topics."
+      },
+      "options": {
+        "cwd": "{workspaceRoot}",
+        "parallel": false,
+        "commands": [
+          {
+            "command": "docker compose --env-file infra/.env -f infra/docker-compose.yml up -d --wait postgres redpanda timescaledb"
+          },
+          {
+            "command": "docker compose --env-file infra/.env -f infra/docker-compose.yml run --rm redpanda-init"
+          }
+        ]
+      },
+      "configurations": {
+        "development": {}
+      }
+    },
+    "stop": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "parallelism": false,
+      "defaultConfiguration": "development",
+      "metadata": {
+        "description": "Stops the local development infrastructure stack without deleting volumes."
+      },
+      "options": {
+        "cwd": "{workspaceRoot}",
+        "command": "docker compose --env-file infra/.env -f infra/docker-compose.yml down --remove-orphans"
+      },
+      "configurations": {
+        "development": {}
+      }
+    },
+    "clean": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "parallelism": false,
+      "defaultConfiguration": "development",
+      "metadata": {
+        "description": "Stops the local development infrastructure stack and deletes volumes."
+      },
+      "options": {
+        "cwd": "{workspaceRoot}",
+        "command": "docker compose --env-file infra/.env -f infra/docker-compose.yml down -v --remove-orphans"
+      },
+      "configurations": {
+        "development": {}
+      }
+    },
+    "serve-integration": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "parallelism": false,
+      "defaultConfiguration": "test-integration",
+      "metadata": {
+        "description": "Starts the isolated integration infrastructure stack and bootstraps Kafka topics."
+      },
+      "options": {
+        "cwd": "{workspaceRoot}",
+        "parallel": false,
+        "commands": [
+          {
+            "command": "docker compose --env-file infra/.env.test-integration -f infra/docker-compose.test.yml up -d --wait postgres redpanda"
+          },
+          {
+            "command": "docker compose --env-file infra/.env.test-integration -f infra/docker-compose.test.yml run --rm redpanda-init"
+          }
+        ]
+      },
+      "configurations": {
+        "test-integration": {}
+      }
+    },
+    "stop-integration": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "parallelism": false,
+      "defaultConfiguration": "test-integration",
+      "metadata": {
+        "description": "Stops the isolated integration infrastructure stack without deleting volumes."
+      },
+      "options": {
+        "cwd": "{workspaceRoot}",
+        "command": "docker compose --env-file infra/.env.test-integration -f infra/docker-compose.test.yml down --remove-orphans"
+      },
+      "configurations": {
+        "test-integration": {}
+      }
+    },
+    "clean-integration": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "parallelism": false,
+      "defaultConfiguration": "test-integration",
+      "metadata": {
+        "description": "Stops the isolated integration infrastructure stack and deletes volumes."
+      },
+      "options": {
+        "cwd": "{workspaceRoot}",
+        "command": "docker compose --env-file infra/.env.test-integration -f infra/docker-compose.test.yml down -v --remove-orphans"
+      },
+      "configurations": {
+        "test-integration": {}
+      }
+    },
+    "clean-e2e": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "parallelism": false,
+      "defaultConfiguration": "e2e",
+      "metadata": {
+        "description": "Stops the isolated e2e infrastructure stack and deletes volumes."
+      },
+      "options": {
+        "cwd": "{workspaceRoot}",
+        "command": "docker compose --env-file infra/.env.e2e -f infra/docker-compose.test.yml down -v --remove-orphans"
+      },
+      "configurations": {
+        "e2e": {}
+      }
+    },
+    "serve-e2e": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "parallelism": false,
+      "defaultConfiguration": "e2e",
+      "dependsOn": ["clean-e2e"],
+      "metadata": {
+        "description": "Starts the isolated e2e infrastructure stack from a clean state and bootstraps Kafka topics."
+      },
+      "options": {
+        "cwd": "{workspaceRoot}",
+        "parallel": false,
+        "commands": [
+          {
+            "command": "docker compose --env-file infra/.env.e2e -f infra/docker-compose.test.yml up -d --wait postgres redpanda"
+          },
+          {
+            "command": "docker compose --env-file infra/.env.e2e -f infra/docker-compose.test.yml run --rm redpanda-init"
+          }
+        ]
+      },
+      "configurations": {
+        "e2e": {}
+      }
+    },
+    "stop-e2e": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "parallelism": false,
+      "defaultConfiguration": "e2e",
+      "metadata": {
+        "description": "Stops the isolated e2e infrastructure stack without deleting volumes."
+      },
+      "options": {
+        "cwd": "{workspaceRoot}",
+        "command": "docker compose --env-file infra/.env.e2e -f infra/docker-compose.test.yml down --remove-orphans"
+      },
+      "configurations": {
+        "e2e": {}
+      }
+    }
+  }
+}

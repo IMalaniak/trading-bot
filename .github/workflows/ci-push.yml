@@ -347,7 +347,7 @@ jobs:
 
       - name: Tear down isolated integration infra
         if: always()
-        run: npx nx run-many --target=integration-infra-down --configuration=test-integration --all || true
+        run: npx nx run infra:stop-integration:test-integration --outputStyle=static || true
 
       - name: Upload artifacts on failure
         if: failure()
@@ -358,6 +358,79 @@ jobs:
             .nx/cache/terminalOutputs
             **/junit*.xml
             **/test-results/**/*.xml
+          if-no-files-found: ignore
+
+  e2e:
+    name: "Full-System E2E (Push)"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    needs: prepare
+    if: needs.prepare.outputs.skip != 'true' && needs.prepare.outputs.run_all != ''
+    env:
+      BASE: ${{ needs.prepare.outputs.base }}
+      HEAD: ${{ needs.prepare.outputs.head }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+
+      - name: Cache Nx
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/nx
+          key: nx-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            nx-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Restore node_modules
+        id: nm-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: |
+            node_modules
+            apps/*/src/prisma/generated
+          key: node-modules-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json', 'apps/**/prisma/schema.prisma') }}
+
+      - name: Install dependencies
+        if: steps.nm-cache.outputs.cache-hit != 'true'
+        run: npm ci
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: "Full Run: E2E"
+        if: needs.prepare.outputs.run_all == 'true'
+        run: npx nx run trading-bot-e2e:e2e --outputStyle=static
+
+      - name: "Affected: E2E"
+        if: needs.prepare.outputs.run_all != 'true'
+        run: npx nx affected --target=e2e --base=$BASE --head=$HEAD --parallel=1 --outputStyle=static
+
+      - name: Tear down full-system e2e infra
+        if: always()
+        run: npx nx run infra:clean-e2e:e2e --outputStyle=static || true
+
+      - name: Upload artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: full-system-e2e-artifacts
+          path: |
+            .nx/cache/terminalOutputs
+            dist/.playwright/apps/trading-bot-e2e
           if-no-files-found: ignore
 
   build:

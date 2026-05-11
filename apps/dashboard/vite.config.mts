@@ -5,16 +5,36 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 
+const readPort = (name: string, fallback: number): number => {
+  const raw = process.env[name];
+  if (!raw) {
+    return fallback;
+  }
+
+  const port = Number.parseInt(raw, 10);
+  if (!Number.isInteger(port)) {
+    throw new Error(`Expected ${name} to be an integer, received '${raw}'.`);
+  }
+
+  return port;
+};
+
+const dashboardHost = process.env['DASHBOARD_HOST'] ?? '127.0.0.1';
+const dashboardPort = readPort('DASHBOARD_PORT', 4200);
+const dashboardStrictPort = Boolean(process.env['DASHBOARD_PORT']);
+
 export default defineConfig(() => ({
   root: import.meta.dirname,
   cacheDir: '../../node_modules/.vite/apps/dashboard',
   server: {
-    port: 4200,
-    host: '127.0.0.1',
+    port: dashboardPort,
+    host: dashboardHost,
+    strictPort: dashboardStrictPort,
   },
   preview: {
-    port: 4200,
-    host: '127.0.0.1',
+    port: dashboardPort,
+    host: dashboardHost,
+    strictPort: dashboardStrictPort,
   },
   plugins: [
     react(),

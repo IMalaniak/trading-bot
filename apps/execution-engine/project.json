@@ -61,45 +61,37 @@
         },
         "production": {
           "buildTarget": "execution-engine:build:production"
+        },
+        "e2e": {
+          "buildTarget": "execution-engine:build:production",
+          "runBuildTargetDependencies": false,
+          "watch": false
         }
       }
     },
-    "integration-infra-up": {
-      "executor": "nx:run-commands",
+    "serve-e2e": {
+      "continuous": true,
+      "executor": "@nx/js:node",
       "cache": false,
-      "defaultConfiguration": "test-integration",
+      "defaultConfiguration": "e2e",
+      "dependsOn": [
+        {
+          "projects": "trading-bot-e2e",
+          "target": "e2e-seed"
+        }
+      ],
       "options": {
-        "cwd": "{workspaceRoot}",
-        "parallel": false,
-        "commands": [
-          {
-            "command": "docker compose -f infra/docker-compose.test.yml up -d --wait postgres redpanda"
-          },
-          {
-            "command": "docker compose -f infra/docker-compose.test.yml run --rm redpanda-init"
-          }
-        ]
+        "buildTarget": "execution-engine:build:production",
+        "runBuildTargetDependencies": false,
+        "watch": false
       },
       "configurations": {
-        "test-integration": {}
-      }
-    },
-    "integration-infra-down": {
-      "executor": "nx:run-commands",
-      "cache": false,
-      "defaultConfiguration": "test-integration",
-      "options": {
-        "cwd": "{workspaceRoot}",
-        "command": "docker compose -f infra/docker-compose.test.yml down --remove-orphans"
-      },
-      "configurations": {
-        "test-integration": {}
+        "e2e": {}
       }
     },
     "test-integration": {
       "executor": "nx:run-commands",
       "cache": false,
-      "dependsOn": ["integration-infra-up"],
       "options": {
         "cwd": "{workspaceRoot}",
         "parallel": false,
@@ -128,6 +120,9 @@
           "command": "npx prisma migrate deploy"
         },
         "test-integration": {
+          "command": "npx prisma migrate reset --force"
+        },
+        "e2e": {
           "command": "npx prisma migrate reset --force"
         }
       }

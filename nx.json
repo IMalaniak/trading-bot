@@ -52,14 +52,24 @@
         "ciTargetName": "test-ci",
         "testMode": "watch"
       }
+    },
+    {
+      "plugin": "@nx/playwright/plugin",
+      "options": {
+        "targetName": "e2e",
+        "ciTargetName": "e2e-ci"
+      }
     }
   ],
   "targetDefaults": {
     "test-integration": {
-      "parallelism": false
-    },
-    "integration-infra-up": {
-      "parallelism": false
+      "parallelism": false,
+      "dependsOn": [
+        {
+          "projects": ["infra"],
+          "target": "serve-integration"
+        }
+      ]
     },
     "typecheck": {
       "dependsOn": ["^typecheck"],
