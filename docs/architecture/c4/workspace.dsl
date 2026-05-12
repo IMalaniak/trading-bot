@@ -5,6 +5,7 @@ workspace "Trading Bot System" {
     model {
         trader = person "Trader" "User who monitors and configures the trading bot."
         operator = person "Operator" "Engineer who monitors metrics, drains DLQs, and runs replay/recovery workflows."
+        developerReviewer = person "Developer or Reviewer" "Contributor who validates the MVP from a clean checkout."
         prometheus = softwareSystem "Prometheus" "Planned metrics scraper for service /metrics endpoints." "External" {
             tags "Planned"
         }
@@ -349,6 +350,23 @@ workspace "Trading Bot System" {
             }
 
             group "Test Tooling" {
+                validationGuide = container "MVP Validation Guide" "Canonical README walkthrough for dependency install, env setup, local infra, migrations, seed data, service startup, Dashboard inspection, e2e validation, and cleanup." "Markdown" "Documentation" {
+                    tags "Implemented" "Documentation"
+                    localWalkthrough = component "Clean Checkout Walkthrough" "Documents the two supported validation paths: automated full-system e2e and interactive local stack inspection." "Markdown" {
+                        tags "Implemented" "Documentation"
+                    }
+                    productApiBoundary = component "Product API Boundary" "Documents that Dashboard/API Gateway use product portfolio endpoints only, while synthetic signal publishing remains test-harness behavior." "Markdown" {
+                        tags "Implemented" "Documentation"
+                    }
+                    mvpLimitations = component "MVP Limitations" "Documents missing MVP capabilities: real Prediction Engine, market ingestion, Feature Engineering, exchange execution, auth, live Dashboard streaming, production deployment, and schema registry." "Markdown" {
+                        tags "Implemented" "Documentation"
+                    }
+                }
+
+                envExamples = container "Environment Files" "Root/app-local env examples plus committed integration and e2e env files that document runtime values loaded by Nx targets and service bootstraps." ".env files" "Documentation" {
+                    tags "Implemented" "Documentation"
+                }
+
                 localInfraProject = container "Local Infrastructure Nx Project" "Nx project in infra/ that owns Docker Compose lifecycle targets for local development, integration, and full-system e2e stacks." "Nx/Docker Compose" "Test Tooling" {
                     tags "Implemented" "Test Tooling"
                 }
@@ -407,6 +425,8 @@ workspace "Trading Bot System" {
 
         // Container-level relationships
         trader -> tradingBot.dashboard.router "Selects portfolios, monitors portfolio state, and later configures strategies"
+        developerReviewer -> tradingBot.validationGuide.localWalkthrough "Uses to reproduce the MVP from a clean checkout"
+        developerReviewer -> tradingBot.dashboard.router "Inspects portfolio state through"
         operator -> tradingBot.messageBus "Inspects DLQ topics and replays repaired events"
         operator -> tradingBot.portfolioManager.metricsEndpoint "Inspects portfolio-manager metrics"
         operator -> tradingBot.executionEngine.metricsEndpoint "Inspects execution-engine metrics"
@@ -414,6 +434,23 @@ workspace "Trading Bot System" {
         prometheus -> tradingBot.portfolioManager.metricsEndpoint "Will scrape metrics from"
         prometheus -> tradingBot.executionEngine.metricsEndpoint "Will scrape metrics from"
         prometheus -> tradingBot.apiGateway.metricsEndpoint "Will scrape metrics from"
+
+        tradingBot.validationGuide.localWalkthrough -> tradingBot.envExamples "References required local examples and committed integration/e2e env files"
+        tradingBot.validationGuide.localWalkthrough -> tradingBot.localInfraProject "Uses Nx infra targets from"
+        tradingBot.validationGuide.localWalkthrough -> tradingBot.e2eTestHarness "Documents automated full-system validation through"
+        tradingBot.validationGuide.localWalkthrough -> tradingBot.dashboard "Documents interactive Dashboard validation through"
+        tradingBot.validationGuide.productApiBoundary -> tradingBot.apiGateway.REST "Documents product endpoints exposed by"
+        tradingBot.validationGuide.productApiBoundary -> tradingBot.e2eTestHarness.signalPublisher "Documents synthetic signal publishing as test tooling only"
+        tradingBot.validationGuide.mvpLimitations -> tradingBot.predictionEngine "Marks real signal production as missing"
+        tradingBot.validationGuide.mvpLimitations -> tradingBot.dataIngestion "Marks market data ingestion as missing"
+        tradingBot.validationGuide.mvpLimitations -> tradingBot.featureEngineering "Marks Feature Engineering as missing"
+        tradingBot.validationGuide.mvpLimitations -> tradingBot.externalAPIFacade "Marks real exchange execution path as missing"
+        tradingBot.validationGuide.mvpLimitations -> tradingBot.schemaRegistry "Marks schema registry as missing"
+        tradingBot.envExamples -> tradingBot.apiGateway "Configures local and e2e API Gateway runtime"
+        tradingBot.envExamples -> tradingBot.portfolioManager "Configures local, integration, and e2e Portfolio Manager runtime"
+        tradingBot.envExamples -> tradingBot.executionEngine "Configures local, integration, and e2e Execution Engine runtime"
+        tradingBot.envExamples -> tradingBot.dashboard "Configures local and e2e Dashboard runtime"
+        tradingBot.envExamples -> tradingBot.localInfraProject "Configures local, integration, and e2e Docker lifecycle"
 
         tradingBot.dashboard.apiClient -> tradingBot.apiGateway.REST "Uses portfolio list, portfolio read, and portfolio instrument endpoints"
         tradingBot.e2eTestHarness.orchestrator -> tradingBot.portfolioManager "Starts through Nx target with isolated e2e env"
@@ -487,6 +524,9 @@ workspace "Trading Bot System" {
         }
 
         container tradingBot "SignalToPortfolioE2E" {
+            include developerReviewer
+            include tradingBot.validationGuide
+            include tradingBot.envExamples
             include tradingBot.localInfraProject
             include tradingBot.e2eTestHarness
             include tradingBot.dashboard
@@ -632,6 +672,11 @@ workspace "Trading Bot System" {
         }
 
         component tradingBot.e2eTestHarness "E2EHarness-Components" {
+            include developerReviewer
+            include tradingBot.validationGuide.localWalkthrough
+            include tradingBot.validationGuide.productApiBoundary
+            include tradingBot.validationGuide.mvpLimitations
+            include tradingBot.envExamples
             include tradingBot.e2eTestHarness.orchestrator
             include tradingBot.e2eTestHarness.signalPublisher
             include tradingBot.e2eTestHarness.fillReplayPublisher
@@ -708,6 +753,10 @@ workspace "Trading Bot System" {
                 background #6c8ebf
                 color #ffffff
                 border dashed
+            }
+            element "Documentation" {
+                background #f8cecc
+                color #111111
             }
         }
     }

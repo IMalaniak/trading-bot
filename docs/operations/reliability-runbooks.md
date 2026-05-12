@@ -3,6 +3,10 @@
 These runbooks cover the local MVP reliability features: consumer retries,
 per-topic DLQs, durable outbox retry, and Prometheus metrics endpoints.
 
+Use the repository [README](../../README.md) for the canonical local startup,
+e2e validation, and cleanup workflow. These runbooks assume that local services
+are running through the documented Nx targets.
+
 ## Metrics Endpoints
 
 The endpoints are served by Nest HTTP apps using `@willsoto/nestjs-prometheus`.
@@ -35,6 +39,8 @@ docker compose -f infra/docker-compose.yml exec -T redpanda \
 
 4. Republish only the records that should be replayed, preserving the original
    key and headers when the replay should keep the same idempotency identity.
+   Synthetic `trading.signals` publishing is test/operator tooling only; it is
+   not an API Gateway or Dashboard product endpoint.
 5. Restart the consumer and watch:
 
 ```bash

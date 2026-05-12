@@ -13,7 +13,7 @@ import {
 interface EnvConfig {
   NODE_ENV: NodeEnvironment;
   PORTFOLIO_MANAGER_GRPC_URL: string;
-  DATABASE_URL: string;
+  PORTFOLIO_MANAGER_DATABASE_URL: string;
   KAFKA_BROKERS: string;
   KAFKA_CONSUMER_RETRY_MAX_ATTEMPTS: number;
   KAFKA_CONSUMER_RETRY_BASE_MS: number;
@@ -33,9 +33,12 @@ class EnvironmentVariables implements EnvConfig {
 
   @IsUrl(
     { protocols: ['postgresql', 'postgres'], require_tld: false },
-    { message: 'DATABASE_URL must be a valid PostgreSQL connection URL' },
+    {
+      message:
+        'PORTFOLIO_MANAGER_DATABASE_URL must be a valid PostgreSQL connection URL',
+    },
   )
-  DATABASE_URL: string;
+  PORTFOLIO_MANAGER_DATABASE_URL: string;
 
   @IsString()
   @IsNotEmpty()

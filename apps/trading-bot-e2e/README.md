@@ -4,6 +4,9 @@
 isolated local system for each run: Redpanda, Postgres, service migrations, seed
 data, backend service processes, the API Gateway, and the dashboard.
 
+The repository `README.md` is the canonical clean-checkout walkthrough. This
+file documents the e2e target details.
+
 Run the suite with:
 
 ```bash
@@ -28,15 +31,15 @@ from `apps/trading-bot-e2e/.env.e2e` for harness behavior, and from each app's
 to app-owned `serve-e2e` targets after migrations and seed have completed.
 Backend services use `@nx/js:node`; the dashboard uses `@nx/vite:dev-server`.
 The suite is intentionally run through the serial `e2e` target in CI because it
-owns one shared local system. It uses the integration stack ports by default:
+owns one shared local system. It uses a dedicated e2e port range so it can run
+alongside service integration targets:
 
-- Kafka: `127.0.0.1:19092`
-- Postgres: `127.0.0.1:15432`
+- Kafka: `127.0.0.1:29092`
+- Postgres: `127.0.0.1:16432`
 - API Gateway: `127.0.0.1:13000`
 - Dashboard: `127.0.0.1:14200`
 
 Synthetic signal publishing and duplicate fill replay are test harness behavior
 only. They are not product APIs and are intentionally kept out of the dashboard.
-The harness producer reads `KAFKA_BROKERS` from
-`apps/trading-bot-e2e/.env.e2e`, otherwise it derives the broker from
-`KAFKA_HOST:KAFKA_PORT`.
+The harness producer and Kafka readiness check read `KAFKA_BROKERS` from
+`apps/trading-bot-e2e/.env.e2e`.

@@ -35,7 +35,7 @@ const requireEnv = (name: string): string => {
 
 const createPrismaClient = (): PrismaClient => {
   const adapter = new PrismaPg({
-    connectionString: requireEnv('DATABASE_URL'),
+    connectionString: requireEnv('PORTFOLIO_MANAGER_DATABASE_URL'),
   });
 
   return new PrismaClient({ adapter });

@@ -3,7 +3,7 @@ import { defineConfig, env } from 'prisma/config';
 const datasource = process.argv.includes('generate')
   ? {}
   : {
-      url: env('DATABASE_URL'),
+      url: env('PORTFOLIO_MANAGER_DATABASE_URL'),
     };
 
 export default defineConfig({

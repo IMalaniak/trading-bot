@@ -65,6 +65,7 @@
       "cache": false,
       "parallelism": false,
       "defaultConfiguration": "test-integration",
+      "dependsOn": ["clean-integration"],
       "metadata": {
         "description": "Starts the isolated integration infrastructure stack and bootstraps Kafka topics."
       },
