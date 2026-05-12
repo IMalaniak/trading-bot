@@ -19,6 +19,24 @@ Synthetic signal publishing is test tooling only. The product surface remains:
 - Node.js and npm compatible with the checked-in `package-lock.json`
 - Docker with Compose v2
 - Playwright browser dependencies for the full e2e path
+- **Rust toolchain** — install via [rustup](https://rustup.rs/):
+  ```bash
+  curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+  source "$HOME/.cargo/env"
+  ```
+  The `rust-toolchain.toml` at repo root pins the exact version; `rustup` auto-installs it on first use.
+- **protoc** (Protocol Buffers compiler) — required to compile Rust gRPC stubs:
+  ```bash
+  brew install protobuf
+  ```
+- **cmake** — required by `rdkafka-sys` to compile librdkafka:
+  ```bash
+  brew install cmake
+  ```
+- **cargo-audit** (optional, for `nx run data-ingestion:audit`):
+  ```bash
+  cargo install cargo-audit
+  ```
 
 Install dependencies:
 
@@ -35,6 +53,7 @@ cp apps/api-gateway/.env.example apps/api-gateway/.env
 cp apps/portfolio-manager/.env.example apps/portfolio-manager/.env
 cp apps/execution-engine/.env.example apps/execution-engine/.env
 cp apps/dashboard/.env.example apps/dashboard/.env
+cp apps/external-api-facade/.env.example apps/external-api-facade/.env
 ```
 
 The committed `.env.e2e` files provide deterministic defaults for the isolated

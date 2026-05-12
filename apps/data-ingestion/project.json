@@ -1,0 +1,77 @@
+{
+  "name": "data-ingestion",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/data-ingestion/src",
+  "projectType": "application",
+  "tags": ["lang:rust", "scope:backend"],
+  "targets": {
+    "build": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": ["rustFiles", "^rustFiles"],
+      "outputs": ["{workspaceRoot}/target/debug/data-ingestion"],
+      "options": {
+        "command": "cargo build -p data-ingestion",
+        "cwd": "{workspaceRoot}"
+      }
+    },
+    "build-release": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": ["rustFiles", "^rustFiles"],
+      "outputs": ["{workspaceRoot}/target/release/data-ingestion"],
+      "options": {
+        "command": "cargo build --release -p data-ingestion",
+        "cwd": "{workspaceRoot}"
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": ["rustFiles", "^rustFiles"],
+      "options": {
+        "command": "cargo test -p data-ingestion",
+        "cwd": "{workspaceRoot}"
+      }
+    },
+    "test-integration": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "cargo test -p data-ingestion --test integration",
+        "cwd": "{workspaceRoot}"
+      }
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": ["rustFiles", "^rustFiles"],
+      "options": {
+        "command": "cargo clippy -p data-ingestion -- -D warnings",
+        "cwd": "{workspaceRoot}"
+      }
+    },
+    "fmt": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": ["rustFiles"],
+      "options": {
+        "command": "cargo fmt -p data-ingestion -- --check",
+        "cwd": "{workspaceRoot}"
+      }
+    },
+    "fmt-write": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "cargo fmt -p data-ingestion",
+        "cwd": "{workspaceRoot}"
+      }
+    },
+    "audit": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "cargo audit",
+        "cwd": "{workspaceRoot}"
+      }
+    }
+  }
+}

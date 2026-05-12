@@ -1,0 +1,61 @@
+[workspace]
+members = ["apps/data-ingestion"]
+resolver = "2"
+
+[workspace.package]
+edition = "2021"
+version = "0.1.0"
+authors = ["IMALANIAK"]
+license = "MIT"
+
+# Shared dependency versions — crates reference these with `workspace = true`
+[workspace.dependencies]
+# Async runtime — Rust doesn't have a built-in async runtime; tokio is the standard one.
+# "full" feature enables everything: threads, timers, networking, file I/O, etc.
+tokio = { version = "1", features = ["full"] }
+
+# gRPC framework (wraps tonic) + protobuf codec
+tonic = { version = "0.12" }
+prost = { version = "0.13" }
+prost-types = { version = "0.13" }
+
+# Kafka client (librdkafka bindings)
+rdkafka = { version = "0.37", features = ["cmake-build", "sasl", "ssl"] }
+
+# SQL toolkit — async, compile-time checked queries
+sqlx = { version = "0.8", features = ["runtime-tokio", "postgres", "chrono", "uuid", "migrate"] }
+
+# Serialization / deserialization (JSON, etc.)
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1" }
+
+# Structured logging (like `pino` in Node)
+tracing = { version = "0.1" }
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+# Error handling ergonomics
+anyhow = { version = "1" }         # Opaque error wrapping (great for application code)
+thiserror = { version = "2" }      # Derive macros for typed errors (great for libraries/services)
+
+# Environment variable loading (.env files)
+dotenvy = { version = "0.15" }
+
+# Timestamp / duration types
+chrono = { version = "0.4", features = ["serde"] }
+
+# UUID generation
+uuid = { version = "1", features = ["v4", "serde"] }
+
+# HTTP client (for health checks / REST calls)
+reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
+
+# Metrics (Prometheus)
+prometheus = { version = "0.13" }
+
+# Async trait support (Rust's `async fn` in traits requires this until stabilised in 1.75+)
+async-trait = { version = "0.1" }
+
+# Dev dependencies shared across workspace — still declared under [workspace.dependencies];
+# individual crates reference them under [dev-dependencies] with `workspace = true`.
+mockall = { version = "0.13" }    # Mock framework (like jest.fn() but at compile time)
+tokio-test = { version = "0.4" }  # Test utilities for async Tokio code

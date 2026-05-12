@@ -41,6 +41,10 @@ Thumbs.db
 
 .nx/cache
 .nx/workspace-data
+
+# Rust build artifacts — equivalent of dist/ + node_modules/.cache for Cargo
+# Cargo.toml and Cargo.lock are committed; only the compiled output is ignored.
+target/
 .cursor/rules/nx-rules.mdc
 .github/instructions/nx.instructions.md
 
