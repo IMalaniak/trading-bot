@@ -1,0 +1,51 @@
+[package]
+# Cargo package names use hyphens; Rust module names use underscores.
+# So `use trading_common::proto::...` in code, `trading-common` in Cargo.toml deps.
+name = "trading-common"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+# Pure library — no binary. Analogous to a libs/ package in the NX monorepo
+# that exports shared utilities but doesn't run on its own.
+[lib]
+name = "trading_common"
+path = "src/lib.rs"
+
+[dependencies]
+# Async runtime — needed for tokio::time::sleep in the retry loop
+tokio.workspace = true
+# gRPC runtime — needed to use the generated types (Request, Response, Status)
+tonic.workspace = true
+prost.workspace = true
+prost-types.workspace = true
+
+# Kafka producer — used by the DLQ publisher
+rdkafka.workspace = true
+
+# Serialization — for DLQ payload JSON
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+
+# Structured logging
+tracing.workspace = true
+
+# Error handling
+anyhow.workspace = true
+thiserror.workspace = true
+
+# Timestamps for DLQ payloads
+chrono.workspace = true
+
+# Async trait support
+async-trait.workspace = true
+
+[build-dependencies]
+# tonic-build reads .proto files at compile time and generates:
+#   - prost structs (message types like MarketDataBar)
+#   - tonic service traits (like DataIngestion server/client stubs)
+# Centralising this here means every future Rust crate just depends on
+# `trading-common` and gets all proto types — no per-crate build.rs needed.
+tonic-build = { version = "0.12" }
+prost-build = { version = "0.13" }

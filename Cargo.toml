@@ -1,5 +1,8 @@
 [workspace]
-members = ["apps/data-ingestion"]
+members = [
+  "libs/common-rs",   # shared proto types + Kafka utilities (lang:rust, scope:shared)
+  "apps/data-ingestion",
+]
 resolver = "2"
 
 [workspace.package]

@@ -306,9 +306,6 @@ dependencies = [
  "dotenvy",
  "mockall",
  "prometheus",
- "prost",
- "prost-build",
- "prost-types",
  "rdkafka",
  "serde",
  "serde_json",
@@ -317,9 +314,9 @@ dependencies = [
  "tokio",
  "tokio-test",
  "tonic",
- "tonic-build",
  "tracing",
  "tracing-subscriber",
+ "trading-common",
  "uuid",
 ]
 
@@ -2483,6 +2480,26 @@ dependencies = [
  "tracing-core",
  "tracing-log",
  "tracing-serde",
+]
+
+[[package]]
+name = "trading-common"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "chrono",
+ "prost",
+ "prost-build",
+ "prost-types",
+ "rdkafka",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tokio",
+ "tonic",
+ "tonic-build",
+ "tracing",
 ]
 
 [[package]]
