@@ -12,3 +12,5 @@ trading.signals.dlq
 trading.signals.portfolio.dlq
 trades.approved.dlq
 orders.fills.dlq
+instrument.registered.dlq
+market.raw.data.dlq

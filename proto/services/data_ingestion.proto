@@ -1,0 +1,46 @@
+syntax = "proto3";
+
+package tradingbot.data_ingestion;
+
+// DataIngestion exposes historical market data read queries.
+// Used by API Gateway to serve the GET /api/market-data/bars endpoint.
+service DataIngestion {
+  // GetMarketDataBars returns stored OHLCV bars for a given instrument,
+  // interval, and time range. Results are ordered by open_time_ms ascending.
+  rpc GetMarketDataBars(GetMarketDataBarsRequest)
+      returns (GetMarketDataBarsResponse);
+}
+
+message GetMarketDataBarsRequest {
+  // Internal instrument identifier.
+  string instrument_id = 1;
+  // Kline interval, e.g. "1m", "5m", "1h".
+  string interval = 2;
+  // Start of the time range (Unix epoch milliseconds, inclusive).
+  int64 from_ms = 3;
+  // End of the time range (Unix epoch milliseconds, inclusive).
+  int64 to_ms = 4;
+  // Maximum number of bars to return. 0 means server default (500).
+  int32 limit = 5;
+}
+
+message GetMarketDataBarsResponse {
+  repeated MarketDataBarRecord bars = 1;
+}
+
+// MarketDataBarRecord is the read-model projection stored in TimescaleDB.
+message MarketDataBarRecord {
+  string instrument_id = 1;
+  string symbol = 2;
+  string venue = 3;
+  string interval = 4;
+  int64 open_time_ms = 5;
+  int64 close_time_ms = 6;
+  string open = 7;
+  string high = 8;
+  string low = 9;
+  string close = 10;
+  string volume = 11;
+  string quote_volume = 12;
+  int64 trade_count = 13;
+}

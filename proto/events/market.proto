@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+package tradingbot.events;
+
+// MarketDataBar represents a single OHLCV candlestick bar received from
+// an exchange. Published to the `market.raw.data` Kafka topic by the
+// External API Facade and consumed by Data Ingestion.
+message MarketDataBar {
+  // Internal instrument identifier (UUID, matches Instrument.id).
+  string instrument_id = 1;
+  // Exchange-native symbol, e.g. "BTCUSDT".
+  string symbol = 2;
+  // Exchange venue, e.g. "BINANCE".
+  string venue = 3;
+  // Kline interval, e.g. "1m", "5m", "1h".
+  string interval = 4;
+  // Open time of the bar as Unix epoch milliseconds.
+  int64 open_time_ms = 5;
+  // Close time of the bar as Unix epoch milliseconds.
+  int64 close_time_ms = 6;
+  // OHLCV values as decimal strings to avoid floating-point precision loss.
+  string open = 7;
+  string high = 8;
+  string low = 9;
+  string close = 10;
+  string volume = 11;
+  // Quote asset volume (e.g. USDT volume).
+  string quote_volume = 12;
+  // Number of trades in the bar.
+  int64 trade_count = 13;
+  // True when this is the final (closed) bar for the interval.
+  // False for in-progress bars streamed before close.
+  bool is_final = 14;
+}
