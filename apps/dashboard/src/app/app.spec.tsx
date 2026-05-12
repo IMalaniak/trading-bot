@@ -2,7 +2,7 @@ import '@testing-library/jest-dom/vitest';
 
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type {
@@ -81,10 +81,7 @@ const installMatchMedia = (matches = false) => {
 
 const renderApp = (initialEntries = ['/']) =>
   render(
-    <MemoryRouter
-      future={{ v7_relativeSplatPath: true, v7_startTransition: true }}
-      initialEntries={initialEntries}
-    >
+    <MemoryRouter initialEntries={initialEntries}>
       <App />
     </MemoryRouter>,
   );
