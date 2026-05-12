@@ -28,23 +28,40 @@ Environment files
 - `infra/.env`
   - Docker Compose credentials for Postgres and TimescaleDB
 - `infra/.env.test-integration`
-  - Nx-loaded isolated integration Docker Compose ports
+  - committed Nx-loaded isolated integration Docker Compose ports
 - `infra/.env.e2e`
-  - Nx-loaded isolated e2e Docker Compose project and ports
+  - committed Nx-loaded isolated e2e Docker Compose project and ports
 - `infra/.env.example`
   - Example values for the infra credentials
 - root `.env`
-  - `PORTFOLIO_MANAGER_GRPC_URL`
   - `KAFKA_BROKERS`
-  - optional `PORT` for `api-gateway`
+  - `PORTFOLIO_MANAGER_GRPC_URL`
+  - `EXECUTION_ENGINE_GRPC_URL`
+  - optional Kafka retry overrides
+- `apps/api-gateway/.env`
+  - API Gateway-owned runtime config loaded after root `.env`
+  - `PORT`
+  - optional dashboard CORS origins
 - `apps/portfolio-manager/.env`
-  - `DATABASE_URL`
+  - `PORTFOLIO_MANAGER_DATABASE_URL`
+- `apps/execution-engine/.env`
+  - `EXECUTION_ENGINE_DATABASE_URL`
+- `apps/dashboard/.env`
+  - optional `VITE_API_BASE_URL`
 - `apps/portfolio-manager/.env.test-integration`
-  - Nx-loaded app env for portfolio-manager integration migrations and tests
+  - committed Nx-loaded app env for portfolio-manager integration migrations
+    and tests
 - `apps/execution-engine/.env.test-integration`
-  - Nx-loaded app env for execution-engine integration migrations and tests
+  - committed Nx-loaded app env for execution-engine integration migrations and
+    tests
+- app-scoped `.env.e2e` files
+  - committed Nx-loaded full-system e2e runtime values for each service, the
+    dashboard, and the e2e harness
 
 Recommended local workflow
+
+The canonical clean-checkout walkthrough lives in the repository
+`README.md`. The infra-specific sequence is:
 
 1. Start infra:
 
@@ -56,6 +73,8 @@ npx nx run infra:serve
 
 ```bash
 npx nx run portfolio-manager:migrate
+npx nx run execution-engine:migrate
+npx nx run portfolio-manager:seed
 ```
 
 3. Topics are bootstrapped automatically by the one-shot `redpanda-init` service. If you need to rerun that provisioning manually:
@@ -68,13 +87,17 @@ npx nx run infra:serve
 
 ```bash
 npx nx serve portfolio-manager
+npx nx serve execution-engine
 npx nx serve api-gateway
+npx nx serve dashboard
 ```
 
-5. Validate the automated acceptance path:
+5. Validate the automated acceptance paths:
 
 ```bash
 npx nx run portfolio-manager:test-integration
+npx nx run execution-engine:test-integration
+npx nx run trading-bot-e2e:e2e
 ```
 
 The integration target depends on the shared `infra:serve-integration` Nx task.
@@ -82,7 +105,9 @@ Nx runs that task once per command invocation even when multiple projects run
 `test-integration`. The task uses the isolated `infra/docker-compose.test.yml`
 stack, not the shared local development stack. It starts Redpanda on `19092`
 and Postgres on `15432`, bootstraps topics via `redpanda-init`, runs the owning
-service's migrations, and then executes the integration Vitest suite.
+service's migrations, and then executes the integration Vitest suite. The
+full-system e2e stack uses separate host ports from `infra/.env.e2e`, so these
+targets can run alongside `trading-bot-e2e:e2e`.
 
 Isolated integration stack
 
@@ -146,8 +171,8 @@ docker compose -f infra/docker-compose.yml down -v
 
 Manual registration smoke
 
-1. Start infra and both apps.
-2. Call `POST /portfolio/register-instrument` on `api-gateway`.
+1. Start infra, `portfolio-manager`, and `api-gateway`.
+2. Call `POST /api/portfolios/:portfolioId/instrument` on `api-gateway`.
 3. Consume from `instrument.registered` with `rpk` or another Kafka client.
 4. Verify:
    - topic is `instrument.registered`

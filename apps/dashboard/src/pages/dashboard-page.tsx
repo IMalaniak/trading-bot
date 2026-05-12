@@ -1,6 +1,6 @@
 import { AlertTriangle, ArrowLeft, RefreshCw } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router';
+import { Link, useParams } from 'react-router-dom';
 
 import { InstrumentRegistration } from '../components/instrument-registration';
 import { PortfolioInstrumentsView } from '../components/portfolio-instruments-view';

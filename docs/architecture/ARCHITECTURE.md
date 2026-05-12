@@ -83,6 +83,33 @@ checkout:
 
 - Polish local setup documentation and env examples so the MVP is reproducible
   from a clean checkout.
+- Keep `README.md` as the canonical local validation walkthrough, with the
+  architecture, C4 model, infra notes, roadmap, and reliability runbooks linked
+  from that entrypoint.
+- Keep the boundary between product APIs and test-harness Kafka publishing
+  explicit. Synthetic `trading.signals` publishing exists for e2e/manual test
+  tooling only.
+
+Operational documentation gaps to keep visible:
+
+- Clean-checkout command order must stay documented in `README.md`.
+- Local env examples and committed integration/e2e env files must stay aligned
+  with runtime validation code and Nx target wiring.
+- Smoke-test docs must use the implemented plural API Gateway paths under
+  `/api/portfolios`.
+- The MVP limitations below must stay clear so planned target architecture is
+  not mistaken for implemented behavior.
+
+Current MVP limitations:
+
+- No real Prediction Engine.
+- No market data ingestion.
+- No Feature Engineering service.
+- No real exchange or paper exchange execution.
+- No auth, users, or permissions.
+- No websocket/live Dashboard stream.
+- No production deployment story.
+- No schema registry.
 
 Implemented full-system e2e boundary:
 
@@ -141,12 +168,11 @@ That target architecture is still valid. Today the repo implements registration,
 the current two-stage risk pipeline, a durable execution simulator, and fill
 reconciliation. Prediction and real exchange execution remain planned.
 
-For the remaining MVP, the Dashboard should expose the implemented backend
-surface rather than introduce new trading control APIs. It should list
-portfolios, read selected portfolio visibility, and configure portfolio
-instruments through API Gateway. Full-flow e2e tests may publish synthetic
-signals directly to Kafka, but that publisher is test tooling and is not part of
-the production container model.
+For the MVP, the Dashboard exposes the implemented backend surface rather than
+introduce new trading control APIs. It lists portfolios, reads selected
+portfolio visibility, and configures portfolio instruments through API Gateway.
+Full-flow e2e tests may publish synthetic signals directly to Kafka, but that
+publisher is test tooling and is not part of the production container model.
 
 ## Eventing, Ordering, and Consistency
 
@@ -355,62 +381,88 @@ No compacted topics are configured at this stage.
 
 ## Local Development Workflow
 
+The canonical clean-checkout walkthrough lives in
+[README.md](../../README.md). This section records the architecture-level
+configuration boundaries and the Nx targets used by that walkthrough.
+
 Expected env files:
 
 - root `.env`
+  - example: `.env.example`
+  - shared runtime config loaded before app-local env files
+  - `KAFKA_BROKERS`
   - `PORTFOLIO_MANAGER_GRPC_URL`
   - `EXECUTION_ENGINE_GRPC_URL`
-  - `KAFKA_BROKERS`
   - optional `KAFKA_CONSUMER_RETRY_MAX_ATTEMPTS`, `KAFKA_CONSUMER_RETRY_BASE_MS`, `KAFKA_CONSUMER_RETRY_MAX_MS`
-  - optional `PORT` for `api-gateway`
+- `apps/api-gateway/.env`
+  - example: `apps/api-gateway/.env.example`
+  - API Gateway-owned runtime config loaded after root `.env`
+  - `PORT`
   - optional `API_GATEWAY_CORS_ORIGINS` for dashboard browser access; defaults to `http://localhost:4200,http://127.0.0.1:4200`
 - `apps/dashboard/.env`
+  - example: `apps/dashboard/.env.example`
   - optional `VITE_API_BASE_URL`; defaults in code to `http://localhost:3000/api`
 - `apps/portfolio-manager/.env`
-  - `DATABASE_URL`
+  - example: `apps/portfolio-manager/.env.example`
+  - `PORTFOLIO_MANAGER_DATABASE_URL`
   - optional `PORTFOLIO_MANAGER_METRICS_PORT`
 - `apps/portfolio-manager/.env.test-integration`
-  - isolated integration-test `DATABASE_URL`
+  - committed isolated integration-test env file
+  - isolated integration-test `PORTFOLIO_MANAGER_DATABASE_URL`
   - isolated integration-test `KAFKA_BROKERS`
+  - isolated integration-test `PORTFOLIO_MANAGER_GRPC_URL` and
+    `PORTFOLIO_MANAGER_METRICS_PORT`
 - `apps/execution-engine/.env`
+  - example: `apps/execution-engine/.env.example`
   - `EXECUTION_ENGINE_DATABASE_URL`
-  - `EXECUTION_ENGINE_GRPC_URL`
   - optional `EXECUTION_ENGINE_METRICS_PORT`
 - `apps/execution-engine/.env.test-integration`
+  - committed isolated integration-test env file
   - isolated integration-test `EXECUTION_ENGINE_DATABASE_URL`
   - isolated integration-test `KAFKA_BROKERS`
+  - isolated integration-test `EXECUTION_ENGINE_GRPC_URL` and
+    `EXECUTION_ENGINE_METRICS_PORT`
 - `infra/.env.test-integration`
-  - isolated integration-test Docker Compose host ports loaded by
+  - committed isolated integration-test env file
+  - isolated integration-test Docker Compose host ports, including Kafka
+    `19092` and Postgres `15432`, loaded by
     `infra:serve-integration:test-integration`
 - `infra/.env.e2e`
-  - isolated e2e Docker Compose project name and host ports loaded by
+  - committed isolated e2e env file
+  - isolated e2e Docker Compose project name and host ports, including Kafka
+    `29092` and Postgres `16432`, loaded by
     `infra:serve-e2e:e2e`, `infra:stop-e2e:e2e`, and `infra:clean-e2e:e2e`
 - `apps/trading-bot-e2e/.env.e2e`
+  - committed isolated e2e env file
   - isolated full-system e2e harness ports and Kafka broker defaults loaded by
     Nx for test harness behavior
-  - the test harness Kafka producer reads `KAFKA_BROKERS`, or derives the
-    broker from `KAFKA_HOST:KAFKA_PORT`
+  - the test harness Kafka producer and readiness check read `KAFKA_BROKERS`
 - `apps/portfolio-manager/.env.e2e`
-  - e2e service process `DATABASE_URL`, `KAFKA_BROKERS`, gRPC URL, and metrics
+  - committed isolated e2e env file
+  - e2e service process `PORTFOLIO_MANAGER_DATABASE_URL`, `KAFKA_BROKERS`, gRPC URL, and metrics
     port loaded by Nx for `portfolio-manager:serve:e2e`, plus seed/migration
     access for `portfolio-manager` e2e targets
 - `apps/execution-engine/.env.e2e`
+  - committed isolated e2e env file
   - e2e service process database URL, `KAFKA_BROKERS`, gRPC URL, and metrics
     port loaded by Nx for `execution-engine:serve:e2e` and migration access for
     `execution-engine:migrate:e2e`
 - `apps/api-gateway/.env.e2e`
+  - committed isolated e2e env file
   - e2e API Gateway port, CORS origins, and backend gRPC URLs loaded by Nx for
     `api-gateway:serve:e2e`
 - `apps/dashboard/.env.e2e`
+  - committed isolated e2e env file
   - e2e Vite host, dashboard port, and `VITE_API_BASE_URL` loaded by Nx for
     `dashboard:serve:e2e`
 - `infra/.env`
+  - example: `infra/.env.example`
   - Postgres and Timescale credentials for Docker Compose
 
 Suggested local run order:
 
 ```bash
-docker compose -f infra/docker-compose.yml up -d
+npx nx run infra:serve
 npx nx run portfolio-manager:migrate
 npx nx run execution-engine:migrate
 npx nx run portfolio-manager:seed
@@ -423,7 +475,7 @@ npx nx serve dashboard
 If local Kafka topics need to be re-created after startup, rerun:
 
 ```bash
-docker compose -f infra/docker-compose.yml run --rm redpanda-init
+npx nx run infra:serve
 ```
 
 Useful validation commands:
@@ -484,8 +536,8 @@ npx nx run infra:clean-e2e:e2e
 
 Default full e2e ports:
 
-- Kafka: `127.0.0.1:19092`
-- Postgres: `127.0.0.1:15432`
+- Kafka: `127.0.0.1:29092`
+- Postgres: `127.0.0.1:16432`
 - Portfolio Manager gRPC: `127.0.0.1:15051`
 - Execution Engine gRPC: `127.0.0.1:15052`
 - Portfolio Manager metrics: `19101`
@@ -494,12 +546,13 @@ Default full e2e ports:
 - Dashboard: `14200`
 
 The e2e suite depends on Docker and a local Chromium browser install managed by
-Playwright. It should not run in parallel with the existing service integration
-targets because they use the same host Kafka and Postgres ports.
+Playwright. Its Kafka, Postgres, service, API, and Dashboard host ports are
+separate from the service integration target ports so both validation paths can
+run at the same time.
 
 Manual portfolio instrument smoke:
 
-1. Start infra and both apps.
+1. Start infra, `portfolio-manager`, and `api-gateway`.
 2. Call `POST /api/portfolios/:portfolioId/instrument` on `api-gateway`.
 3. Consume from `instrument.registered`.
 4. Verify key, headers, decoded `InstrumentRegistered` payload for newly
@@ -509,7 +562,9 @@ Manual risk-pipeline smoke:
 
 1. Start infra and `portfolio-manager`.
 2. Insert at least one portfolio, one instrument, and one `PortfolioInstrumentConfig` row in Postgres or seed portfolios and sample configs with `npx nx run portfolio-manager:seed`.
-3. Publish a `common.Signal` to `trading.signals` with Kafka header `event-id`.
+3. Publish a `common.Signal` to `trading.signals` with Kafka header `event-id`
+   from test/operator tooling only. Do not expose this as an API Gateway or
+   Dashboard product endpoint.
 4. Consume from `trading.signals.portfolio`, `trades.approved`, and `trades.rejected`.
 5. Verify `SignalReceipt`, `PortfolioSignalCandidateRecord`, `RiskDecision`, and `ExposureReservation` rows in Postgres.
 

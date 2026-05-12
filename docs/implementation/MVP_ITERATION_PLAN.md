@@ -3,16 +3,17 @@
 ## Purpose
 
 This document tracks what remains before the trading bot is a usable MVP. It
-replaces the original implementation iteration plan now that Iterations 1-6 are
+replaces the original implementation iteration plan now that Iterations 1-8 are
 complete.
 
-The backend MVP foundation is already in place. The remaining MVP work should
-make that foundation visible to a user, prove the full local flow with e2e
-automation, and leave one reproducible validation path for future contributors.
+The backend MVP foundation, Dashboard visibility, and full-system e2e coverage
+are already in place. The remaining MVP work should make that foundation
+reproducible from a clean checkout and document the operational boundaries for
+future contributors.
 
 ## Completed Backend Baseline
 
-Iterations 1-6 are treated as complete and should not be repeated as active
+Iterations 1-8 are treated as complete and should not be repeated as active
 roadmap work.
 
 Implemented baseline:
@@ -54,114 +55,45 @@ Implemented baseline:
   - Prometheus metrics endpoints
   - reliability runbooks for replay, stuck outbox inspection, DLQ drain, and
     local failure drills
+- Dashboard operations console:
+  - Nx React/Vite Dashboard app
+  - portfolio list and selected portfolio visibility
+  - configured instruments, open positions, recent execution orders, and nested
+    fills
+  - portfolio-scoped instrument form using
+    `POST /api/portfolios/:portfolioId/instrument`
+  - loading, empty, validation, and upstream error states
+  - no signal injection, strategy editor, trading controls, market charts,
+    websocket stream, or auth
+- Full-system e2e:
+  - dedicated `trading-bot-e2e` Nx/Playwright project
+  - isolated e2e Redpanda/Postgres lifecycle through the `infra` Nx project
+  - database migration and seed workflow for `portfolio-alpha`
+  - startup of `portfolio-manager`, `execution-engine`, `api-gateway`, and
+    `dashboard` through Nx targets
+  - synthetic `common.Signal` publishing to `trading.signals` from test harness
+    code only
+  - REST and browser-visible Dashboard assertions, plus duplicate source signal
+    and duplicate fill replay checks
 
-Current backend validation remains:
+Current validation remains:
 
 ```bash
 npx nx run common:test
 npx nx run api-gateway:test
 npx nx run portfolio-manager:test
 npx nx run execution-engine:test
+npx nx run dashboard:test
+npx nx run dashboard:typecheck
+npx nx run dashboard:build
+npx nx run trading-bot-e2e:test
+npx nx run trading-bot-e2e:typecheck
 npx nx run portfolio-manager:test-integration
 npx nx run execution-engine:test-integration
-npx nx run-many -t test -p common,api-gateway,portfolio-manager,execution-engine
+npx nx run trading-bot-e2e:e2e
 ```
 
 ## Remaining MVP Iterations
-
-### Iteration 7: React Dashboard Operations Console
-
-Goal: add a minimal user-facing console that makes the implemented backend
-flow observable without expanding the product API surface.
-
-Scope:
-
-- New planned Nx React dashboard app.
-- Default portfolio ID: `portfolio-alpha`, with an editable portfolio ID input.
-- Portfolio summary view:
-  - portfolio name, active state, exposure cap, aggregate exposure, open
-    position count, and last update time
-- Open positions view:
-  - instrument summary, quantity, average entry price, exposure, and last fill
-- Recent orders/fills view:
-  - order status, side, requested size, reference price, timestamps, nested
-    fills, and instrument enrichment when present
-- Register instrument form using:
-  - `POST /api/portfolios/:portfolioId/instrument`
-- Portfolio refresh using:
-  - `GET /api/portfolios/:portfolioId?recentOrdersLimit=20`
-- Loading, empty, validation, and upstream error states.
-
-Out of scope:
-
-- Signal injection UI.
-- Trading start/stop controls.
-- Strategy editor or risk-rule configuration UI.
-- Market charts, signal monitor, websocket streaming, and auth.
-- List-portfolios API.
-
-Acceptance criteria:
-
-- A user can open the dashboard, inspect `portfolio-alpha`, refresh it, and see
-  positions plus recent simulated execution orders after the backend flow runs.
-- A user can register an instrument from the UI and receive a clear success or
-  error state.
-- The UI uses existing API Gateway product endpoints only.
-- No product API endpoint is added solely to publish test signals.
-
-Suggested validation commands:
-
-```bash
-npx nx run dashboard:test
-npx nx run dashboard:lint
-npx nx run dashboard:typecheck
-npx nx run dashboard:build
-```
-
-### Iteration 8: Full-System E2E Tests
-
-Goal: prove the trading system as one local system, from synthetic signal input
-through backend reconciliation and browser-visible dashboard state.
-
-Scope:
-
-- Add a dedicated e2e test target or project that runs through Nx.
-- Start isolated infra equivalent to the existing integration stack.
-- Run required database migrations and seed data.
-- Start `portfolio-manager`, `execution-engine`, `api-gateway`, and the
-  dashboard.
-- Publish synthetic `common.Signal` protobuf messages directly to
-  `trading.signals` through the e2e test harness.
-- Wait for:
-  - risk decision output
-  - execution simulator lifecycle
-  - fill reconciliation
-  - updated portfolio read response
-- Verify the REST API response for `portfolio-alpha`.
-- Verify the dashboard renders the updated summary, position, recent order, and
-  fill state in a real browser.
-- Include one replay/idempotency check where practical:
-  - duplicate source signal does not create duplicate approved trades, or
-  - duplicate fill does not mutate portfolio state twice
-
-Important boundary:
-
-- Direct signal publishing is e2e test harness behavior. It is not a product
-  API and should not be exposed in the dashboard.
-
-Acceptance criteria:
-
-- One command can run the full local e2e suite.
-- The e2e suite uses shared proto encoders and Kafka topic/key helpers.
-- The e2e suite fails if the backend event chain works but the dashboard cannot
-  render the resulting state.
-- The e2e suite is documented with startup assumptions and teardown behavior.
-
-Suggested validation command:
-
-```bash
-npx nx run trading-bot-e2e:e2e
-```
 
 ### Iteration 9: MVP Operational Polish and Documentation
 
@@ -170,23 +102,24 @@ clean checkout.
 
 Scope:
 
-- Add one canonical local validation walkthrough:
+- Add `README.md` as the canonical local validation walkthrough:
   - install dependencies
   - start infra
   - migrate databases
   - seed baseline portfolio data
   - start services
   - start dashboard
-  - run full e2e or manual signal publish
-  - inspect portfolio state in the UI
+  - run full e2e as an automated validation path
+  - inspect portfolio state in the UI as an interactive validation path
 - Normalize env examples for:
-  - root API Gateway config
+  - root shared Kafka, retry, and internal gRPC endpoint config
+  - `api-gateway`
   - `portfolio-manager`
   - `execution-engine`
   - dashboard
   - integration/e2e stack
-- Update runbooks where the e2e harness changes local replay or smoke-test
-  workflows.
+- Update runbooks and docs links where the e2e harness changes local replay or
+  smoke-test workflows.
 - Add a clear MVP limitations section.
 
 Known MVP limitations to document:

@@ -6,12 +6,13 @@ import { validate } from './env.validation';
 import { PortfolioModule } from './portfolio/portfolio.module';
 
 const rootEnvPath = join(process.cwd(), '.env');
+const appEnvPath = join(process.cwd(), 'apps/api-gateway/.env');
 
 @Module({
   imports: [
     CommonModule.forRoot({
       config: {
-        envFilePath: [rootEnvPath],
+        envFilePath: [rootEnvPath, appEnvPath],
         validate,
       },
     }),
