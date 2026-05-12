@@ -104,7 +104,7 @@ describe('portfolio API client', () => {
 
     await expect(
       createDashboardApi('https://api.example/api').getPortfolio('missing'),
-    ).rejects.toMatchObject<Partial<DashboardApiError>>({
+    ).rejects.toMatchObject({
       message: 'Not found',
       status: 404,
     });
@@ -118,7 +118,7 @@ describe('portfolio API client', () => {
 
     await expect(
       createDashboardApi('https://api.example/api').getPortfolio('alpha'),
-    ).rejects.toMatchObject<Partial<DashboardApiError>>({
+    ).rejects.toMatchObject({
       message: 'Network error: connection refused',
     });
   });

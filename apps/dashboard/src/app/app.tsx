@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes } from 'react-router';
 
 import { DashboardPage } from '../pages/dashboard-page';
 import { PortfolioListPage } from '../pages/portfolio-list-page';
