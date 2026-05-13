@@ -63,6 +63,11 @@ export const verifySystemReady = async (): Promise<void> => {
   await waitForKafka();
   await waitForHttp(URLS.portfolioMetrics, 'portfolio-manager metrics');
   await waitForHttp(URLS.executionMetrics, 'execution-engine metrics');
+  await waitForHttp(URLS.dataIngestionMetrics, 'data-ingestion metrics');
+  await waitForHttp(
+    URLS.externalApiFacadeMetrics,
+    'external-api-facade metrics',
+  );
   await waitForHttp(`${URLS.apiBase}/portfolios`, 'api-gateway portfolios');
   await waitForHttp(URLS.dashboard, 'dashboard');
 };

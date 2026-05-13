@@ -29,6 +29,7 @@ import { MarketDataService } from './market-data.service';
             loader: {
               includeDirs: [join(process.cwd(), PROTO_FOLDER)],
               defaults: true,
+              longs: Number,
             },
           },
         }),

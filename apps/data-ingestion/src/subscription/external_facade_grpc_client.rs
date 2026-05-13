@@ -20,13 +20,19 @@ pub struct ExternalFacadeGrpcClient {
 }
 
 impl ExternalFacadeGrpcClient {
-    /// Create a new client connected to `endpoint`
+    /// Create a new client wired to `endpoint`
     /// (e.g. `"http://external-api-facade:50053"`).
-    pub async fn connect(endpoint: String) -> std::result::Result<Self, AppError> {
-        let client = ExternalApiFacadeClient::connect(endpoint)
-            .await
-            .map_err(|e| AppError::Internal(e.into()))?;
-        Ok(Self { client })
+    ///
+    /// Uses a lazy channel — no TCP connection is established until the first
+    /// RPC request, so the External API Facade does not need to be reachable at
+    /// startup time.
+    pub fn connect(endpoint: String) -> std::result::Result<Self, AppError> {
+        let channel = tonic::transport::Endpoint::from_shared(endpoint)
+            .map_err(|e| AppError::Internal(e.into()))?
+            .connect_lazy();
+        Ok(Self {
+            client: ExternalApiFacadeClient::new(channel),
+        })
     }
 }
 

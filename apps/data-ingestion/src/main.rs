@@ -1,6 +1,7 @@
 use std::net::SocketAddr;
 use std::sync::Arc;
 
+use prometheus::{Encoder, TextEncoder};
 use sqlx::postgres::PgPoolOptions;
 use tonic::transport::Server;
 use tracing::{error, info};
@@ -46,7 +47,7 @@ async fn main() -> anyhow::Result<()> {
     let repository = Arc::new(PgMarketDataRepository::new(pool));
 
     let gateway = Arc::new(
-        ExternalFacadeGrpcClient::connect(config.external_api_facade_url.clone()).await?,
+        ExternalFacadeGrpcClient::connect(config.external_api_facade_url.clone())?,
     );
 
     let dlq_producer: rdkafka::producer::FutureProducer = rdkafka::ClientConfig::new()
@@ -62,36 +63,48 @@ async fn main() -> anyhow::Result<()> {
     // On restart the process has no in-memory state. Query Portfolio Manager
     // for every registered instrument and start market-data subscriptions so
     // we don't miss bars during the downtime window.
+    // If Portfolio Manager is not yet reachable (e.g. during e2e startup),
+    // skip re-subscription and rely on incoming instrument.registered events.
     {
-        let mut pm_client =
-            RiskAndPortfolioManagerClient::connect(config.portfolio_manager_url.clone()).await?;
+        match RiskAndPortfolioManagerClient::connect(config.portfolio_manager_url.clone()).await {
+            Err(e) => {
+                info!(error = %e, "Portfolio Manager unreachable on startup — skipping re-subscription");
+            }
+            Ok(mut pm_client) => {
+                match pm_client
+                    .list_instruments(ListInstrumentsRequest {
+                        instrument_ids: vec![], // empty = all instruments
+                    })
+                    .await
+                {
+                    Err(e) => {
+                        info!(error = %e, "list_instruments failed on startup — skipping re-subscription");
+                    }
+                    Ok(resp) => {
+                        let instruments = resp.into_inner().instruments;
+                        info!(count = instruments.len(), "Re-subscribing to all instruments on startup");
 
-        let resp = pm_client
-            .list_instruments(ListInstrumentsRequest {
-                instrument_ids: vec![], // empty = all instruments
-            })
-            .await?;
-
-        let instruments = resp.into_inner().instruments;
-        info!(count = instruments.len(), "Re-subscribing to all instruments on startup");
-
-        for instrument in instruments {
-            for interval in &config.kafka_default_intervals {
-                let req = StartMarketDataSubscriptionRequest {
-                    instrument_id: instrument.id.clone(),
-                    symbol: instrument.symbol.clone(),
-                    venue: instrument.venue.clone(),
-                    intervals: vec![interval.clone()],
-                };
-                if let Err(e) = gateway.start_subscription(req).await {
-                    // Log and continue — a single subscription failure should not
-                    // prevent the service from starting.
-                    error!(
-                        instrument_id = %instrument.id,
-                        interval,
-                        error = %e,
-                        "Startup re-subscription failed"
-                    );
+                        for instrument in instruments {
+                            for interval in &config.kafka_default_intervals {
+                                let req = StartMarketDataSubscriptionRequest {
+                                    instrument_id: instrument.id.clone(),
+                                    symbol: instrument.symbol.clone(),
+                                    venue: instrument.venue.clone(),
+                                    intervals: vec![interval.clone()],
+                                };
+                                if let Err(e) = gateway.start_subscription(req).await {
+                                    // Log and continue — a single subscription failure should not
+                                    // prevent the service from starting.
+                                    error!(
+                                        instrument_id = %instrument.id,
+                                        interval,
+                                        error = %e,
+                                        "Startup re-subscription failed"
+                                    );
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -147,6 +160,48 @@ async fn main() -> anyhow::Result<()> {
     let grpc_service = DataIngestionGrpcService::new(Arc::clone(&repository));
 
     info!(%grpc_addr, "gRPC server listening");
+
+    // ── 9. Metrics HTTP server ─────────────────────────────────────────────────
+    // Serves GET /metrics in Prometheus text format.
+    // Uses only tokio primitives — no extra HTTP framework needed.
+    let metrics_addr: SocketAddr = format!("0.0.0.0:{}", config.metrics_port)
+        .parse()
+        .expect("invalid metrics bind address");
+    let metrics_listener = tokio::net::TcpListener::bind(metrics_addr)
+        .await
+        .expect("failed to bind metrics port");
+    info!(%metrics_addr, "metrics HTTP server listening");
+
+    let rx4 = rx3.clone();
+    tokio::spawn(async move {
+        let mut shutdown = rx4;
+        loop {
+            tokio::select! {
+                _ = shutdown.changed() => break,
+                accept = metrics_listener.accept() => {
+                    match accept {
+                        Ok((mut stream, _)) => {
+                            tokio::spawn(async move {
+                                let encoder = TextEncoder::new();
+                                let families = prometheus::gather();
+                                let mut body = Vec::new();
+                                let _ = encoder.encode(&families, &mut body);
+                                let response = format!(
+                                    "HTTP/1.1 200 OK\r\nContent-Type: {}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                                    encoder.format_type(),
+                                    body.len()
+                                );
+                                use tokio::io::AsyncWriteExt;
+                                let _ = stream.write_all(response.as_bytes()).await;
+                                let _ = stream.write_all(&body).await;
+                            });
+                        }
+                        Err(_) => break,
+                    }
+                }
+            }
+        }
+    });
 
     let mut rx = rx3;
     Server::builder()

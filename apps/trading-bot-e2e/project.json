@@ -27,6 +27,14 @@
           "target": "serve-e2e"
         },
         {
+          "projects": "external-api-facade",
+          "target": "serve-e2e"
+        },
+        {
+          "projects": "data-ingestion",
+          "target": "serve-e2e"
+        },
+        {
           "projects": "api-gateway",
           "target": "serve-e2e"
         },
@@ -86,6 +94,14 @@
         },
         {
           "projects": "execution-engine",
+          "target": "serve-e2e"
+        },
+        {
+          "projects": "external-api-facade",
+          "target": "serve-e2e"
+        },
+        {
+          "projects": "data-ingestion",
           "target": "serve-e2e"
         },
         {
