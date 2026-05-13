@@ -134,7 +134,7 @@ jobs:
       - name: Install Rust system dependencies
         uses: awalsh128/cache-apt-pkgs-action@v1
         with:
-          packages: libsasl2-dev
+          packages: libsasl2-dev protobuf-compiler libcurl4-openssl-dev
           version: 1.0
 
       - name: Setup Rust toolchain
@@ -271,7 +271,7 @@ jobs:
       - name: Install Rust system dependencies
         uses: awalsh128/cache-apt-pkgs-action@v1
         with:
-          packages: libsasl2-dev
+          packages: libsasl2-dev protobuf-compiler libcurl4-openssl-dev
           version: 1.0
 
       - name: Setup Rust toolchain
@@ -348,7 +348,7 @@ jobs:
       - name: Install Rust system dependencies
         uses: awalsh128/cache-apt-pkgs-action@v1
         with:
-          packages: libsasl2-dev
+          packages: libsasl2-dev protobuf-compiler libcurl4-openssl-dev
           version: 1.0
 
       - name: Setup Rust toolchain
@@ -502,7 +502,7 @@ jobs:
       - name: Install Rust system dependencies
         uses: awalsh128/cache-apt-pkgs-action@v1
         with:
-          packages: libsasl2-dev
+          packages: libsasl2-dev protobuf-compiler libcurl4-openssl-dev
           version: 1.0
 
       - name: Setup Rust toolchain
