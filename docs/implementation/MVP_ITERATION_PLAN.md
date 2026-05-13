@@ -101,6 +101,20 @@ npx nx run execution-engine:test-integration
 npx nx run trading-bot-e2e:e2e
 ```
 
+Validation commands added in Iteration 10:
+
+```bash
+# External API Facade (NestJS/TypeScript)
+npx nx run external-api-facade:typecheck
+npx nx run external-api-facade:test
+
+# Data Ingestion (Rust)
+npx nx run data-ingestion:fmt
+npx nx run data-ingestion:lint
+npx nx run data-ingestion:test
+npx nx run data-ingestion:test-integration  # requires: npx nx run infra:serve-integration
+```
+
 ## Remaining MVP Iterations
 
 ### Iteration 10: Market Data and Exchange Integration

@@ -11,13 +11,15 @@
   - [Eventing, Ordering, and Consistency](#eventing-ordering-and-consistency)
     - [Current event transport contract](#current-event-transport-contract)
     - [Ordering and idempotency rules](#ordering-and-idempotency-rules)
+    - [Consumer retry and DLQ policy](#consumer-retry-and-dlq-policy)
+    - [Metrics and runbooks](#metrics-and-runbooks)
     - [Versioning rules](#versioning-rules)
     - [Outbox pattern](#outbox-pattern)
   - [Kafka Topics and Partition Keys](#kafka-topics-and-partition-keys)
   - [Local Development Workflow](#local-development-workflow)
   - [C4 Model Diagrams](#c4-model-diagrams)
   - [Workflows](#workflows)
-    - [Current: Instrument Registration](#current-instrument-registration)
+    - [Current: Portfolio Instrument Configuration](#current-portfolio-instrument-configuration)
     - [Current: Risk Pipeline](#current-risk-pipeline)
     - [Current: Execution Simulator](#current-execution-simulator)
     - [Current: Fill Reconciliation](#current-fill-reconciliation)
@@ -43,6 +45,8 @@ The current implementation is still intentionally narrow:
 - `execution-engine` consumes approved trades, persists deterministic simulated order lifecycles, writes outbox records, and dispatches order events.
 - `common` owns shared proto contracts and Kafka contract helpers.
 - `common` also owns the reusable Kafka consumer retry/DLQ wrapper and Prometheus metric helpers used by implemented services.
+- `external-api-facade` manages Binance WebSocket kline subscriptions and publishes raw market data directly to Kafka (no outbox — streaming workload where a missed candle is reproduced by the next tick).
+- `data-ingestion` consumes `instrument.registered` and `market.raw.data`, persists OHLCV bars to TimescaleDB, and exposes `GetMarketDataBars` over gRPC.
 - `dashboard` provides the React portfolio dashboard for portfolio selection,
   portfolio visibility, and portfolio-scoped instrument configuration.
 - Local infra provides Redpanda, Postgres, and TimescaleDB.
@@ -62,14 +66,14 @@ Everything else in this document should be read as either:
 | Shared Contracts (`common`)      | Implemented          | Proto types, topic constants, key builders, Kafka header helpers, and reusable outbox dispatch ports live here.                                                                                                 |
 | Message Bus (Redpanda/Kafka API) | Implemented          | Local development uses Redpanda.                                                                                                                                                                                |
 | Portfolio DB (Postgres)          | Implemented          | Source of truth for instruments, outbox rows, portfolios, risk decisions, exposure reservations, reconciled orders/fills, positions, and portfolio summary snapshots.                                           |
-| Market Data Store (TimescaleDB)  | Implemented in infra | Provisioned locally, but not yet exercised by application code in this repo.                                                                                                                                    |
-| Data Ingestion Service           | Planned              | Not implemented in this repo yet.                                                                                                                                                                               |
+| Market Data Store (TimescaleDB)  | Implemented          | Provisioned locally and exercised by Data Ingestion. OHLCV bars are written by the `data-ingestion` service after consuming `market.raw.data` events.                                                          |
+| Data Ingestion Service           | Implemented          | Rust service. Consumes `instrument.registered` → starts Binance kline subscription via External API Facade. Consumes `market.raw.data` → persists OHLCV bars to TimescaleDB. Exposes `GetMarketDataBars` gRPC API for API Gateway. Startup re-subscription from portfolio-manager `ListInstruments`. DLQ publishing for both consumers. Integration tests require live TimescaleDB. |
 | Feature Engineering Service      | Planned              | Not implemented in this repo yet.                                                                                                                                                                               |
 | Prediction Engine                | Planned              | Not implemented in this repo yet.                                                                                                                                                                               |
 | Execution Engine                 | Implemented          | Event simulator consumes approved trades, emits deterministic placed/fill lifecycle events, and exposes execution-owned order/fill read queries over gRPC.                                                      |
 | Execution DB (Postgres schema)   | Implemented          | Source of truth for simulated orders, fills, and execution outbox rows.                                                                                                                                         |
 | Reliability & Operability        | Implemented          | Implemented consumers use bounded retry, per-topic DLQs, correlation/causation headers, structured logs, and Prometheus metrics endpoints.                                                                      |
-| External API Facade              | Planned              | Not implemented in this repo yet.                                                                                                                                                                               |
+| External API Facade              | Implemented          | NestJS service. Manages Binance WebSocket kline subscriptions. `StartMarketDataSubscription` / `StopMarketDataSubscription` gRPC API. Publishes `MarketDataBar` protobuf events directly to `market.raw.data` (no outbox — high-frequency streaming; a missed candle is reproduced by the next WebSocket tick). Prometheus metrics endpoint. |
 | Dashboard                        | Implemented          | Nx React/Vite/Tailwind dashboard lists portfolios, reads selected portfolio state, and adds instruments to the selected portfolio through API Gateway only.                                                     |
 | Full-System E2E                  | Implemented          | Dedicated `trading-bot-e2e` Nx/Playwright project depends on the shared `infra` Nx project for isolated Docker lifecycle, runs both service migrations, seeds portfolio data, starts backend services and dashboard, publishes synthetic Kafka events from the test harness, and verifies REST plus browser-visible state. |
 | Schema Registry                  | Planned              | Documented as a future capability; not provisioned in local infra.                                                                                                                                              |
@@ -103,9 +107,8 @@ Operational documentation gaps to keep visible:
 Current MVP limitations:
 
 - No real Prediction Engine.
-- No market data ingestion.
 - No Feature Engineering service.
-- No real exchange or paper exchange execution.
+- No real exchange or paper exchange execution (External API Facade implements Binance kline subscriptions; order placement is planned).
 - No auth, users, or permissions.
 - No websocket/live Dashboard stream.
 - No production deployment story.
