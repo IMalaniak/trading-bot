@@ -24,15 +24,21 @@ CREATE TABLE IF NOT EXISTS market_data_bars (
     quote_volume     NUMERIC(36,18) NOT NULL,
     trade_count      BIGINT         NOT NULL,
     -- source_event_id is the Kafka event-id header (UUID).
-    -- UNIQUE constraint makes all inserts idempotent at the DB level:
-    -- if the consumer retries the same event, the second INSERT is a no-op.
-    source_event_id  TEXT           NOT NULL UNIQUE,
+    -- Idempotency is enforced by the unique index below (must include `time`
+    -- because TimescaleDB requires all unique indexes to include the
+    -- partitioning column).
+    source_event_id  TEXT           NOT NULL,
     created_at       TIMESTAMPTZ    NOT NULL DEFAULT NOW()
 );
 
 -- Convert the table to a TimescaleDB hypertable partitioned on `time`.
 -- This must be called before any data is inserted.
 SELECT create_hypertable('market_data_bars', 'time', if_not_exists => TRUE);
+
+-- Idempotency index: duplicate event IDs at the same timestamp are rejected.
+-- `time` must be included in every unique index on a TimescaleDB hypertable.
+CREATE UNIQUE INDEX IF NOT EXISTS market_data_bars_source_event_id_time_idx
+    ON market_data_bars (source_event_id, time);
 
 -- Composite index for the primary query pattern:
 -- "give me all bars for instrument X at interval Y, newest first".

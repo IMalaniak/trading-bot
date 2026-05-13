@@ -37,9 +37,31 @@
     },
     "test-integration": {
       "executor": "nx:run-commands",
+      "cache": false,
       "options": {
-        "command": "cargo test -p data-ingestion --test integration",
+        "cwd": "{workspaceRoot}",
+        "parallel": false,
+        "commands": [
+          {
+            "command": "npx nx run data-ingestion:migrate:test-integration"
+          },
+          {
+            "command": "cargo test -p data-ingestion --tests"
+          }
+        ]
+      }
+    },
+    "migrate": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "defaultConfiguration": "development",
+      "options": {
+        "command": "cargo sqlx migrate run --database-url \"$DATA_INGESTION_DATABASE_URL\" --source apps/data-ingestion/migrations",
         "cwd": "{workspaceRoot}"
+      },
+      "configurations": {
+        "development": {},
+        "test-integration": {}
       }
     },
     "lint": {

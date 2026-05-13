@@ -45,6 +45,8 @@ impl MarketDataRepository for PgMarketDataRepository {
         //
         // ON CONFLICT DO NOTHING implements idempotency: duplicate source_event_id
         // is silently ignored if the Kafka consumer retries the same message.
+        // The conflict target must include `time` because TimescaleDB requires
+        // all unique indexes to include the partitioning column.
         sqlx::query(
             r#"
             INSERT INTO market_data_bars
@@ -52,7 +54,7 @@ impl MarketDataRepository for PgMarketDataRepository {
                open, high, low, close, volume, quote_volume, trade_count,
                source_event_id)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-            ON CONFLICT (source_event_id) DO NOTHING
+            ON CONFLICT (source_event_id, time) DO NOTHING
             "#,
         )
         .bind(bar.time)
