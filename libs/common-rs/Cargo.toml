@@ -37,6 +37,7 @@ thiserror.workspace = true
 
 # Timestamps for DLQ payloads
 chrono.workspace = true
+rust_decimal.workspace = true
 
 # Async trait support
 async-trait.workspace = true
