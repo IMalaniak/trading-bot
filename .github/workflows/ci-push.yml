@@ -23,6 +23,7 @@ jobs:
       base: ${{ steps.vars.outputs.base }}
       head: ${{ steps.vars.outputs.head }}
       run_all: ${{ steps.detect.outputs.run_all }}
+      run_all_rust: ${{ steps.detect.outputs.run_all_rust }}
       skip: ${{ steps.skip_push.outputs.skip }}
     steps:
       - name: Checkout repository
@@ -96,6 +97,11 @@ jobs:
           else
             echo "run_all=false" >> $GITHUB_OUTPUT
           fi
+          if echo "$changed_files" | grep -E '(^|/)(Cargo\.lock|Cargo\.toml)$' >/dev/null; then
+            echo "run_all_rust=true" >> $GITHUB_OUTPUT
+          else
+            echo "run_all_rust=false" >> $GITHUB_OUTPUT
+          fi
 
       - name: Install dependencies
         if: steps.skip_push.outputs.skip != 'true'
@@ -156,12 +162,29 @@ jobs:
         if: steps.nm-cache.outputs.cache-hit != 'true'
         run: npm ci
 
+      - name: Install Rust system dependencies
+        uses: awalsh128/cache-apt-pkgs-action@v1
+        with:
+          packages: libsasl2-dev
+          version: 1.0
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.95"
+          components: clippy, rustfmt
+
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "rust"
+
       - name: "Full Run: Lint"
-        if: needs.prepare.outputs.run_all == 'true'
+        if: needs.prepare.outputs.run_all == 'true' || needs.prepare.outputs.run_all_rust == 'true'
         run: npx nx run-many --target=lint --all --parallel
 
       - name: "Affected: Lint"
-        if: needs.prepare.outputs.run_all != 'true'
+        if: needs.prepare.outputs.run_all != 'true' && needs.prepare.outputs.run_all_rust != 'true'
         run: npx nx affected --target=lint --base=$BASE --head=$HEAD --parallel
 
       - name: Upload artifacts on failure
@@ -276,13 +299,29 @@ jobs:
         if: steps.nm-cache.outputs.cache-hit != 'true'
         run: npm ci
 
+      - name: Install Rust system dependencies
+        uses: awalsh128/cache-apt-pkgs-action@v1
+        with:
+          packages: libsasl2-dev
+          version: 1.0
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.95"
+
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "rust"
+
       - name: "Full Run: Test"
-        if: needs.prepare.outputs.run_all == 'true'
-        run: npx nx run-many --target=test --all --parallel --ci
+        if: needs.prepare.outputs.run_all == 'true' || needs.prepare.outputs.run_all_rust == 'true'
+        run: npx nx run-many --target=test --all --parallel
 
       - name: "Affected: Test"
-        if: needs.prepare.outputs.run_all != 'true'
-        run: npx nx affected --target=test --base=$BASE --head=$HEAD --parallel --ci
+        if: needs.prepare.outputs.run_all != 'true' && needs.prepare.outputs.run_all_rust != 'true'
+        run: npx nx affected --target=test --base=$BASE --head=$HEAD --parallel
 
       - name: Upload artifacts on failure
         if: failure()
@@ -337,12 +376,28 @@ jobs:
         if: steps.nm-cache.outputs.cache-hit != 'true'
         run: npm ci
 
+      - name: Install Rust system dependencies
+        uses: awalsh128/cache-apt-pkgs-action@v1
+        with:
+          packages: libsasl2-dev
+          version: 1.0
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.95"
+
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "rust"
+
       - name: "Full Run: Integration Test"
-        if: needs.prepare.outputs.run_all == 'true'
+        if: needs.prepare.outputs.run_all == 'true' || needs.prepare.outputs.run_all_rust == 'true'
         run: npx nx run-many --target=test-integration --all --parallel=1 --outputStyle=static
 
       - name: "Affected: Integration Test"
-        if: needs.prepare.outputs.run_all != 'true'
+        if: needs.prepare.outputs.run_all != 'true' && needs.prepare.outputs.run_all_rust != 'true'
         run: npx nx affected --target=test-integration --base=$BASE --head=$HEAD --parallel=1 --outputStyle=static
 
       - name: Tear down isolated integration infra
@@ -475,12 +530,28 @@ jobs:
         if: steps.nm-cache.outputs.cache-hit != 'true'
         run: npm ci
 
+      - name: Install Rust system dependencies
+        uses: awalsh128/cache-apt-pkgs-action@v1
+        with:
+          packages: libsasl2-dev
+          version: 1.0
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.95"
+
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "rust"
+
       - name: "Full Run: Build"
-        if: needs.prepare.outputs.run_all == 'true'
+        if: needs.prepare.outputs.run_all == 'true' || needs.prepare.outputs.run_all_rust == 'true'
         run: npx nx run-many --target=build --all --parallel
 
       - name: "Affected: Build"
-        if: needs.prepare.outputs.run_all != 'true'
+        if: needs.prepare.outputs.run_all != 'true' && needs.prepare.outputs.run_all_rust != 'true'
         run: npx nx affected --target=build --base=$BASE --head=$HEAD --parallel
 
       - name: Upload artifacts on failure
