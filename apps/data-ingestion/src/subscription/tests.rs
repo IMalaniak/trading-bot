@@ -37,7 +37,7 @@ mod tests {
         let mut mock = MockSubscriptionGateway::new();
         mock.expect_start_subscription()
             .times(1)
-            .returning(|_| Err(AppError::Grpc(tonic::Status::unavailable("service down"))));
+            .returning(|_| Err(AppError::from(tonic::Status::unavailable("service down"))));
 
         let result = mock.start_subscription(req).await;
         assert!(
@@ -65,7 +65,7 @@ mod tests {
         let mut mock = MockSubscriptionGateway::new();
         mock.expect_stop_subscription()
             .times(1)
-            .returning(|_| Err(AppError::Grpc(tonic::Status::not_found("no such subscription"))));
+            .returning(|_| Err(AppError::from(tonic::Status::not_found("no such subscription"))));
 
         let result = mock.stop_subscription("UNKNOWN-VENUE").await;
         assert!(

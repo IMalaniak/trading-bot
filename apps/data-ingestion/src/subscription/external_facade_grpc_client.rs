@@ -42,7 +42,7 @@ impl SubscriptionGateway for ExternalFacadeGrpcClient {
             .start_market_data_subscription(req)
             .await
             .map(|_| ())
-            .map_err(AppError::Grpc)
+            .map_err(AppError::from)
     }
 
     #[instrument(skip(self), fields(instrument_id))]
@@ -55,6 +55,6 @@ impl SubscriptionGateway for ExternalFacadeGrpcClient {
             .stop_market_data_subscription(req)
             .await
             .map(|_| ())
-            .map_err(AppError::Grpc)
+            .map_err(AppError::from)
     }
 }

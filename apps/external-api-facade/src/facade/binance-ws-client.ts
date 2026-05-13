@@ -135,7 +135,9 @@ export class BinanceWebSocketClient {
       try {
         const raw = Array.isArray(data)
           ? Buffer.concat(data).toString('utf8')
-          : Buffer.from(data).toString('utf8');
+          : data instanceof ArrayBuffer
+            ? Buffer.from(new Uint8Array(data)).toString('utf8')
+            : data.toString('utf8');
         const event: BinanceKlineEvent = JSON.parse(raw) as BinanceKlineEvent;
         if (event.e !== 'kline') return;
         const bar = this.parseEvent(event, venue);

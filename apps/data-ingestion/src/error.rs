@@ -36,7 +36,7 @@ pub enum AppError {
 
     /// gRPC call to an upstream service failed.
     #[error("gRPC error: {0}")]
-    Grpc(#[from] tonic::Status),
+    Grpc(Box<tonic::Status>),
 
     /// Catch-all for unexpected errors (wraps anyhow).
     #[error("Internal error: {0}")]
@@ -46,6 +46,12 @@ pub enum AppError {
 // Convert AppError → tonic::Status so gRPC handlers can use `?` directly.
 // In NestJS terms: this is your global exception filter translating domain
 // errors into HTTP/gRPC status codes.
+impl From<tonic::Status> for AppError {
+    fn from(status: tonic::Status) -> Self {
+        AppError::Grpc(Box::new(status))
+    }
+}
+
 impl From<AppError> for tonic::Status {
     fn from(err: AppError) -> Self {
         match err {
@@ -57,7 +63,7 @@ impl From<AppError> for tonic::Status {
             AppError::ProtoDecode(e) => {
                 tonic::Status::invalid_argument(format!("malformed request: {e}"))
             }
-            AppError::Grpc(s) => s,
+            AppError::Grpc(s) => *s,
             AppError::Internal(e) => tonic::Status::internal(e.to_string()),
         }
     }

@@ -12,7 +12,6 @@ use trading_common::proto::tradingbot::events::InstrumentRegistered;
 use trading_common::proto::tradingbot::external_api_facade::StartMarketDataSubscriptionRequest;
 
 use crate::config::AppConfig;
-use crate::error::AppError;
 use crate::subscription::SubscriptionGateway;
 
 const INSTRUMENT_TOPIC: &str = "instrument.registered";

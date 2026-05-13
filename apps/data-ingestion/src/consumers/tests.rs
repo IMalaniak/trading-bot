@@ -9,11 +9,10 @@ mod tests {
         use trading_common::kafka::consumer::RetryConfig;
         use trading_common::proto::tradingbot::common::{AssetClass, Instrument};
         use trading_common::proto::tradingbot::events::InstrumentRegistered;
-        use trading_common::proto::tradingbot::external_api_facade::StartMarketDataSubscriptionRequest;
 
         use crate::consumers::instrument_consumer::InstrumentConsumer;
         use crate::error::AppError;
-        use crate::subscription::gateway::{MockSubscriptionGateway, SubscriptionGateway};
+        use crate::subscription::gateway::{MockSubscriptionGateway};
 
         fn make_dlq_producer() -> FutureProducer {
             // We intentionally point at a broker that will never be reached so
@@ -131,7 +130,7 @@ mod tests {
             let mut mock = MockSubscriptionGateway::new();
             mock.expect_start_subscription()
                 .times(1)
-                .returning(|_| Err(AppError::Grpc(tonic::Status::unavailable("down"))));
+                .returning(|_| Err(AppError::from(tonic::Status::unavailable("down"))));
 
             // Retry config with 0 retries so the test finishes quickly
             let retry_cfg = RetryConfig {
@@ -161,9 +160,8 @@ mod tests {
         use trading_common::proto::tradingbot::events::MarketDataBar;
 
         use crate::consumers::market_data_consumer::MarketDataConsumer;
-        use crate::error::AppError;
         use crate::repository::market_data_repository::{
-            MarketDataRepository, MockMarketDataRepository,
+            MockMarketDataRepository,
         };
 
         fn make_dlq_producer() -> rdkafka::producer::FutureProducer {

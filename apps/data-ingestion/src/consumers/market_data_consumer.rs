@@ -14,7 +14,7 @@ use trading_common::kafka::dlq::DlqPublisher;
 use trading_common::proto::tradingbot::events::MarketDataBar;
 
 use crate::config::AppConfig;
-use crate::domain::{BarsQuery, MarketDataBarRow};
+use crate::domain::MarketDataBarRow;
 use crate::error::AppError;
 use crate::repository::MarketDataRepository;
 
@@ -130,9 +130,7 @@ impl<R: MarketDataRepository> MarketDataConsumer<R> {
                 let r = Arc::clone(&repo);
                 let row = row_clone.clone();
                 async move {
-                    r.insert_bar(&row)
-                        .await
-                        .map_err(anyhow::Error::from)
+                    r.insert_bar(&row).await
                 }
             },
         )
