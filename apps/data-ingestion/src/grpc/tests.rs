@@ -12,7 +12,7 @@ mod tests {
     use crate::domain::MarketDataBarRow;
     use crate::grpc::data_ingestion_service::DataIngestionGrpcService;
     use crate::repository::market_data_repository::{
-        MarketDataRepository, MockMarketDataRepository,
+        MockMarketDataRepository,
     };
 
     fn make_row(symbol: &str) -> MarketDataBarRow {

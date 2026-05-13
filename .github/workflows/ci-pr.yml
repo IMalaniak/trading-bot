@@ -132,10 +132,9 @@ jobs:
         run: npm ci
 
       - name: Install Rust system dependencies
-        uses: awalsh128/cache-apt-pkgs-action@v1
-        with:
-          packages: libsasl2-dev protobuf-compiler libcurl4-openssl-dev
-          version: 1.0
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends libsasl2-dev protobuf-compiler libcurl4-openssl-dev
 
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@master
@@ -269,10 +268,9 @@ jobs:
         run: npm ci
 
       - name: Install Rust system dependencies
-        uses: awalsh128/cache-apt-pkgs-action@v1
-        with:
-          packages: libsasl2-dev protobuf-compiler libcurl4-openssl-dev
-          version: 1.0
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends libsasl2-dev protobuf-compiler libcurl4-openssl-dev
 
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@master
@@ -346,10 +344,9 @@ jobs:
         run: npm ci
 
       - name: Install Rust system dependencies
-        uses: awalsh128/cache-apt-pkgs-action@v1
-        with:
-          packages: libsasl2-dev protobuf-compiler libcurl4-openssl-dev
-          version: 1.0
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends libsasl2-dev protobuf-compiler libcurl4-openssl-dev
 
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@master
@@ -360,6 +357,11 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           shared-key: "rust"
+
+      - name: Install sqlx-cli
+        uses: taiki-e/install-action@v2
+        with:
+          tool: sqlx-cli
 
       - name: "Full Run: Integration Test"
         if: needs.prepare.outputs.run_all == 'true' || needs.prepare.outputs.run_all_rust == 'true'
@@ -425,6 +427,26 @@ jobs:
       - name: Install dependencies
         if: steps.nm-cache.outputs.cache-hit != 'true'
         run: npm ci
+
+      - name: Install Rust system dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends libsasl2-dev protobuf-compiler libcurl4-openssl-dev
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.95"
+
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "rust"
+
+      - name: Install sqlx-cli
+        uses: taiki-e/install-action@v2
+        with:
+          tool: sqlx-cli
 
       - name: Cache Playwright browsers
         uses: actions/cache@v5
@@ -500,10 +522,9 @@ jobs:
         run: npm ci
 
       - name: Install Rust system dependencies
-        uses: awalsh128/cache-apt-pkgs-action@v1
-        with:
-          packages: libsasl2-dev protobuf-compiler libcurl4-openssl-dev
-          version: 1.0
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends libsasl2-dev protobuf-compiler libcurl4-openssl-dev
 
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@master
