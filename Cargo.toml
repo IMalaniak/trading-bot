@@ -64,5 +64,5 @@ async-trait = { version = "=0.1.89" }
 
 # Dev dependencies shared across workspace — still declared under [workspace.dependencies];
 # individual crates reference them under [dev-dependencies] with `workspace = true`.
-mockall = { version = "=0.13.1" }    # Mock framework (like jest.fn() but at compile time)
+mockall = { version = "=0.14.0" }    # Mock framework (like jest.fn() but at compile time)
 tokio-test = { version = "=0.4.5" }  # Test utilities for async Tokio code
