@@ -26,6 +26,13 @@ export {
   TradeDecisionKind,
   TradeDecisionReason,
 } from './events/events';
+export { MarketDataBar } from './events/market';
+export {
+  GetMarketDataBarsRequest,
+  GetMarketDataBarsResponse,
+  MarketDataBarRecord,
+  protobufPackage as PROTOBUF_SERVICES_DATA_INGESTION_PACKAGE,
+} from './services/data_ingestion';
 export {
   ExecutionFill,
   ExecutionOrder,
@@ -33,6 +40,13 @@ export {
   ListPortfolioExecutionOrdersResponse,
   protobufPackage as PROTOBUF_SERVICES_EXECUTION_ENGINE_PACKAGE,
 } from './services/execution_engine';
+export {
+  protobufPackage as PROTOBUF_SERVICES_EXTERNAL_API_FACADE_PACKAGE,
+  StartMarketDataSubscriptionRequest,
+  StartMarketDataSubscriptionResponse,
+  StopMarketDataSubscriptionRequest,
+  StopMarketDataSubscriptionResponse,
+} from './services/external_api_facade';
 export {
   GetPortfolioRequest,
   GetPortfolioResponse,
@@ -61,8 +75,17 @@ export const COMMON_SIGNAL_PROTO = 'proto/common/signal.proto';
 
 export const EVENTS_EVENTS_PROTO = 'proto/events/events.proto';
 
+export const EVENTS_MARKET_PROTO = 'proto/events/market.proto';
+
+export const DATA_INGESTION_PROTO = 'proto/services/data_ingestion.proto';
+export const DATA_INGESTION_CLIENT = 'DATA_INGESTION_CLIENT';
+
 export const EXECUTION_ENGINE_PROTO = 'proto/services/execution_engine.proto';
 export const EXECUTION_ENGINE_CLIENT = 'EXECUTION_ENGINE_CLIENT';
+
+export const EXTERNAL_API_FACADE_PROTO =
+  'proto/services/external_api_facade.proto';
+export const EXTERNAL_API_FACADE_CLIENT = 'EXTERNAL_API_FACADE_CLIENT';
 
 export const PORTFOLIO_MANAGER_PROTO = 'proto/services/portfolio_manager.proto';
 export const PORTFOLIO_MANAGER_CLIENT = 'PORTFOLIO_MANAGER_CLIENT';

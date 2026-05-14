@@ -20,6 +20,7 @@ export const KAFKA_EVENT_PRODUCERS = {
   PORTFOLIO_MANAGER: 'portfolio-manager',
   PREDICTION_ENGINE: 'prediction-engine',
   EXECUTION_ENGINE: 'execution-engine',
+  EXTERNAL_API_FACADE: 'external-api-facade',
 } as const;
 
 export const KAFKA_EVENT_SCHEMA_VERSIONS = {
@@ -35,6 +36,9 @@ export const KAFKA_EVENT_SCHEMA_VERSIONS = {
   TRADING_SIGNALS_PORTFOLIO_DLQ: '1',
   TRADES_APPROVED_DLQ: '1',
   ORDERS_FILLS_DLQ: '1',
+  MARKET_RAW_DATA: '1',
+  INSTRUMENT_REGISTERED_DLQ: '1',
+  MARKET_RAW_DATA_DLQ: '1',
 } as const;
 
 export type KafkaEventProducer =

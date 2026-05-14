@@ -1,0 +1,53 @@
+{
+  "name": "common-rs",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/common-rs/src",
+  "projectType": "library",
+  "tags": ["lang:rust", "scope:shared"],
+  "targets": {
+    "build": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": ["rustFiles"],
+      "outputs": ["{workspaceRoot}/target/debug/libtrading_common.rlib"],
+      "options": {
+        "command": "cargo build -p trading-common",
+        "cwd": "{workspaceRoot}"
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": ["rustFiles"],
+      "options": {
+        "command": "cargo test -p trading-common",
+        "cwd": "{workspaceRoot}"
+      }
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": ["rustFiles"],
+      "options": {
+        "command": "cargo clippy -p trading-common -- -D warnings",
+        "cwd": "{workspaceRoot}"
+      }
+    },
+    "fmt": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": ["rustFiles"],
+      "options": {
+        "command": "cargo fmt -p trading-common -- --check",
+        "cwd": "{workspaceRoot}"
+      }
+    },
+    "fmt-write": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "cargo fmt -p trading-common",
+        "cwd": "{workspaceRoot}"
+      }
+    }
+  }
+}

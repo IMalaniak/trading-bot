@@ -1,5 +1,7 @@
 instrument.registered
+instrument.registered.dlq
 market.raw.data
+market.raw.data.dlq
 features.indicators
 trading.signals
 trading.signals.portfolio
@@ -12,3 +14,5 @@ trading.signals.dlq
 trading.signals.portfolio.dlq
 trades.approved.dlq
 orders.fills.dlq
+instrument.registered.dlq
+market.raw.data.dlq

@@ -1,0 +1,55 @@
+[package]
+name = "data-ingestion"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+# The library target exposes all modules so integration tests (in tests/) and
+# the binary can both import from the same crate. In NestJS terms this is like
+# having a shared AppModule that both the app and test harness consume.
+[lib]
+name = "data_ingestion"
+path = "src/lib.rs"
+
+[[bin]]
+name = "data-ingestion"
+path = "src/main.rs"
+
+[dependencies]
+# Shared proto types + Kafka retry/DLQ utilities — the Rust equivalent of libs/common.
+# All generated gRPC stubs (DataIngestionServer, ExternalApiFacadeClient, etc.) come
+# from trading_common::proto; no build.rs or per-crate codegen needed here.
+trading-common = { path = "../../libs/common-rs" }
+
+# Async runtime
+tokio.workspace = true
+# gRPC + proto runtime (also provided by trading-common, but error.rs uses prost::DecodeError
+# directly so it must be an explicit dep to avoid depending on re-export stability)
+prost.workspace = true
+tonic.workspace = true
+# Database
+sqlx.workspace = true
+# Kafka consumer
+rdkafka.workspace = true
+# Config + serialization
+serde.workspace = true
+serde_json.workspace = true
+dotenvy.workspace = true
+# Logging
+tracing.workspace = true
+tracing-subscriber.workspace = true
+# Error handling
+anyhow.workspace = true
+thiserror.workspace = true
+# Domain types
+chrono.workspace = true
+uuid.workspace = true
+async-trait.workspace = true
+rust_decimal.workspace = true
+# Metrics
+prometheus.workspace = true
+
+[dev-dependencies]
+mockall.workspace = true
+tokio-test.workspace = true

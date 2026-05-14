@@ -1,0 +1,121 @@
+{
+  "name": "data-ingestion",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/data-ingestion/src",
+  "projectType": "application",
+  "tags": ["lang:rust", "scope:backend"],
+  "implicitDependencies": ["common-rs"],
+  "targets": {
+    "serve-e2e": {
+      "continuous": true,
+      "executor": "nx:run-commands",
+      "cache": false,
+      "defaultConfiguration": "e2e",
+      "dependsOn": [
+        "build",
+        {
+          "projects": "trading-bot-e2e",
+          "target": "e2e-seed"
+        }
+      ],
+      "options": {
+        "command": "./target/debug/data-ingestion",
+        "cwd": "{workspaceRoot}"
+      },
+      "configurations": {
+        "e2e": {}
+      }
+    },
+    "build": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": ["rustFiles", "^rustFiles"],
+      "outputs": ["{workspaceRoot}/target/debug/data-ingestion"],
+      "options": {
+        "command": "cargo build -p data-ingestion",
+        "cwd": "{workspaceRoot}"
+      }
+    },
+    "build-release": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": ["rustFiles", "^rustFiles"],
+      "outputs": ["{workspaceRoot}/target/release/data-ingestion"],
+      "options": {
+        "command": "cargo build --release -p data-ingestion",
+        "cwd": "{workspaceRoot}"
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": ["rustFiles", "^rustFiles"],
+      "options": {
+        "command": "cargo test -p data-ingestion --lib",
+        "cwd": "{workspaceRoot}"
+      }
+    },
+    "test-integration": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "options": {
+        "cwd": "{workspaceRoot}",
+        "parallel": false,
+        "commands": [
+          {
+            "command": "npx nx run data-ingestion:migrate:test-integration"
+          },
+          {
+            "command": "cargo test -p data-ingestion --test integration"
+          }
+        ]
+      }
+    },
+    "migrate": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "defaultConfiguration": "development",
+      "options": {
+        "command": "cargo sqlx migrate run --database-url \"$DATA_INGESTION_DATABASE_URL\" --source apps/data-ingestion/migrations",
+        "cwd": "{workspaceRoot}"
+      },
+      "configurations": {
+        "development": {},
+        "test-integration": {},
+        "e2e": {}
+      }
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": ["rustFiles", "^rustFiles"],
+      "options": {
+        "command": "cargo clippy -p data-ingestion -- -D warnings",
+        "cwd": "{workspaceRoot}"
+      }
+    },
+    "fmt": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": ["rustFiles"],
+      "options": {
+        "command": "cargo fmt -p data-ingestion -- --check",
+        "cwd": "{workspaceRoot}"
+      }
+    },
+    "fmt-write": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "cargo fmt -p data-ingestion",
+        "cwd": "{workspaceRoot}"
+      }
+    },
+    "audit": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "cargo audit",
+        "cwd": "{workspaceRoot}"
+      }
+    }
+  }
+}

@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+package tradingbot.external_api_facade;
+
+// ExternalApiFacade manages connections to external exchange APIs.
+// Data Ingestion calls this service to start and stop market data
+// subscriptions on behalf of registered instruments.
+service ExternalApiFacade {
+  // StartMarketDataSubscription starts a Binance kline WebSocket stream
+  // for the given instrument and intervals. Idempotent: calling it again
+  // for an already-subscribed instrument is a no-op.
+  rpc StartMarketDataSubscription(StartMarketDataSubscriptionRequest)
+      returns (StartMarketDataSubscriptionResponse);
+
+  // StopMarketDataSubscription stops the Binance kline stream for the
+  // given instrument. No-op if no subscription is active.
+  rpc StopMarketDataSubscription(StopMarketDataSubscriptionRequest)
+      returns (StopMarketDataSubscriptionResponse);
+}
+
+message StartMarketDataSubscriptionRequest {
+  // Internal instrument identifier (matches Instrument.id).
+  string instrument_id = 1;
+  // Exchange-native symbol, e.g. "BTCUSDT".
+  string symbol = 2;
+  // Exchange venue, e.g. "BINANCE".
+  string venue = 3;
+  // Kline intervals to subscribe to, e.g. ["1m", "5m"].
+  // Empty list uses the service default (["1m"]).
+  repeated string intervals = 4;
+}
+
+message StartMarketDataSubscriptionResponse {
+  // True if a new subscription was started; false if already active (idempotent).
+  bool started = 1;
+}
+
+message StopMarketDataSubscriptionRequest {
+  string instrument_id = 1;
+}
+
+message StopMarketDataSubscriptionResponse {
+  // True if a subscription was stopped; false if none was active.
+  bool stopped = 1;
+}

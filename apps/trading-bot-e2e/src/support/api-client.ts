@@ -80,6 +80,34 @@ export interface ListPortfoliosResponseDto {
   portfolios: PortfolioSummaryDto[];
 }
 
+export interface MarketDataBarDto {
+  closeTimeMs: number;
+  instrumentId: string;
+  interval: string;
+  close: string;
+  high: string;
+  low: string;
+  open: string;
+  openTimeMs: number;
+  quoteVolume: string;
+  symbol: string;
+  tradeCount: number;
+  venue: string;
+  volume: string;
+}
+
+export interface GetMarketDataBarsResponseDto {
+  bars: MarketDataBarDto[];
+}
+
+export interface GetMarketDataBarsQuery {
+  instrumentId: string;
+  interval: string;
+  from?: string;
+  to?: string;
+  limit?: number;
+}
+
 const requestJson = async <T>(url: string): Promise<T> => {
   const response = await fetch(url, {
     headers: {
@@ -108,6 +136,21 @@ export class ApiClient {
   async getPortfolio(portfolioId: string): Promise<PortfolioReadResponseDto> {
     return await requestJson<PortfolioReadResponseDto>(
       `${this.apiBaseUrl}/portfolios/${encodeURIComponent(portfolioId)}?recentOrdersLimit=20`,
+    );
+  }
+
+  async getMarketDataBars(
+    query: GetMarketDataBarsQuery,
+  ): Promise<GetMarketDataBarsResponseDto> {
+    const params = new URLSearchParams({
+      instrumentId: query.instrumentId,
+      interval: query.interval,
+    });
+    if (query.from) params.set('from', query.from);
+    if (query.to) params.set('to', query.to);
+    if (query.limit !== undefined) params.set('limit', String(query.limit));
+    return await requestJson<GetMarketDataBarsResponseDto>(
+      `${this.apiBaseUrl}/market-data/bars?${params.toString()}`,
     );
   }
 }

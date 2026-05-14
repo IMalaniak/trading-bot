@@ -2,6 +2,15 @@
   "$schema": "./node_modules/nx/schemas/nx-schema.json",
   "namedInputs": {
     "default": ["{projectRoot}/**/*", "sharedGlobals"],
+    "rustFiles": [
+      "{workspaceRoot}/Cargo.toml",
+      "{workspaceRoot}/Cargo.lock",
+      "{workspaceRoot}/rust-toolchain.toml",
+      "{projectRoot}/Cargo.toml",
+      "{projectRoot}/build.rs",
+      "{projectRoot}/src/**/*.rs",
+      "{projectRoot}/tests/**/*.rs"
+    ],
     "production": [
       "default",
       "!{projectRoot}/.eslintrc.json",
@@ -62,6 +71,12 @@
     }
   ],
   "targetDefaults": {
+    "build-release": {
+      "cache": true
+    },
+    "fmt": {
+      "cache": true
+    },
     "test-integration": {
       "parallelism": false,
       "dependsOn": [

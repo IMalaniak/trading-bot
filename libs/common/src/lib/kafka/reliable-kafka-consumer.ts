@@ -92,7 +92,8 @@ export interface ReliableKafkaMessageHandlerInput<TPayload> {
 export interface ReliableKafkaConsumerInput<TPayload> {
   service:
     | typeof KAFKA_EVENT_PRODUCERS.PORTFOLIO_MANAGER
-    | typeof KAFKA_EVENT_PRODUCERS.EXECUTION_ENGINE;
+    | typeof KAFKA_EVENT_PRODUCERS.EXECUTION_ENGINE
+    | typeof KAFKA_EVENT_PRODUCERS.EXTERNAL_API_FACADE;
   consumerGroup: string;
   sourceTopic: DeadLetterSourceTopic;
   dlqTopic: DeadLetterTopic;
@@ -161,6 +162,10 @@ const dlqSchemaVersion = (topic: DeadLetterTopic): string => {
       return KAFKA_EVENT_SCHEMA_VERSIONS.TRADES_APPROVED_DLQ;
     case KAFKA_TOPICS.ORDERS_FILLS_DLQ:
       return KAFKA_EVENT_SCHEMA_VERSIONS.ORDERS_FILLS_DLQ;
+    case KAFKA_TOPICS.INSTRUMENT_REGISTERED_DLQ:
+      return KAFKA_EVENT_SCHEMA_VERSIONS.INSTRUMENT_REGISTERED_DLQ;
+    case KAFKA_TOPICS.MARKET_RAW_DATA_DLQ:
+      return KAFKA_EVENT_SCHEMA_VERSIONS.MARKET_RAW_DATA_DLQ;
   }
 };
 

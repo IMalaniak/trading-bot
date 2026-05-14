@@ -75,6 +75,14 @@ Implemented baseline:
     code only
   - REST and browser-visible Dashboard assertions, plus duplicate source signal
     and duplicate fill replay checks
+- Operational polish and documentation (Iteration 9):
+  - `README.md` added as canonical local validation walkthrough covering clean-checkout
+    setup, infra start, database migrations, portfolio seeding, service startup, e2e
+    validation path, and interactive inspection path
+  - env examples normalized for root shared Kafka/retry/gRPC config, `api-gateway`,
+    `portfolio-manager`, `execution-engine`, `dashboard`, and integration/e2e stacks
+  - MVP limitations clearly documented; runbooks and docs links updated to reference
+    implemented plural `/api/portfolios...` paths
 
 Current validation remains:
 
@@ -93,66 +101,74 @@ npx nx run execution-engine:test-integration
 npx nx run trading-bot-e2e:e2e
 ```
 
+Validation commands added in Iteration 10:
+
+```bash
+# External API Facade (NestJS/TypeScript)
+npx nx run external-api-facade:typecheck
+npx nx run external-api-facade:test
+
+# Data Ingestion (Rust)
+npx nx run data-ingestion:fmt
+npx nx run data-ingestion:lint
+npx nx run data-ingestion:test
+npx nx run data-ingestion:test-integration  # requires: npx nx run infra:serve-integration
+```
+
 ## Remaining MVP Iterations
 
-### Iteration 9: MVP Operational Polish and Documentation
+### Iteration 10: Market Data and Exchange Integration
 
-Goal: make the MVP reproducible for a developer or reviewer starting from a
-clean checkout.
+Goal: implement the External API Facade (NestJS/TypeScript) and the Data
+Ingestion service (Rust), connecting Binance market data to the trading
+pipeline via Kafka and TimescaleDB.
+
+Detailed implementation plan: `docs/implementation/ITERATION_10_PLAN.md`
 
 Scope:
 
-- Add `README.md` as the canonical local validation walkthrough:
-  - install dependencies
-  - start infra
-  - migrate databases
-  - seed baseline portfolio data
-  - start services
-  - start dashboard
-  - run full e2e as an automated validation path
-  - inspect portfolio state in the UI as an interactive validation path
-- Normalize env examples for:
-  - root shared Kafka, retry, and internal gRPC endpoint config
-  - `api-gateway`
-  - `portfolio-manager`
-  - `execution-engine`
-  - dashboard
-  - integration/e2e stack
-- Update runbooks and docs links where the e2e harness changes local replay or
-  smoke-test workflows.
-- Add a clear MVP limitations section.
+- External API Facade (NestJS/TypeScript):
+  - gRPC API: `StartMarketDataSubscription` and `StopMarketDataSubscription`
+  - Binance WebSocket kline stream with testnet/production switch via env
+  - Direct Kafka publish to `market.raw.data` (no outbox — streaming workload)
+  - Prometheus metrics endpoint
+- Data Ingestion service (Rust):
+  - Consumes `instrument.registered` → starts Binance kline subscription via Facade
+  - Consumes `market.raw.data` → writes OHLCV bars to TimescaleDB
+  - gRPC API: `GetMarketDataBars` for historical queries
+  - Startup re-subscription from portfolio-manager gRPC `ListInstruments`
+  - DLQ publishing for both consumers
+  - sqlx offline cache committed; integration tests require live TimescaleDB
+- Proto contracts: `proto/events/market.proto`, `proto/services/external_api_facade.proto`,
+  `proto/services/data_ingestion.proto`
+- API Gateway: `GET /api/market-data/bars` proxy to Data Ingestion
+- New Kafka topics: `instrument.registered.dlq`, `market.raw.data.dlq`
+- Infra: add both services to `docker-compose.yml`
+- NX Rust integration: `Cargo.toml` workspace at repo root; NX targets for
+  build, test, lint, fmt, audit
 
-Known MVP limitations to document:
+Known limitations for this iteration:
 
-- No real Prediction Engine.
-- No market data ingestion.
-- No Feature Engineering service.
-- No real exchange or paper exchange execution.
-- No auth, users, or permissions.
-- No websocket/live dashboard stream.
-- No production deployment story.
-- No schema registry.
+- Binance API keys not required (kline streams are public); keys are optional
+  and documented for future order placement only.
+- No Feature Engineering or Prediction Engine (next roadmap items).
+- No real order placement (execution engine simulator remains in place).
+- No WebSocket/live dashboard market data stream.
 
 Acceptance criteria:
 
-- A clean local setup can reproduce the flow without relying on undocumented
-  commands.
-- Docs distinguish product APIs from test harness signal publishing.
-- Docs link the roadmap, architecture, C4 model, infra notes, and reliability
-  runbooks where relevant.
+- `instrument.registered` event triggers a Binance kline subscription via Facade.
+- Kline events flow from Binance → Facade → `market.raw.data` → Data Ingestion → TimescaleDB.
+- `GET /api/market-data/bars` returns stored bars via API Gateway.
+- All Rust targets pass: `nx run data-ingestion:lint`, `nx run data-ingestion:test`,
+  `nx run data-ingestion:fmt`.
+- All TypeScript targets pass: `nx run external-api-facade:test`,
+  `nx run external-api-facade:typecheck`.
 
 ## Post-MVP Roadmap
 
 These items are intentionally grouped by capability rather than sprint-sized
 iterations.
-
-### Market Data and Exchange Integration
-
-- External API Facade for exchange connectivity.
-- Data Ingestion service consuming `instrument.registered`.
-- Raw market data publishing on `market.raw.data`.
-- TimescaleDB-backed historical market data reads.
-- Exchange sandbox or paper trading mode before real order placement.
 
 ### Prediction and Feature Pipeline
 

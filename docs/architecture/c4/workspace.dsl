@@ -16,7 +16,7 @@ workspace "Trading Bot System" {
 
             group "Data Ingestion Service" {
                 dataIngestion = container "Data Ingestion" "Subscribes to market data topics, stores raw/indicator time-series data, and manages stream subscriptions." "Rust" {
-                    tags "Planned"
+                    tags "Implemented"
                     gRPC = component "Market Data API" "Exposes gRPC API for API Gateway to fetch historical data." "gRPC" "API"
                     gRPC_Client = component "gRPC Client" "Handles internal service-to-service communication." "gRPC"
 
@@ -246,7 +246,9 @@ workspace "Trading Bot System" {
 
                     core = component "Core Orchestration" "Coordinates the current registration workflow and portfolio visibility aggregation." "TypeScript"
 
-                    marketDataProxy = component "Market Data Proxy" "Forwards dashboard queries to Data Ingestion (Market Data API)." "TypeScript"
+                    marketDataProxy = component "Market Data Proxy" "Forwards dashboard queries to Data Ingestion (Market Data API)." "TypeScript" {
+                        tags "Implemented"
+                    }
                     portfolioProxy = component "Portfolio Proxy" "Forwards portfolio listing, portfolio-scoped instrument configuration, portfolio reads, and instrument resolution to Risk & Portfolio Manager." "TypeScript"
                     executionProxy = component "Execution Proxy" "Fetches recent execution-owned orders and fills from Execution Engine." "TypeScript" {
                         tags "Implemented"
@@ -277,8 +279,8 @@ workspace "Trading Bot System" {
                 }
             }
             
-            externalAPIFacade = container "External API Facade" "Handles external API integrations (e.g., Binance)." "Nest.js" {
-                tags "Planned"
+            externalAPIFacade = container "External API Facade" "Handles external API integrations (e.g., Binance). Manages WebSocket kline subscriptions and publishes market data directly to Kafka (no outbox — high-frequency streaming workload)." "Nest.js" {
+                tags "Implemented"
                 gRPC = component "External Facade API" "Exposes gRPC API for internal services to interact with external exchanges." "gRPC" "API"
 
                 core = component "Facade Core" "Manages connections and interactions with external exchange APIs." "TypeScript"
@@ -442,9 +444,8 @@ workspace "Trading Bot System" {
         tradingBot.validationGuide.productApiBoundary -> tradingBot.apiGateway.REST "Documents product endpoints exposed by"
         tradingBot.validationGuide.productApiBoundary -> tradingBot.e2eTestHarness.signalPublisher "Documents synthetic signal publishing as test tooling only"
         tradingBot.validationGuide.mvpLimitations -> tradingBot.predictionEngine "Marks real signal production as missing"
-        tradingBot.validationGuide.mvpLimitations -> tradingBot.dataIngestion "Marks market data ingestion as missing"
         tradingBot.validationGuide.mvpLimitations -> tradingBot.featureEngineering "Marks Feature Engineering as missing"
-        tradingBot.validationGuide.mvpLimitations -> tradingBot.externalAPIFacade "Marks real exchange execution path as missing"
+        tradingBot.validationGuide.mvpLimitations -> tradingBot.externalAPIFacade "Marks real exchange order placement as missing"
         tradingBot.validationGuide.mvpLimitations -> tradingBot.schemaRegistry "Marks schema registry as missing"
         tradingBot.envExamples -> tradingBot.apiGateway "Configures local and e2e API Gateway runtime"
         tradingBot.envExamples -> tradingBot.portfolioManager "Configures local, integration, and e2e Portfolio Manager runtime"
