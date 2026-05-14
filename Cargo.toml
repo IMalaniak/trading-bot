@@ -23,7 +23,7 @@ prost = { version = "=0.13.5" }
 prost-types = { version = "=0.13.5" }
 
 # Kafka client (librdkafka bindings)
-rdkafka = { version = "=0.37.0", features = ["cmake-build", "sasl", "ssl"] }
+rdkafka = { version = "=0.39.0", features = ["cmake-build", "sasl", "ssl"] }
 
 # SQL toolkit — async, compile-time checked queries
 sqlx = { version = "=0.8.6", features = ["runtime-tokio", "postgres", "chrono", "uuid", "migrate", "rust_decimal"] }
