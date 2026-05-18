@@ -75,8 +75,8 @@ pub fn feature_vector_id(bar: &MarketDataBarInput) -> String {
 
 pub fn market_data_bar_identity(bar: &MarketDataBarInput) -> String {
     format!(
-        "{}:{}:{}:{}",
-        bar.instrument_id, bar.interval, bar.open_time_ms, bar.close_time_ms
+        "{}:{}:{}",
+        bar.instrument_id, bar.interval, bar.open_time_ms
     )
 }
 
@@ -120,6 +120,28 @@ mod tests {
         assert_eq!(
             feature_vector_id(&bar),
             "feat:btc-usdt:1m:1775044800000:core-v1"
+        );
+    }
+
+    #[test]
+    fn bar_identity_ignores_derived_close_time() {
+        let first = MarketDataBarInput {
+            instrument_id: "btc-usdt".to_string(),
+            symbol: "BTCUSDT".to_string(),
+            venue: "BINANCE".to_string(),
+            interval: "1m".to_string(),
+            open_time_ms: 1_775_044_800_000,
+            close_time_ms: 1_775_044_800_001,
+            close: 62_000.0,
+        };
+        let second = MarketDataBarInput {
+            close_time_ms: 1_775_044_859_999,
+            ..first.clone()
+        };
+
+        assert_eq!(
+            market_data_bar_identity(&first),
+            market_data_bar_identity(&second)
         );
     }
 }

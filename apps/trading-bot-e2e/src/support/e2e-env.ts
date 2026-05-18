@@ -34,7 +34,7 @@ export const SYSTEM_PORTS = {
 } as const;
 
 export const TIMEOUTS = {
-  serviceReadyMs: 120_000,
+  serviceReadyMs: readEnvInt('E2E_SERVICE_READY_MS', 30_000),
   systemFlowMs: 60_000,
 } as const;
 

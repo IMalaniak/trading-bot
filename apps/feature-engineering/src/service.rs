@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -20,12 +20,46 @@ use crate::metrics::FeatureEngineeringMetrics;
 use crate::publisher::FeaturePublisher;
 use crate::warmup::WarmupGateway;
 
+const MAX_PROCESSED_BAR_IDENTITIES: usize = 50_000;
+const MAX_PUBLISHED_VECTOR_CACHE: usize = 10_000;
+
 #[derive(Default)]
 struct FeatureEngineeringState {
     calculators: HashMap<FeatureSeriesKey, CoreFeatureCalculator>,
     warmed_series: HashSet<FeatureSeriesKey>,
     processed_bars: HashSet<String>,
+    processed_bar_order: VecDeque<String>,
     published_vectors: HashMap<String, IndicatorFeatureVector>,
+    published_vector_order: VecDeque<String>,
+}
+
+impl FeatureEngineeringState {
+    fn insert_processed_bar(&mut self, identity: String) {
+        if !self.processed_bars.insert(identity.clone()) {
+            return;
+        }
+
+        self.processed_bar_order.push_back(identity);
+        while self.processed_bars.len() > MAX_PROCESSED_BAR_IDENTITIES {
+            if let Some(expired) = self.processed_bar_order.pop_front() {
+                self.processed_bars.remove(&expired);
+            }
+        }
+    }
+
+    fn insert_published_vector(&mut self, vector: IndicatorFeatureVector) {
+        let id = vector.id.clone();
+        if !self.published_vectors.contains_key(&id) {
+            self.published_vector_order.push_back(id.clone());
+        }
+
+        self.published_vectors.insert(id, vector);
+        while self.published_vectors.len() > MAX_PUBLISHED_VECTOR_CACHE {
+            if let Some(expired) = self.published_vector_order.pop_front() {
+                self.published_vectors.remove(&expired);
+            }
+        }
+    }
 }
 
 pub struct FeatureEngineeringService {
@@ -73,7 +107,9 @@ impl FeatureEngineeringService {
             identities.push(market_data_bar_identity(&prior_bar));
             calculator.observe(&prior_bar);
         }
-        state.processed_bars.extend(identities);
+        for identity in identities {
+            state.insert_processed_bar(identity);
+        }
 
         state.warmed_series.insert(key);
         self.metrics.increment_warmups();
@@ -126,7 +162,7 @@ impl MarketDataHandler for FeatureEngineeringService {
                 let calculator = state.calculators.entry(key).or_default();
                 calculator.observe(&input)
             };
-            state.processed_bars.insert(bar_identity);
+            state.insert_processed_bar(bar_identity);
             let source_event_id = source_context
                 .event_id
                 .clone()
@@ -162,8 +198,7 @@ impl MarketDataHandler for FeatureEngineeringService {
         self.state
             .lock()
             .await
-            .published_vectors
-            .insert(vector.id.clone(), vector.clone());
+            .insert_published_vector(vector.clone());
         self.publisher.publish(&vector, &source_context).await?;
         self.metrics.increment_feature_vectors_published();
 

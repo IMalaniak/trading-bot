@@ -107,6 +107,8 @@ npx nx serve execution-engine
 npx nx serve external-api-facade
 npx nx run data-ingestion:build
 ./target/debug/data-ingestion
+npx nx run feature-engineering:build
+./target/debug/feature-engineering
 npx nx serve api-gateway
 npx nx serve dashboard
 ```

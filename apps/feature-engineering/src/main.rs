@@ -39,8 +39,9 @@ async fn main() -> anyhow::Result<()> {
     let metrics = Arc::new(PrometheusFeatureEngineeringMetrics::new()?);
     let publisher = Arc::new(KafkaFeaturePublisher::new(producer.clone()));
     let dlq = Arc::new(KafkaDeadLetterPublisher::new(DlqPublisher::new(producer)));
-    let warmup =
-        Arc::new(DataIngestionWarmupClient::connect(config.data_ingestion_grpc_url.clone()).await?);
+    let warmup = Arc::new(DataIngestionWarmupClient::connect_lazy(
+        config.data_ingestion_grpc_url.clone(),
+    )?);
     let service = Arc::new(FeatureEngineeringService::new(
         warmup,
         publisher,

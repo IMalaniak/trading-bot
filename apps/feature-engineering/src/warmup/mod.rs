@@ -1,5 +1,8 @@
 use async_trait::async_trait;
-use tonic::{transport::Channel, Request};
+use tonic::{
+    transport::{Channel, Endpoint},
+    Request,
+};
 
 use trading_common::proto::tradingbot::data_ingestion::{
     data_ingestion_client::DataIngestionClient, GetMarketDataBarsRequest,
@@ -23,8 +26,9 @@ pub struct DataIngestionWarmupClient {
 }
 
 impl DataIngestionWarmupClient {
-    pub async fn connect(url: String) -> Result<Self, tonic::transport::Error> {
-        let client = DataIngestionClient::connect(url).await?;
+    pub fn connect_lazy(url: String) -> Result<Self, tonic::transport::Error> {
+        let channel = Endpoint::from_shared(url)?.connect_lazy();
+        let client = DataIngestionClient::new(channel);
         Ok(Self {
             client: tokio::sync::Mutex::new(client),
         })
