@@ -128,15 +128,26 @@ iterations.
 
 ### Prediction and Feature Pipeline
 
-- Feature Engineering service consuming raw market data. This is the current
-  implementation target after Iteration 10.
-- Indicator publishing on `features.indicators`.
-- Real Prediction Engine producing `trading.signals`.
-- Signal cache and read API for dashboard signal visibility.
-- Model registry and training pipeline once prediction logic needs lifecycle
-  management.
-- Feature persistence/read API and cross-instrument correlations after the
-  first per-instrument feature pipeline is stable.
+- [x] Feature Engineering service consuming raw market data. Implemented as the
+      Rust `feature-engineering` service consuming final `market.raw.data` bars,
+      warming per-instrument rolling state from Data Ingestion gRPC, and exposing
+      Prometheus metrics.
+- [x] Indicator publishing on `features.indicators`. Implemented with
+      protobuf `IndicatorFeatureVector` events, deterministic event ids, Kafka
+      metadata headers, shared topic/schema constants, and e2e coverage for
+      duplicate raw-bar idempotency.
+- [ ] Real Prediction Engine producing `trading.signals`. Missing. Current
+      tests still publish synthetic `common.Signal` events directly to Kafka; only
+      the future Prediction Engine gRPC contract exists.
+- [ ] Signal cache and read API for dashboard signal visibility. Missing. There
+      is no implemented Prediction Engine service, Redis-backed signal cache, API
+      Gateway read route, or Dashboard signal view.
+- [ ] Model registry and training pipeline once prediction logic needs
+      lifecycle management. Missing.
+- [ ] Feature persistence/read API. Missing. The v1 Feature Engineering service
+      keeps rolling state in memory and publishes Kafka output only.
+- [ ] Cross-instrument correlations. Missing. Current indicators are
+      per-instrument/per-interval only.
 
 ### Strategy and Risk Configuration
 
