@@ -221,6 +221,36 @@ mod tests {
     }
 
     #[test]
+    fn produces_golden_core_v1_values_for_fixed_close_fixture() {
+        let mut calculator = CoreFeatureCalculator::default();
+        let mut snapshot = None;
+
+        for i in 0..35 {
+            snapshot = calculator.observe(&bar(i, 100.0 + i as f64));
+        }
+
+        let snapshot = snapshot.expect("features should be ready");
+        let value = |name: &str| {
+            snapshot
+                .values
+                .iter()
+                .find(|feature| feature.name == name)
+                .expect("feature should exist")
+                .value
+        };
+
+        assert!((value(SMA_CLOSE_20) - 124.5).abs() < 1e-12);
+        assert!((value(EMA_CLOSE_12) - 128.518_777_596_668_6).abs() < 1e-12);
+        assert!((value(EMA_CLOSE_26) - 122.413_066_326_442_3).abs() < 1e-12);
+        assert!((value(RSI_CLOSE_14) - 99.922_436_450_032_31).abs() < 1e-12);
+        assert!((value(MACD_CLOSE_12_26_9) - 6.105_711_270_226_294).abs() < 1e-12);
+        assert!((value(MACD_SIGNAL_CLOSE_12_26_9) - 5.721_652_413_848_894).abs() < 1e-12);
+        assert!((value(MACD_HISTOGRAM_CLOSE_12_26_9) - 0.384_058_856_377_399_67).abs() < 1e-12);
+        assert!((value(RETURN_CLOSE_1) - 0.007_518_796_992_481_258).abs() < 1e-12);
+        assert!((value(VOLATILITY_LOG_RETURN_20) - 0.000_376_810_726_700_774_26).abs() < 1e-12);
+    }
+
+    #[test]
     fn formats_values_without_locale_or_float_noise() {
         assert_eq!(format_feature_value(1.234500000000), "1.2345");
         assert_eq!(format_feature_value(0.0), "0");

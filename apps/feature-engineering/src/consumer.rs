@@ -244,3 +244,224 @@ impl MarketDataConsumer {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Mutex;
+
+    use prost::Message;
+    use rdkafka::message::OwnedHeaders;
+    use trading_common::kafka::metadata::{
+        build_event_metadata_headers, producers, EventContext, EventMetadataHeadersInput,
+    };
+    use trading_common::kafka::topics::{self, schema_versions};
+
+    use crate::metrics::NoopFeatureEngineeringMetrics;
+
+    use super::*;
+
+    struct RecordingHandler {
+        calls: Mutex<Vec<(MarketDataBar, EventContext)>>,
+        outcome: ProcessingOutcome,
+    }
+
+    #[async_trait]
+    impl MarketDataHandler for RecordingHandler {
+        async fn handle_final_bar(
+            &self,
+            bar: MarketDataBar,
+            source_context: EventContext,
+        ) -> Result<ProcessingOutcome, FeatureEngineeringError> {
+            self.calls
+                .lock()
+                .expect("calls mutex poisoned")
+                .push((bar, source_context));
+            Ok(self.outcome.clone())
+        }
+    }
+
+    struct RecordingDlq {
+        records: Mutex<Vec<DeadLetterRecord>>,
+    }
+
+    #[async_trait]
+    impl DeadLetterPublisher for RecordingDlq {
+        async fn publish_dead_letter(
+            &self,
+            record: DeadLetterRecord,
+        ) -> Result<(), FeatureEngineeringError> {
+            self.records
+                .lock()
+                .expect("records mutex poisoned")
+                .push(record);
+            Ok(())
+        }
+    }
+
+    fn build_consumer(
+        handler: Arc<RecordingHandler>,
+        dlq: Arc<RecordingDlq>,
+    ) -> MarketDataConsumer {
+        MarketDataConsumer::new(
+            handler,
+            RetryConfig {
+                max_retries: 0,
+                initial_delay_ms: 0,
+                max_delay_ms: 0,
+            },
+            dlq,
+            Arc::new(NoopFeatureEngineeringMetrics),
+        )
+    }
+
+    fn final_bar(interval: &str, is_final: bool) -> MarketDataBar {
+        MarketDataBar {
+            instrument_id: "instrument-1".to_string(),
+            symbol: "BTCUSDT".to_string(),
+            venue: "BINANCE".to_string(),
+            interval: interval.to_string(),
+            open_time_ms: 1_775_044_800_000,
+            close_time_ms: 1_775_044_859_999,
+            open: "100.0".to_string(),
+            high: "101.0".to_string(),
+            low: "99.0".to_string(),
+            close: "100.5".to_string(),
+            volume: "10.0".to_string(),
+            quote_volume: "1000.0".to_string(),
+            trade_count: 10,
+            is_final,
+        }
+    }
+
+    fn encode_bar(bar: &MarketDataBar) -> Vec<u8> {
+        let mut payload = Vec::new();
+        bar.encode(&mut payload).expect("bar should encode");
+        payload
+    }
+
+    #[tokio::test]
+    async fn skips_non_final_bars_without_handler_or_dlq() {
+        let handler = Arc::new(RecordingHandler {
+            calls: Mutex::new(Vec::new()),
+            outcome: ProcessingOutcome::Published("unused".to_string()),
+        });
+        let dlq = Arc::new(RecordingDlq {
+            records: Mutex::new(Vec::new()),
+        });
+        let consumer = build_consumer(handler.clone(), dlq.clone());
+
+        let outcome = consumer
+            .process_payload::<OwnedHeaders>(&encode_bar(&final_bar("1m", false)), None, None)
+            .await;
+
+        assert_eq!(outcome, ProcessingOutcome::SkippedNonFinal);
+        assert!(handler
+            .calls
+            .lock()
+            .expect("calls mutex poisoned")
+            .is_empty());
+        assert!(dlq
+            .records
+            .lock()
+            .expect("records mutex poisoned")
+            .is_empty());
+    }
+
+    #[tokio::test]
+    async fn dead_letters_malformed_protobuf_payloads() {
+        let handler = Arc::new(RecordingHandler {
+            calls: Mutex::new(Vec::new()),
+            outcome: ProcessingOutcome::Published("unused".to_string()),
+        });
+        let dlq = Arc::new(RecordingDlq {
+            records: Mutex::new(Vec::new()),
+        });
+        let consumer = build_consumer(handler.clone(), dlq.clone());
+
+        let outcome = consumer
+            .process_payload::<OwnedHeaders>(&[0xff], Some("BINANCE:instrument-1"), None)
+            .await;
+
+        assert_eq!(outcome, ProcessingOutcome::DeadLettered);
+        assert!(handler
+            .calls
+            .lock()
+            .expect("calls mutex poisoned")
+            .is_empty());
+        let records = dlq.records.lock().expect("records mutex poisoned");
+        assert_eq!(records.len(), 1);
+        assert_eq!(records[0].original_topic, topics::MARKET_RAW_DATA);
+        assert_eq!(
+            records[0].original_key.as_deref(),
+            Some("BINANCE:instrument-1")
+        );
+    }
+
+    #[tokio::test]
+    async fn dead_letters_unsupported_intervals() {
+        let handler = Arc::new(RecordingHandler {
+            calls: Mutex::new(Vec::new()),
+            outcome: ProcessingOutcome::Published("unused".to_string()),
+        });
+        let dlq = Arc::new(RecordingDlq {
+            records: Mutex::new(Vec::new()),
+        });
+        let consumer = build_consumer(handler.clone(), dlq.clone());
+
+        let outcome = consumer
+            .process_payload::<OwnedHeaders>(&encode_bar(&final_bar("tick", true)), None, None)
+            .await;
+
+        assert_eq!(outcome, ProcessingOutcome::DeadLettered);
+        assert!(handler
+            .calls
+            .lock()
+            .expect("calls mutex poisoned")
+            .is_empty());
+        let records = dlq.records.lock().expect("records mutex poisoned");
+        assert_eq!(records.len(), 1);
+        assert!(records[0].error_message.contains("unsupported"));
+    }
+
+    #[tokio::test]
+    async fn passes_source_event_context_to_handler() {
+        let handler = Arc::new(RecordingHandler {
+            calls: Mutex::new(Vec::new()),
+            outcome: ProcessingOutcome::Published("feature-event-1".to_string()),
+        });
+        let dlq = Arc::new(RecordingDlq {
+            records: Mutex::new(Vec::new()),
+        });
+        let consumer = build_consumer(handler.clone(), dlq.clone());
+        let headers = build_event_metadata_headers(EventMetadataHeadersInput {
+            event_id: "market-event-1",
+            event_type: topics::MARKET_RAW_DATA,
+            schema_version: schema_versions::MARKET_RAW_DATA,
+            occurred_at: "2026-05-18T08:00:00Z",
+            producer: producers::EXTERNAL_API_FACADE,
+            content_type: None,
+            correlation_id: Some("workflow-1"),
+            causation_id: None,
+            traceparent: Some("trace-1"),
+        });
+
+        let outcome = consumer
+            .process_payload(&encode_bar(&final_bar("1m", true)), None, Some(&headers))
+            .await;
+
+        assert_eq!(
+            outcome,
+            ProcessingOutcome::Published("feature-event-1".to_string())
+        );
+        assert!(dlq
+            .records
+            .lock()
+            .expect("records mutex poisoned")
+            .is_empty());
+        let calls = handler.calls.lock().expect("calls mutex poisoned");
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].1.event_id.as_deref(), Some("market-event-1"));
+        assert_eq!(calls[0].1.correlation_id.as_deref(), Some("workflow-1"));
+        assert_eq!(calls[0].1.traceparent.as_deref(), Some("trace-1"));
+    }
+}

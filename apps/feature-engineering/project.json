@@ -16,6 +16,10 @@
         {
           "projects": "trading-bot-e2e",
           "target": "e2e-seed"
+        },
+        {
+          "projects": "data-ingestion",
+          "target": "serve-e2e"
         }
       ],
       "options": {
