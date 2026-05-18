@@ -2,6 +2,7 @@
 members = [
   "libs/common-rs",   # shared proto types + Kafka utilities (lang:rust, scope:shared)
   "apps/data-ingestion",
+  "apps/feature-engineering",
 ]
 resolver = "2"
 
@@ -58,6 +59,9 @@ reqwest = { version = "=0.13.3", features = ["json", "rustls-tls"], default-feat
 
 # Metrics (Prometheus)
 prometheus = { version = "=0.14.0" }
+
+# Technical analysis indicators for Feature Engineering.
+ta = { version = "=0.5.0" }
 
 # Async trait support (Rust's `async fn` in traits requires this until stabilised in 1.75+)
 async-trait = { version = "=0.1.89" }

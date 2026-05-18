@@ -1,0 +1,49 @@
+[package]
+name = "feature-engineering"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[lib]
+name = "feature_engineering"
+path = "src/lib.rs"
+
+[[bin]]
+name = "feature-engineering"
+path = "src/main.rs"
+
+[dependencies]
+# Shared proto types + Kafka helpers for Rust services.
+trading-common = { path = "../../libs/common-rs" }
+
+# Async runtime
+tokio.workspace = true
+# gRPC + proto runtime
+prost.workspace = true
+tonic.workspace = true
+# Kafka consumer/producer
+rdkafka.workspace = true
+# Config + serialization
+serde.workspace = true
+serde_json.workspace = true
+dotenvy.workspace = true
+# Logging
+tracing.workspace = true
+tracing-subscriber.workspace = true
+# Error handling
+anyhow.workspace = true
+thiserror.workspace = true
+# Domain types
+chrono.workspace = true
+uuid.workspace = true
+async-trait.workspace = true
+rust_decimal.workspace = true
+# Metrics
+prometheus.workspace = true
+# Technical indicators
+ta.workspace = true
+
+[dev-dependencies]
+mockall.workspace = true
+tokio-test.workspace = true
