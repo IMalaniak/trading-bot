@@ -24,13 +24,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 "../../proto/common/instrument.proto",
                 "../../proto/common/portfolio.proto",
                 "../../proto/common/signal.proto",
-                // Event messages (InstrumentRegistered, MarketDataBar)
+                // Event messages (InstrumentRegistered, MarketDataBar, features)
                 "../../proto/events/events.proto",
                 "../../proto/events/market.proto",
+                "../../proto/events/features.proto",
                 // gRPC service definitions
                 "../../proto/services/external_api_facade.proto",
                 "../../proto/services/portfolio_manager.proto",
                 "../../proto/services/data_ingestion.proto",
+                "../../proto/services/prediction_engine.proto",
             ],
             &["../../proto"], // root search path for `import` statements in .proto files
         )?;

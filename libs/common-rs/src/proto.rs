@@ -41,4 +41,9 @@ pub mod tradingbot {
         // RiskAndPortfolioManagerClient used at startup for re-subscription.
         tonic::include_proto!("tradingbot.portfolio_manager");
     }
+
+    pub mod prediction {
+        // Signals service definitions for the future Prediction Engine.
+        tonic::include_proto!("tradingbot.prediction");
+    }
 }

@@ -26,6 +26,10 @@ export {
   TradeDecisionKind,
   TradeDecisionReason,
 } from './events/events';
+export {
+  IndicatorFeatureValue,
+  IndicatorFeatureVector,
+} from './events/features';
 export { MarketDataBar } from './events/market';
 export {
   GetMarketDataBarsRequest,
@@ -74,6 +78,8 @@ export const COMMON_PORTFOLIO_PROTO = 'proto/common/portfolio.proto';
 export const COMMON_SIGNAL_PROTO = 'proto/common/signal.proto';
 
 export const EVENTS_EVENTS_PROTO = 'proto/events/events.proto';
+
+export const EVENTS_FEATURES_PROTO = 'proto/events/features.proto';
 
 export const EVENTS_MARKET_PROTO = 'proto/events/market.proto';
 

@@ -19,6 +19,7 @@ export const KAFKA_EVENT_CONTENT_TYPES = {
 export const KAFKA_EVENT_PRODUCERS = {
   PORTFOLIO_MANAGER: 'portfolio-manager',
   PREDICTION_ENGINE: 'prediction-engine',
+  FEATURE_ENGINEERING: 'feature-engineering',
   EXECUTION_ENGINE: 'execution-engine',
   EXTERNAL_API_FACADE: 'external-api-facade',
 } as const;
@@ -32,6 +33,7 @@ export const KAFKA_EVENT_SCHEMA_VERSIONS = {
   ORDERS_PLACED: '1',
   ORDERS_FILLS: '1',
   PORTFOLIO_UPDATED: '1',
+  FEATURES_INDICATORS: '1',
   TRADING_SIGNALS_DLQ: '1',
   TRADING_SIGNALS_PORTFOLIO_DLQ: '1',
   TRADES_APPROVED_DLQ: '1',

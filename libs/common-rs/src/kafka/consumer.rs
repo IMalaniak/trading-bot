@@ -132,7 +132,11 @@ mod tests {
         .await;
 
         assert_eq!(result.unwrap(), 42);
-        assert_eq!(call_count.load(Ordering::SeqCst), 1, "should only call once");
+        assert_eq!(
+            call_count.load(Ordering::SeqCst),
+            1,
+            "should only call once"
+        );
     }
 
     #[tokio::test]

@@ -85,7 +85,9 @@ impl DlqPublisher {
 
         self.producer
             .send(
-                FutureRecord::to(dlq_topic).payload(body.as_slice()).key(key),
+                FutureRecord::to(dlq_topic)
+                    .payload(body.as_slice())
+                    .key(key),
                 // Timeout::Never: block until the broker acknowledges.
                 // Appropriate here because losing a DLQ message is worse than blocking.
                 Timeout::Never,
