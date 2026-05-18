@@ -3,16 +3,18 @@
 ## MVP Local Validation
 
 This README is the canonical local walkthrough for validating the MVP from a
-clean checkout. The MVP proves the implemented portfolio flow: seeded portfolio
-data, Dashboard visibility, instrument configuration through API Gateway, and a
-test-harness Kafka signal that drives risk, execution, fill reconciliation, REST
-state, and browser-visible Dashboard state.
+clean checkout. The MVP proves the implemented portfolio and market-data flows:
+seeded portfolio data, Dashboard visibility, instrument configuration through
+API Gateway, market data ingestion through Data Ingestion, and a test-harness
+Kafka signal that drives risk, execution, fill reconciliation, REST state, and
+browser-visible Dashboard state.
 
 Synthetic signal publishing is test tooling only. The product surface remains:
 
 - `GET /api/portfolios`
 - `GET /api/portfolios/:portfolioId?recentOrdersLimit=20`
 - `POST /api/portfolios/:portfolioId/instrument`
+- `GET /api/market-data/bars`
 
 ### Prerequisites
 
@@ -54,6 +56,7 @@ cp apps/portfolio-manager/.env.example apps/portfolio-manager/.env
 cp apps/execution-engine/.env.example apps/execution-engine/.env
 cp apps/dashboard/.env.example apps/dashboard/.env
 cp apps/external-api-facade/.env.example apps/external-api-facade/.env
+cp apps/data-ingestion/.env.example apps/data-ingestion/.env
 ```
 
 The committed `.env.e2e` files provide deterministic defaults for the isolated
@@ -69,9 +72,9 @@ npx nx run trading-bot-e2e:e2e
 
 This Nx target starts isolated Redpanda and Postgres through `infra:serve-e2e`,
 runs service migrations, seeds `portfolio-alpha`, starts `portfolio-manager`,
-`execution-engine`, `api-gateway`, and `dashboard`, publishes synthetic
-protobuf events from the e2e harness, then verifies both REST state and the
-Dashboard in Chromium.
+`execution-engine`, `external-api-facade`, `data-ingestion`, `api-gateway`, and
+`dashboard`, publishes synthetic protobuf events from the e2e harness, then
+verifies REST state, market-data reads, and the Dashboard in Chromium.
 
 Clean the isolated e2e Docker stack after the run when needed:
 
@@ -92,6 +95,7 @@ Apply migrations and seed baseline portfolio data:
 ```bash
 npx nx run portfolio-manager:migrate
 npx nx run execution-engine:migrate
+npx nx run data-ingestion:migrate
 npx nx run portfolio-manager:seed
 ```
 
@@ -100,6 +104,9 @@ Start the services in separate terminals:
 ```bash
 npx nx serve portfolio-manager
 npx nx serve execution-engine
+npx nx serve external-api-facade
+npx nx run data-ingestion:build
+./target/debug/data-ingestion
 npx nx serve api-gateway
 npx nx serve dashboard
 ```
@@ -145,11 +152,14 @@ npx nx run execution-engine:test-integration
 ## MVP Limitations
 
 - No real Prediction Engine.
-- No market data ingestion.
-- No Feature Engineering service.
+- No completed Feature Engineering service yet; this is the current post-MVP
+  implementation target.
+- No signal cache/read API or feature persistence/read API.
+- No model registry, training pipeline, or cross-instrument correlations.
 - No real exchange or paper exchange execution.
 - No auth, users, or permissions.
-- No websocket or live Dashboard stream.
+- No websocket/live Dashboard stream, signal monitor, or indicator chart
+  overlays.
 - No production deployment story.
 - No schema registry.
 

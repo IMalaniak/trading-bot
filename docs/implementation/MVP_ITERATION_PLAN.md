@@ -6,10 +6,9 @@ This document tracks what remains before the trading bot is a usable MVP. It
 replaces the original implementation iteration plan now that Iterations 1-8 are
 complete.
 
-The backend MVP foundation, Dashboard visibility, and full-system e2e coverage
-are already in place. The remaining MVP work should make that foundation
-reproducible from a clean checkout and document the operational boundaries for
-future contributors.
+The backend MVP foundation, market data ingestion, Dashboard visibility, and
+full-system e2e coverage are already in place. The remaining work in this
+document tracks post-MVP capability expansion.
 
 ## Completed Backend Baseline
 
@@ -69,12 +68,13 @@ Implemented baseline:
   - dedicated `trading-bot-e2e` Nx/Playwright project
   - isolated e2e Redpanda/Postgres lifecycle through the `infra` Nx project
   - database migration and seed workflow for `portfolio-alpha`
-  - startup of `portfolio-manager`, `execution-engine`, `api-gateway`, and
-    `dashboard` through Nx targets
+  - startup of `portfolio-manager`, `execution-engine`, `external-api-facade`,
+    `data-ingestion`, `api-gateway`, and `dashboard` through Nx targets
   - synthetic `common.Signal` publishing to `trading.signals` from test harness
     code only
-  - REST and browser-visible Dashboard assertions, plus duplicate source signal
-    and duplicate fill replay checks
+  - REST and browser-visible Dashboard assertions, market-data read assertions,
+    plus duplicate source signal, duplicate fill replay, and duplicate market
+    data replay checks
 - Operational polish and documentation (Iteration 9):
   - `README.md` added as canonical local validation walkthrough covering clean-checkout
     setup, infra start, database migrations, portfolio seeding, service startup, e2e
@@ -83,6 +83,20 @@ Implemented baseline:
     `portfolio-manager`, `execution-engine`, `dashboard`, and integration/e2e stacks
   - MVP limitations clearly documented; runbooks and docs links updated to reference
     implemented plural `/api/portfolios...` paths
+- Market data and exchange integration (Iteration 10):
+  - `external-api-facade` NestJS service manages Binance kline WebSocket
+    subscriptions through `StartMarketDataSubscription` and
+    `StopMarketDataSubscription`
+  - raw market data is published directly to `market.raw.data` as protobuf
+    `MarketDataBar` messages
+  - `data-ingestion` Rust service consumes `instrument.registered` to start
+    subscriptions, consumes `market.raw.data` to persist final OHLCV bars to
+    TimescaleDB, and exposes `GetMarketDataBars` over gRPC
+  - API Gateway exposes `GET /api/market-data/bars` through the Data Ingestion
+    gRPC API
+  - local infra bootstraps `instrument.registered.dlq` and
+    `market.raw.data.dlq`, and Rust workspace/Nx targets exist for
+    `data-ingestion` and `common-rs`
 
 Current validation remains:
 
@@ -99,71 +113,13 @@ npx nx run trading-bot-e2e:typecheck
 npx nx run portfolio-manager:test-integration
 npx nx run execution-engine:test-integration
 npx nx run trading-bot-e2e:e2e
-```
-
-Validation commands added in Iteration 10:
-
-```bash
-# External API Facade (NestJS/TypeScript)
 npx nx run external-api-facade:typecheck
 npx nx run external-api-facade:test
-
-# Data Ingestion (Rust)
 npx nx run data-ingestion:fmt
 npx nx run data-ingestion:lint
 npx nx run data-ingestion:test
 npx nx run data-ingestion:test-integration  # requires: npx nx run infra:serve-integration
 ```
-
-## Remaining MVP Iterations
-
-### Iteration 10: Market Data and Exchange Integration
-
-Goal: implement the External API Facade (NestJS/TypeScript) and the Data
-Ingestion service (Rust), connecting Binance market data to the trading
-pipeline via Kafka and TimescaleDB.
-
-Detailed implementation plan: `docs/implementation/ITERATION_10_PLAN.md`
-
-Scope:
-
-- External API Facade (NestJS/TypeScript):
-  - gRPC API: `StartMarketDataSubscription` and `StopMarketDataSubscription`
-  - Binance WebSocket kline stream with testnet/production switch via env
-  - Direct Kafka publish to `market.raw.data` (no outbox — streaming workload)
-  - Prometheus metrics endpoint
-- Data Ingestion service (Rust):
-  - Consumes `instrument.registered` → starts Binance kline subscription via Facade
-  - Consumes `market.raw.data` → writes OHLCV bars to TimescaleDB
-  - gRPC API: `GetMarketDataBars` for historical queries
-  - Startup re-subscription from portfolio-manager gRPC `ListInstruments`
-  - DLQ publishing for both consumers
-  - sqlx offline cache committed; integration tests require live TimescaleDB
-- Proto contracts: `proto/events/market.proto`, `proto/services/external_api_facade.proto`,
-  `proto/services/data_ingestion.proto`
-- API Gateway: `GET /api/market-data/bars` proxy to Data Ingestion
-- New Kafka topics: `instrument.registered.dlq`, `market.raw.data.dlq`
-- Infra: add both services to `docker-compose.yml`
-- NX Rust integration: `Cargo.toml` workspace at repo root; NX targets for
-  build, test, lint, fmt, audit
-
-Known limitations for this iteration:
-
-- Binance API keys not required (kline streams are public); keys are optional
-  and documented for future order placement only.
-- No Feature Engineering or Prediction Engine (next roadmap items).
-- No real order placement (execution engine simulator remains in place).
-- No WebSocket/live dashboard market data stream.
-
-Acceptance criteria:
-
-- `instrument.registered` event triggers a Binance kline subscription via Facade.
-- Kline events flow from Binance → Facade → `market.raw.data` → Data Ingestion → TimescaleDB.
-- `GET /api/market-data/bars` returns stored bars via API Gateway.
-- All Rust targets pass: `nx run data-ingestion:lint`, `nx run data-ingestion:test`,
-  `nx run data-ingestion:fmt`.
-- All TypeScript targets pass: `nx run external-api-facade:test`,
-  `nx run external-api-facade:typecheck`.
 
 ## Post-MVP Roadmap
 
@@ -172,12 +128,15 @@ iterations.
 
 ### Prediction and Feature Pipeline
 
-- Feature Engineering service consuming raw market data.
+- Feature Engineering service consuming raw market data. This is the current
+  implementation target after Iteration 10.
 - Indicator publishing on `features.indicators`.
 - Real Prediction Engine producing `trading.signals`.
 - Signal cache and read API for dashboard signal visibility.
 - Model registry and training pipeline once prediction logic needs lifecycle
   management.
+- Feature persistence/read API and cross-instrument correlations after the
+  first per-instrument feature pipeline is stable.
 
 ### Strategy and Risk Configuration
 
