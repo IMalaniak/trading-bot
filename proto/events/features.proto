@@ -1,0 +1,40 @@
+syntax = "proto3";
+
+package tradingbot.events;
+
+// IndicatorFeatureValue is one named numeric feature emitted by Feature
+// Engineering. Values are decimal strings so Rust, TypeScript, and future
+// Python consumers do not lose precision through binary floating point.
+message IndicatorFeatureValue {
+  // Stable feature name, e.g. "rsi.close.14".
+  string name = 1;
+  // Numeric value represented as a string.
+  string value = 2;
+}
+
+// IndicatorFeatureVector is published to `features.indicators` once the core
+// indicator set is ready for a finalized market data bar.
+message IndicatorFeatureVector {
+  // Deterministic event/business identity for the feature vector.
+  string id = 1;
+  // Internal instrument identifier.
+  string instrument_id = 2;
+  // Exchange-native symbol, e.g. "BTCUSDT".
+  string symbol = 3;
+  // Exchange venue, e.g. "BINANCE".
+  string venue = 4;
+  // Kline interval, e.g. "1m", "5m", "1h".
+  string interval = 5;
+  // Source bar open time as Unix epoch milliseconds.
+  int64 open_time_ms = 6;
+  // Source bar close time as Unix epoch milliseconds.
+  int64 close_time_ms = 7;
+  // Kafka event-id of the source market.raw.data event.
+  string source_event_id = 8;
+  // Feature-set version, e.g. "core-v1".
+  string feature_set = 9;
+  // Computed indicator values.
+  repeated IndicatorFeatureValue features = 10;
+  // ISO-8601 timestamp for when this vector was calculated.
+  string calculated_at = 11;
+}

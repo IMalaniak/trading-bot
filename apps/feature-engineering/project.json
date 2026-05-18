@@ -1,0 +1,96 @@
+{
+  "name": "feature-engineering",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/feature-engineering/src",
+  "projectType": "application",
+  "tags": ["lang:rust", "scope:backend"],
+  "implicitDependencies": ["common-rs"],
+  "targets": {
+    "serve-e2e": {
+      "continuous": true,
+      "executor": "nx:run-commands",
+      "cache": false,
+      "defaultConfiguration": "e2e",
+      "dependsOn": [
+        "build",
+        {
+          "projects": "trading-bot-e2e",
+          "target": "e2e-seed"
+        },
+        {
+          "projects": "data-ingestion",
+          "target": "serve-e2e"
+        }
+      ],
+      "options": {
+        "command": "./target/debug/feature-engineering",
+        "cwd": "{workspaceRoot}",
+        "envFile": "apps/feature-engineering/.env.e2e"
+      },
+      "configurations": {
+        "e2e": {}
+      }
+    },
+    "build": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": ["rustFiles", "^rustFiles"],
+      "outputs": ["{workspaceRoot}/target/debug/feature-engineering"],
+      "options": {
+        "command": "cargo build -p feature-engineering",
+        "cwd": "{workspaceRoot}"
+      }
+    },
+    "build-release": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": ["rustFiles", "^rustFiles"],
+      "outputs": ["{workspaceRoot}/target/release/feature-engineering"],
+      "options": {
+        "command": "cargo build --release -p feature-engineering",
+        "cwd": "{workspaceRoot}"
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": ["rustFiles", "^rustFiles"],
+      "options": {
+        "command": "cargo test -p feature-engineering --lib",
+        "cwd": "{workspaceRoot}"
+      }
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": ["rustFiles", "^rustFiles"],
+      "options": {
+        "command": "cargo clippy -p feature-engineering -- -D warnings",
+        "cwd": "{workspaceRoot}"
+      }
+    },
+    "fmt": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": ["rustFiles"],
+      "options": {
+        "command": "cargo fmt -p feature-engineering -- --check",
+        "cwd": "{workspaceRoot}"
+      }
+    },
+    "fmt-write": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "cargo fmt -p feature-engineering",
+        "cwd": "{workspaceRoot}"
+      }
+    },
+    "audit": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "cargo audit",
+        "cwd": "{workspaceRoot}"
+      }
+    }
+  }
+}

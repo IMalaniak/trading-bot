@@ -8,6 +8,7 @@
     "api-gateway",
     "dashboard",
     "execution-engine",
+    "feature-engineering",
     "portfolio-manager",
     "common",
     "testing"
@@ -32,6 +33,10 @@
         },
         {
           "projects": "data-ingestion",
+          "target": "serve-e2e"
+        },
+        {
+          "projects": "feature-engineering",
           "target": "serve-e2e"
         },
         {
@@ -102,6 +107,10 @@
         },
         {
           "projects": "data-ingestion",
+          "target": "serve-e2e"
+        },
+        {
+          "projects": "feature-engineering",
           "target": "serve-e2e"
         },
         {

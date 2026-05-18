@@ -15,7 +15,7 @@ workspace "Trading Bot System" {
             // Containers
 
             group "Data Ingestion Service" {
-                dataIngestion = container "Data Ingestion" "Subscribes to market data topics, stores raw/indicator time-series data, and manages stream subscriptions." "Rust" {
+                dataIngestion = container "Data Ingestion" "Subscribes to instrument and raw market data topics, stores OHLCV time-series data, and manages market stream subscriptions." "Rust" {
                     tags "Implemented"
                     gRPC = component "Market Data API" "Exposes gRPC API for API Gateway to fetch historical data." "gRPC" "API"
                     gRPC_Client = component "gRPC Client" "Handles internal service-to-service communication." "gRPC"
@@ -24,11 +24,11 @@ workspace "Trading Bot System" {
                     marketCollector = component "Market Data Collector" "Orchestrates market stream subscriptions via External API Facade." "Rust"
                     repository = component "Data Ingestion Repository" "Reads/Writes data from/to TimescaleDB." "Rust"
 
-                    kafkaConsumer = component "Kafka Consumer" "Consumes instrument registration, raw market data, and engineered indicator topics from Kafka." "Rust"
+                    kafkaConsumer = component "Kafka Consumer" "Consumes instrument registration and raw market data topics from Kafka." "Rust"
 
                     gRPC -> core "Handles market data requests via"
                     core -> marketCollector "Controls subscription feeds of"
-                    core -> repository "Reads historical data and writes raw/indicator series via"
+                    core -> repository "Reads historical data and writes raw OHLCV series via"
                     core -> kafkaConsumer "Subscribes to instrument registration and market topics via"
                     marketCollector -> gRPC_Client "Communicates with External API Facade over"
 
@@ -40,13 +40,16 @@ workspace "Trading Bot System" {
             }
 
             group "Feature Engineering Service" {
-                featureEngineering = container "Feature Engineering" "Computes indicators and transforms raw data for prediction." "Rust" {
-                    tags "Planned"
-                    featureCalculator = component "Feature Calculator" "Computes indicators (RSI, MACD, volatility, correlations)." "Rust"
+                featureEngineering = container "Feature Engineering" "Current post-MVP implementation target. Computes core per-instrument indicators from raw market data and publishes feature vectors for prediction." "Rust" {
+                    tags "Planned" "Current Target"
+                    featureCalculator = component "Feature Calculator" "Computes core v1 indicators: SMA/EMA, RSI, MACD, returns, and volatility. Cross-instrument correlations are planned later." "Rust"
+                    warmupClient = component "Data Ingestion Warm-up Client" "Fetches recent stored bars from Data Ingestion gRPC to rebuild rolling indicator state after startup." "Rust"
 
                     kafkaConsumer = component "Kafka Consumer" "Consumes raw market data from Kafka." "Rust"
-                    kafkaPublisher = component "Kafka Publisher" "Publishes engineered features to Kafka." "Rust"
+                    kafkaPublisher = component "Kafka Publisher" "Publishes features.indicators feature-vector events to Kafka." "Rust"
 
+                    kafkaConsumer -> warmupClient "Requests historical bars on first instrument/interval via"
+                    warmupClient -> featureCalculator "Primes rolling state for"
                     kafkaConsumer -> featureCalculator "Feeds raw events to"
                     featureCalculator -> kafkaPublisher "Publishes features to"
 
@@ -360,7 +363,7 @@ workspace "Trading Bot System" {
                     productApiBoundary = component "Product API Boundary" "Documents that Dashboard/API Gateway use product portfolio endpoints only, while synthetic signal publishing remains test-harness behavior." "Markdown" {
                         tags "Implemented" "Documentation"
                     }
-                    mvpLimitations = component "MVP Limitations" "Documents missing MVP capabilities: real Prediction Engine, market ingestion, Feature Engineering, exchange execution, auth, live Dashboard streaming, production deployment, and schema registry." "Markdown" {
+                    mvpLimitations = component "MVP Limitations" "Documents missing capabilities: completed Feature Engineering service, feature persistence/read API, cross-instrument correlations, real Prediction Engine, signal cache/read API, model registry/training, exchange execution, auth, live Dashboard signal/indicator views, production deployment, and schema registry." "Markdown" {
                         tags "Implemented" "Documentation"
                     }
                 }
@@ -444,7 +447,7 @@ workspace "Trading Bot System" {
         tradingBot.validationGuide.productApiBoundary -> tradingBot.apiGateway.REST "Documents product endpoints exposed by"
         tradingBot.validationGuide.productApiBoundary -> tradingBot.e2eTestHarness.signalPublisher "Documents synthetic signal publishing as test tooling only"
         tradingBot.validationGuide.mvpLimitations -> tradingBot.predictionEngine "Marks real signal production as missing"
-        tradingBot.validationGuide.mvpLimitations -> tradingBot.featureEngineering "Marks Feature Engineering as missing"
+        tradingBot.validationGuide.mvpLimitations -> tradingBot.featureEngineering "Marks completed Feature Engineering, feature persistence/read API, and cross-instrument correlations as missing/current target"
         tradingBot.validationGuide.mvpLimitations -> tradingBot.externalAPIFacade "Marks real exchange order placement as missing"
         tradingBot.validationGuide.mvpLimitations -> tradingBot.schemaRegistry "Marks schema registry as missing"
         tradingBot.envExamples -> tradingBot.apiGateway "Configures local and e2e API Gateway runtime"
@@ -480,7 +483,7 @@ workspace "Trading Bot System" {
         tradingBot.executionEngine.kafkaPublisher -> tradingBot.messageBus "Publishes orders.placed and orders.fills to"
         tradingBot.executionEngine.dlqPublisher -> tradingBot.messageBus "Publishes trades.approved.dlq to"
 
-        tradingBot.dataIngestion.kafkaConsumer -> tradingBot.messageBus "Consumes instrument.registered, market.raw.data, and features.indicators from"
+        tradingBot.dataIngestion.kafkaConsumer -> tradingBot.messageBus "Consumes instrument.registered and market.raw.data from"
         tradingBot.featureEngineering.kafkaConsumer -> tradingBot.messageBus "Consumes market.raw.data from"
         tradingBot.predictionEngine.kafkaConsumer -> tradingBot.messageBus "Consumes features.indicators from"
         tradingBot.portfolioManager.instrumentStageConsumer -> tradingBot.messageBus "Consumes trading.signals from"

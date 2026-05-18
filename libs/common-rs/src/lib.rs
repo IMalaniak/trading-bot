@@ -5,7 +5,7 @@
 //
 // Available modules:
 //   trading_common::proto   — all generated gRPC message types and service stubs
-//   trading_common::kafka   — consumer retry loop and DLQ publisher
+//   trading_common::kafka   — topic/key/header helpers, retry loop, and DLQ publisher
 
 pub mod kafka;
 pub mod proto;

@@ -1,5 +1,6 @@
 import {
   DeadLetterEvent,
+  IndicatorFeatureVector,
   OrderFill,
   OrderPlaced,
   OrderStatus,
@@ -215,6 +216,64 @@ describe('Kafka contract', () => {
     );
     expect(decoded.changedPositionExposureNotional).toBe(
       '150.000000000000000004',
+    );
+  });
+
+  it('round-trips indicator feature vectors with decimal values as strings', () => {
+    const vector = IndicatorFeatureVector.fromPartial({
+      id: 'feat:inst-1:1m:1775044800000:core-v1',
+      instrumentId: 'inst-1',
+      symbol: 'BTCUSDT',
+      venue: 'BINANCE',
+      interval: '1m',
+      openTimeMs: 1775044800000,
+      closeTimeMs: 1775044859999,
+      sourceEventId: 'market-event-1',
+      featureSet: 'core-v1',
+      features: [
+        { name: 'rsi.close.14', value: '55.123456789012345678' },
+        { name: 'macd.close.12_26_9', value: '-1.250000000000000001' },
+      ],
+      calculatedAt: '2026-03-22T12:34:56.789Z',
+    });
+
+    const decoded = IndicatorFeatureVector.decode(
+      IndicatorFeatureVector.encode(vector).finish(),
+    );
+
+    expect(decoded.id).toBe('feat:inst-1:1m:1775044800000:core-v1');
+    expect(decoded.sourceEventId).toBe('market-event-1');
+    expect(decoded.featureSet).toBe('core-v1');
+    expect(decoded.features).toEqual([
+      { name: 'rsi.close.14', value: '55.123456789012345678' },
+      { name: 'macd.close.12_26_9', value: '-1.250000000000000001' },
+    ]);
+  });
+
+  it('defines feature-engineering metadata constants', () => {
+    expect(KAFKA_EVENT_PRODUCERS.FEATURE_ENGINEERING).toBe(
+      'feature-engineering',
+    );
+    expect(KAFKA_EVENT_SCHEMA_VERSIONS.FEATURES_INDICATORS).toBe('1');
+
+    expect(
+      buildEventMetadataHeaders({
+        eventId: 'feature-event-1',
+        eventType: KAFKA_TOPICS.FEATURES_INDICATORS,
+        schemaVersion: KAFKA_EVENT_SCHEMA_VERSIONS.FEATURES_INDICATORS,
+        occurredAt: '2026-03-22T12:34:56.789Z',
+        producer: KAFKA_EVENT_PRODUCERS.FEATURE_ENGINEERING,
+        correlationId: 'workflow-1',
+        causationId: 'market-event-1',
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        [KAFKA_EVENT_HEADER_NAMES.EVENT_TYPE]: KAFKA_TOPICS.FEATURES_INDICATORS,
+        [KAFKA_EVENT_HEADER_NAMES.PRODUCER]:
+          KAFKA_EVENT_PRODUCERS.FEATURE_ENGINEERING,
+        [KAFKA_EVENT_HEADER_NAMES.CORRELATION_ID]: 'workflow-1',
+        [KAFKA_EVENT_HEADER_NAMES.CAUSATION_ID]: 'market-event-1',
+      }),
     );
   });
 

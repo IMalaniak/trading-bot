@@ -58,32 +58,31 @@ Everything else in this document should be read as either:
 
 ## Current Implementation Status
 
-| Area                             | Status               | Notes                                                                                                                                                                                                           |
-| -------------------------------- | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| API Gateway                      | Implemented          | REST entrypoint lists portfolios, forwards portfolio-scoped instrument configuration to `portfolio-manager`, aggregates portfolio/execution visibility over gRPC, and allows configured dashboard CORS origins. |
-| Risk & Portfolio Manager         | Implemented          | Instrument registration, the two-stage risk pipeline, fill reconciliation, portfolio read queries, and instrument resolution are implemented in `portfolio-manager`.                                            |
-| Outbox Dispatcher                | Implemented          | Kafka publish happens from the outbox, not inline with the DB write; shared dispatch mechanics live in `common`.                                                                                                |
-| Shared Contracts (`common`)      | Implemented          | Proto types, topic constants, key builders, Kafka header helpers, and reusable outbox dispatch ports live here.                                                                                                 |
-| Message Bus (Redpanda/Kafka API) | Implemented          | Local development uses Redpanda.                                                                                                                                                                                |
-| Portfolio DB (Postgres)          | Implemented          | Source of truth for instruments, outbox rows, portfolios, risk decisions, exposure reservations, reconciled orders/fills, positions, and portfolio summary snapshots.                                           |
-| Market Data Store (TimescaleDB)  | Implemented          | Provisioned locally and exercised by Data Ingestion. OHLCV bars are written by the `data-ingestion` service after consuming `market.raw.data` events.                                                          |
-| Data Ingestion Service           | Implemented          | Rust service. Consumes `instrument.registered` → starts Binance kline subscription via External API Facade. Consumes `market.raw.data` → persists OHLCV bars to TimescaleDB. Exposes `GetMarketDataBars` gRPC API for API Gateway. Startup re-subscription from portfolio-manager `ListInstruments`. DLQ publishing for both consumers. Integration tests require live TimescaleDB. |
-| Feature Engineering Service      | Planned              | Not implemented in this repo yet.                                                                                                                                                                               |
-| Prediction Engine                | Planned              | Not implemented in this repo yet.                                                                                                                                                                               |
-| Execution Engine                 | Implemented          | Event simulator consumes approved trades, emits deterministic placed/fill lifecycle events, and exposes execution-owned order/fill read queries over gRPC.                                                      |
-| Execution DB (Postgres schema)   | Implemented          | Source of truth for simulated orders, fills, and execution outbox rows.                                                                                                                                         |
-| Reliability & Operability        | Implemented          | Implemented consumers use bounded retry, per-topic DLQs, correlation/causation headers, structured logs, and Prometheus metrics endpoints.                                                                      |
-| External API Facade              | Implemented          | NestJS service. Manages Binance WebSocket kline subscriptions. `StartMarketDataSubscription` / `StopMarketDataSubscription` gRPC API. Publishes `MarketDataBar` protobuf events directly to `market.raw.data` (no outbox — high-frequency streaming; a missed candle is reproduced by the next WebSocket tick). Prometheus metrics endpoint. |
-| Dashboard                        | Implemented          | Nx React/Vite/Tailwind dashboard lists portfolios, reads selected portfolio state, and adds instruments to the selected portfolio through API Gateway only.                                                     |
-| Full-System E2E                  | Implemented          | Dedicated `trading-bot-e2e` Nx/Playwright project depends on the shared `infra` Nx project for isolated Docker lifecycle, runs both service migrations, seeds portfolio data, starts backend services and dashboard, publishes synthetic Kafka events from the test harness, and verifies REST plus browser-visible state. |
-| Schema Registry                  | Planned              | Documented as a future capability; not provisioned in local infra.                                                                                                                                              |
+| Area                             | Status         | Notes                                                                                                                                                                                                                                                                                                                                                                               |
+| -------------------------------- | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| API Gateway                      | Implemented    | REST entrypoint lists portfolios, forwards portfolio-scoped instrument configuration to `portfolio-manager`, aggregates portfolio/execution visibility over gRPC, and allows configured dashboard CORS origins.                                                                                                                                                                     |
+| Risk & Portfolio Manager         | Implemented    | Instrument registration, the two-stage risk pipeline, fill reconciliation, portfolio read queries, and instrument resolution are implemented in `portfolio-manager`.                                                                                                                                                                                                                |
+| Outbox Dispatcher                | Implemented    | Kafka publish happens from the outbox, not inline with the DB write; shared dispatch mechanics live in `common`.                                                                                                                                                                                                                                                                    |
+| Shared Contracts (`common`)      | Implemented    | Proto types, topic constants, key builders, Kafka header helpers, and reusable outbox dispatch ports live here.                                                                                                                                                                                                                                                                     |
+| Message Bus (Redpanda/Kafka API) | Implemented    | Local development uses Redpanda.                                                                                                                                                                                                                                                                                                                                                    |
+| Portfolio DB (Postgres)          | Implemented    | Source of truth for instruments, outbox rows, portfolios, risk decisions, exposure reservations, reconciled orders/fills, positions, and portfolio summary snapshots.                                                                                                                                                                                                               |
+| Market Data Store (TimescaleDB)  | Implemented    | Provisioned locally and exercised by Data Ingestion. OHLCV bars are written by the `data-ingestion` service after consuming `market.raw.data` events.                                                                                                                                                                                                                               |
+| Data Ingestion Service           | Implemented    | Rust service. Consumes `instrument.registered` → starts Binance kline subscription via External API Facade. Consumes `market.raw.data` → persists OHLCV bars to TimescaleDB. Exposes `GetMarketDataBars` gRPC API for API Gateway. Startup re-subscription from portfolio-manager `ListInstruments`. DLQ publishing for both consumers. Integration tests require live TimescaleDB. |
+| Feature Engineering Service      | Current target | Current post-MVP implementation target. Planned as a Rust service that consumes final `market.raw.data`, warms rolling state from Data Ingestion, computes core per-instrument indicators, and publishes `features.indicators`. No feature persistence/read API yet.                                                                                                                |
+| Prediction Engine                | Planned        | Not implemented in this repo yet.                                                                                                                                                                                                                                                                                                                                                   |
+| Execution Engine                 | Implemented    | Event simulator consumes approved trades, emits deterministic placed/fill lifecycle events, and exposes execution-owned order/fill read queries over gRPC.                                                                                                                                                                                                                          |
+| Execution DB (Postgres schema)   | Implemented    | Source of truth for simulated orders, fills, and execution outbox rows.                                                                                                                                                                                                                                                                                                             |
+| Reliability & Operability        | Implemented    | Implemented consumers use bounded retry, per-topic DLQs, correlation/causation headers, structured logs, and Prometheus metrics endpoints.                                                                                                                                                                                                                                          |
+| External API Facade              | Implemented    | NestJS service. Manages Binance WebSocket kline subscriptions. `StartMarketDataSubscription` / `StopMarketDataSubscription` gRPC API. Publishes `MarketDataBar` protobuf events directly to `market.raw.data` (no outbox — high-frequency streaming; a missed candle is reproduced by the next WebSocket tick). Prometheus metrics endpoint.                                        |
+| Dashboard                        | Implemented    | Nx React/Vite/Tailwind dashboard lists portfolios, reads selected portfolio state, and adds instruments to the selected portfolio through API Gateway only.                                                                                                                                                                                                                         |
+| Full-System E2E                  | Implemented    | Dedicated `trading-bot-e2e` Nx/Playwright project depends on the shared `infra` Nx project for isolated Docker lifecycle, runs both service migrations, seeds portfolio data, starts backend services and dashboard, publishes synthetic Kafka events from the test harness, and verifies REST plus browser-visible state.                                                          |
+| Schema Registry                  | Planned        | Documented as a future capability; not provisioned in local infra.                                                                                                                                                                                                                                                                                                                  |
 
 ## Remaining MVP Gaps
 
-The backend event chain, dashboard visibility, and full-system e2e
-coverage are implemented through portfolio read visibility. The remaining MVP
-work is about making that chain more polished and reproducible for a clean
-checkout:
+The backend event chain, market data ingestion, dashboard visibility, and
+full-system e2e coverage are implemented through portfolio and market-data read
+visibility. The remaining near-term work is post-MVP capability expansion:
 
 - Polish local setup documentation and env examples so the MVP is reproducible
   from a clean checkout.
@@ -104,13 +103,20 @@ Operational documentation gaps to keep visible:
 - The MVP limitations below must stay clear so planned target architecture is
   not mistaken for implemented behavior.
 
-Current MVP limitations:
+Current implementation limitations:
 
 - No real Prediction Engine.
-- No Feature Engineering service.
+- No completed Feature Engineering service yet; this is the current post-MVP
+  implementation target.
+- No signal cache/read API for dashboard signal visibility.
+- No feature persistence/read API for indicator history or Dashboard overlays.
+- No model registry or training pipeline.
+- No cross-instrument correlations; the first Feature Engineering slice is
+  per-instrument/per-interval.
 - No real exchange or paper exchange execution (External API Facade implements Binance kline subscriptions; order placement is planned).
 - No auth, users, or permissions.
-- No websocket/live Dashboard stream.
+- No websocket/live Dashboard stream, signal monitor, or indicator chart
+  overlays.
 - No production deployment story.
 - No schema registry.
 
@@ -357,22 +363,24 @@ service-specific ordering column such as execution lifecycle sequence.
 
 Local development bootstraps all documented topics explicitly and disables broker auto-creation so topic-name mistakes fail fast.
 
-| Topic                           | Status                | Producer                                                 | Main consumers                                          | Partition key    | Ordering guarantee |
-| ------------------------------- | --------------------- | -------------------------------------------------------- | ------------------------------------------------------- | ---------------- | ------------------ |
-| `instrument.registered`         | Implemented           | Risk & Portfolio Manager                                 | Planned Data Ingestion                                  | `instrument_key` | Per instrument     |
-| `market.raw.data`               | Planned               | Planned External API Facade                              | Planned Data Ingestion, Feature Engineering             | `instrument_key` | Per instrument     |
-| `features.indicators`           | Planned               | Planned Feature Engineering                              | Planned Prediction Engine, Data Ingestion               | `instrument_key` | Per instrument     |
-| `trading.signals`               | Partially implemented | Planned Prediction Engine                                | Implemented Risk & Portfolio Manager (instrument stage) | `instrument_key` | Per instrument     |
-| `trading.signals.portfolio`     | Implemented           | Implemented Risk & Portfolio Manager (repartition stage) | Implemented Risk & Portfolio Manager (portfolio stage)  | `portfolio_key`  | Per portfolio      |
-| `trades.approved`               | Implemented           | Implemented Risk & Portfolio Manager                     | Implemented Execution Engine                            | `portfolio_key`  | Per portfolio      |
-| `trades.rejected`               | Implemented           | Implemented Risk & Portfolio Manager                     | Planned downstream adapters                             | `portfolio_key`  | Per portfolio      |
-| `orders.placed`                 | Implemented           | Implemented Execution Engine simulator                   | Planned Risk & Portfolio Manager                        | `portfolio_key`  | Per portfolio      |
-| `orders.fills`                  | Implemented           | Implemented Execution Engine simulator                   | Implemented Risk & Portfolio Manager                    | `portfolio_key`  | Per portfolio      |
-| `portfolio.updated`             | Implemented           | Implemented Risk & Portfolio Manager                     | Planned downstream adapters and analytics               | `portfolio_key`  | Per portfolio      |
-| `trading.signals.dlq`           | Implemented           | Implemented Risk & Portfolio Manager consumer wrapper    | Operator replay workflow                                | original key     | Per original key   |
-| `trading.signals.portfolio.dlq` | Implemented           | Implemented Risk & Portfolio Manager consumer wrapper    | Operator replay workflow                                | original key     | Per original key   |
-| `trades.approved.dlq`           | Implemented           | Implemented Execution Engine consumer wrapper            | Operator replay workflow                                | original key     | Per original key   |
-| `orders.fills.dlq`              | Implemented           | Implemented Risk & Portfolio Manager consumer wrapper    | Operator replay workflow                                | original key     | Per original key   |
+| Topic                           | Status                | Producer                                                 | Main consumers                                                 | Partition key    | Ordering guarantee |
+| ------------------------------- | --------------------- | -------------------------------------------------------- | -------------------------------------------------------------- | ---------------- | ------------------ |
+| `instrument.registered`         | Implemented           | Risk & Portfolio Manager                                 | Implemented Data Ingestion                                     | `instrument_key` | Per instrument     |
+| `market.raw.data`               | Implemented           | Implemented External API Facade                          | Implemented Data Ingestion; current Feature Engineering target | `instrument_key` | Per instrument     |
+| `features.indicators`           | Current target        | Current Feature Engineering target                       | Planned Prediction Engine                                      | `instrument_key` | Per instrument     |
+| `trading.signals`               | Partially implemented | Planned Prediction Engine                                | Implemented Risk & Portfolio Manager (instrument stage)        | `instrument_key` | Per instrument     |
+| `trading.signals.portfolio`     | Implemented           | Implemented Risk & Portfolio Manager (repartition stage) | Implemented Risk & Portfolio Manager (portfolio stage)         | `portfolio_key`  | Per portfolio      |
+| `trades.approved`               | Implemented           | Implemented Risk & Portfolio Manager                     | Implemented Execution Engine                                   | `portfolio_key`  | Per portfolio      |
+| `trades.rejected`               | Implemented           | Implemented Risk & Portfolio Manager                     | Planned downstream adapters                                    | `portfolio_key`  | Per portfolio      |
+| `orders.placed`                 | Implemented           | Implemented Execution Engine simulator                   | Planned Risk & Portfolio Manager                               | `portfolio_key`  | Per portfolio      |
+| `orders.fills`                  | Implemented           | Implemented Execution Engine simulator                   | Implemented Risk & Portfolio Manager                           | `portfolio_key`  | Per portfolio      |
+| `portfolio.updated`             | Implemented           | Implemented Risk & Portfolio Manager                     | Planned downstream adapters and analytics                      | `portfolio_key`  | Per portfolio      |
+| `trading.signals.dlq`           | Implemented           | Implemented Risk & Portfolio Manager consumer wrapper    | Operator replay workflow                                       | original key     | Per original key   |
+| `trading.signals.portfolio.dlq` | Implemented           | Implemented Risk & Portfolio Manager consumer wrapper    | Operator replay workflow                                       | original key     | Per original key   |
+| `trades.approved.dlq`           | Implemented           | Implemented Execution Engine consumer wrapper            | Operator replay workflow                                       | original key     | Per original key   |
+| `orders.fills.dlq`              | Implemented           | Implemented Risk & Portfolio Manager consumer wrapper    | Operator replay workflow                                       | original key     | Per original key   |
+| `instrument.registered.dlq`     | Implemented           | Implemented Data Ingestion consumer wrapper              | Operator replay workflow                                       | original key     | Per original key   |
+| `market.raw.data.dlq`           | Implemented           | Implemented Data Ingestion consumer wrapper              | Operator replay workflow                                       | original key     | Per original key   |
 
 Local bootstrap defaults:
 
