@@ -82,7 +82,7 @@ export const publishMarketDataBar = async (
     topic: KAFKA_TOPICS.MARKET_RAW_DATA,
     messages: [
       {
-        key: `${E2E_VENUE}:${E2E_SYMBOL}`,
+        key: instrumentKey(E2E_VENUE, E2E_INSTRUMENT_ID),
         value: Buffer.from(MarketDataBar.encode(bar).finish()),
         headers: buildEventMetadataHeaders({
           eventId: sourceEventId,

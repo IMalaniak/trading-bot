@@ -37,11 +37,11 @@ describe('KafkaMarketDataPublisher', () => {
     expect(topic).toBe(KAFKA_TOPICS.MARKET_RAW_DATA);
   });
 
-  it('should use venue:symbol as the Kafka message key', () => {
+  it('should use venue:instrument_id as the Kafka message key', () => {
     publisher.publish(sampleBar);
 
     const [, message] = emit.mock.calls[0] as [string, { key: string }];
-    expect(message.key).toBe('BINANCE:BTCUSDT');
+    expect(message.key).toBe('BINANCE:inst-abc');
   });
 
   it('should include required event headers', () => {

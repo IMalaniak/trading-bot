@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import { ClientKafka } from '@nestjs/microservices';
 import {
+  instrumentKey,
   KAFKA_EVENT_CONTENT_TYPES,
   KAFKA_EVENT_HEADER_NAMES,
   KAFKA_EVENT_PRODUCERS,
@@ -49,7 +50,7 @@ export class KafkaMarketDataPublisher {
     };
 
     const value = Buffer.from(MarketDataBar.encode(payload).finish());
-    const key = `${bar.venue}:${bar.symbol}`;
+    const key = instrumentKey(bar.venue, this.instrumentId);
 
     const headers: Record<string, string> = {
       [KAFKA_EVENT_HEADER_NAMES.EVENT_ID]: eventId,
