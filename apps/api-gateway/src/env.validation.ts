@@ -9,6 +9,7 @@ interface EnvConfig {
   PORTFOLIO_MANAGER_GRPC_URL: string;
   EXECUTION_ENGINE_GRPC_URL: string;
   DATA_INGESTION_GRPC_URL: string;
+  PREDICTION_ENGINE_GRPC_URL: string;
   API_GATEWAY_CORS_ORIGINS: string;
 }
 
@@ -38,6 +39,12 @@ class EnvironmentVariables implements EnvConfig {
     message: 'DATA_INGESTION_GRPC_URL must be a valid host:port string',
   })
   DATA_INGESTION_GRPC_URL: string;
+
+  @IsString()
+  @Matches(/^[\w.-]+(:\d+)?$/, {
+    message: 'PREDICTION_ENGINE_GRPC_URL must be a valid host:port string',
+  })
+  PREDICTION_ENGINE_GRPC_URL: string;
 
   @IsString()
   API_GATEWAY_CORS_ORIGINS: string;
