@@ -1,0 +1,117 @@
+{
+  "name": "prediction-engine",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/prediction-engine/src",
+  "projectType": "application",
+  "tags": ["lang:python", "scope:backend"],
+  "implicitDependencies": ["common-python"],
+  "targets": {
+    "sync": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "options": {
+        "command": "UV_PYTHON_INSTALL_DIR=.uv-python python3 -m uv sync --locked --all-packages",
+        "cwd": "{workspaceRoot}"
+      }
+    },
+    "build": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": ["pythonFiles", "^pythonFiles"],
+      "dependsOn": ["^gen-proto"],
+      "outputs": ["{workspaceRoot}/dist/apps/prediction-engine"],
+      "options": {
+        "command": "UV_PYTHON_INSTALL_DIR=.uv-python python3 -m uv run --package prediction-engine python -m compileall -q apps/prediction-engine/src libs/common-python/src",
+        "cwd": "{workspaceRoot}"
+      }
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": ["pythonFiles", "^pythonFiles"],
+      "dependsOn": ["^gen-proto"],
+      "options": {
+        "command": "UV_PYTHON_INSTALL_DIR=.uv-python python3 -m uv run --package prediction-engine ruff check apps/prediction-engine",
+        "cwd": "{workspaceRoot}"
+      }
+    },
+    "fmt": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": ["pythonFiles"],
+      "options": {
+        "command": "UV_PYTHON_INSTALL_DIR=.uv-python python3 -m uv run --package prediction-engine ruff format --check apps/prediction-engine",
+        "cwd": "{workspaceRoot}"
+      }
+    },
+    "fmt-write": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "UV_PYTHON_INSTALL_DIR=.uv-python python3 -m uv run --package prediction-engine ruff format apps/prediction-engine",
+        "cwd": "{workspaceRoot}"
+      }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": ["pythonFiles", "^pythonFiles"],
+      "dependsOn": ["^gen-proto"],
+      "options": {
+        "command": "UV_PYTHON_INSTALL_DIR=.uv-python python3 -m uv run --package prediction-engine mypy apps/prediction-engine/src apps/prediction-engine/tests",
+        "cwd": "{workspaceRoot}"
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": ["pythonFiles", "^pythonFiles"],
+      "dependsOn": ["^gen-proto"],
+      "options": {
+        "command": "UV_PYTHON_INSTALL_DIR=.uv-python python3 -m uv run --package prediction-engine pytest apps/prediction-engine/tests",
+        "cwd": "{workspaceRoot}"
+      }
+    },
+    "serve": {
+      "continuous": true,
+      "executor": "nx:run-commands",
+      "cache": false,
+      "dependsOn": [
+        "build",
+        {
+          "projects": "common-python",
+          "target": "gen-proto"
+        }
+      ],
+      "options": {
+        "command": "UV_PYTHON_INSTALL_DIR=.uv-python python3 -m uv run --package prediction-engine python -m prediction_engine.main",
+        "cwd": "{workspaceRoot}",
+        "envFile": "apps/prediction-engine/.env"
+      }
+    },
+    "serve-e2e": {
+      "continuous": true,
+      "executor": "nx:run-commands",
+      "cache": false,
+      "defaultConfiguration": "e2e",
+      "dependsOn": [
+        "build",
+        {
+          "projects": "trading-bot-e2e",
+          "target": "e2e-seed"
+        },
+        {
+          "projects": "common-python",
+          "target": "gen-proto"
+        }
+      ],
+      "options": {
+        "command": "UV_PYTHON_INSTALL_DIR=.uv-python python3 -m uv run --package prediction-engine python -m prediction_engine.main",
+        "cwd": "{workspaceRoot}",
+        "envFile": "apps/prediction-engine/.env.e2e"
+      },
+      "configurations": {
+        "e2e": {}
+      }
+    }
+  }
+}

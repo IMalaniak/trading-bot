@@ -1,0 +1,35 @@
+[project]
+name = "trading-bot-python-workspace"
+version = "0.1.0"
+requires-python = ">=3.12,<3.13"
+dependencies = []
+
+[tool.uv.workspace]
+members = ["apps/prediction-engine", "libs/common-python"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "RUF"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_return_any = true
+warn_unused_configs = false
+exclude = [
+  "libs/common-python/src/common",
+  "libs/common-python/src/events",
+  "libs/common-python/src/services",
+]
+
+[[tool.mypy.overrides]]
+module = ["aiokafka.*", "grpc.*", "prometheus_client.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["common.*", "events.*", "services.*"]
+ignore_missing_imports = true
+follow_imports = "skip"

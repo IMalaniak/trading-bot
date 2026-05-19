@@ -1,0 +1,78 @@
+{
+  "name": "common-python",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/common-python/src",
+  "projectType": "library",
+  "tags": ["lang:python", "scope:shared"],
+  "targets": {
+    "sync": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "options": {
+        "command": "UV_PYTHON_INSTALL_DIR=.uv-python python3 -m uv sync --locked --all-packages",
+        "cwd": "{workspaceRoot}"
+      }
+    },
+    "gen-proto": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": ["pythonFiles", "{workspaceRoot}/proto/**/*.proto"],
+      "outputs": [
+        "{workspaceRoot}/libs/common-python/src/common",
+        "{workspaceRoot}/libs/common-python/src/events",
+        "{workspaceRoot}/libs/common-python/src/services"
+      ],
+      "dependsOn": ["sync"],
+      "options": {
+        "command": "UV_PYTHON_INSTALL_DIR=.uv-python python3 -m uv run --package trading-common-python python scripts/generate_python_proto.py",
+        "cwd": "{workspaceRoot}"
+      }
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": ["pythonFiles"],
+      "dependsOn": ["gen-proto"],
+      "options": {
+        "command": "UV_PYTHON_INSTALL_DIR=.uv-python python3 -m uv run --package trading-common-python ruff check libs/common-python/src/tradingbot_common libs/common-python/tests scripts/generate_python_proto.py",
+        "cwd": "{workspaceRoot}"
+      }
+    },
+    "fmt": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": ["pythonFiles"],
+      "options": {
+        "command": "UV_PYTHON_INSTALL_DIR=.uv-python python3 -m uv run --package trading-common-python ruff format --check libs/common-python/src/tradingbot_common libs/common-python/tests scripts/generate_python_proto.py",
+        "cwd": "{workspaceRoot}"
+      }
+    },
+    "fmt-write": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "UV_PYTHON_INSTALL_DIR=.uv-python python3 -m uv run --package trading-common-python ruff format libs/common-python/src/tradingbot_common libs/common-python/tests scripts/generate_python_proto.py",
+        "cwd": "{workspaceRoot}"
+      }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": ["pythonFiles"],
+      "dependsOn": ["gen-proto"],
+      "options": {
+        "command": "UV_PYTHON_INSTALL_DIR=.uv-python python3 -m uv run --package trading-common-python mypy libs/common-python/src/tradingbot_common libs/common-python/tests",
+        "cwd": "{workspaceRoot}"
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": ["pythonFiles"],
+      "dependsOn": ["gen-proto"],
+      "options": {
+        "command": "UV_PYTHON_INSTALL_DIR=.uv-python python3 -m uv run --package trading-common-python pytest libs/common-python/tests",
+        "cwd": "{workspaceRoot}"
+      }
+    }
+  }
+}
