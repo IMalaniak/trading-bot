@@ -93,6 +93,9 @@ describe('Kafka contract', () => {
     expect(deadLetterTopicFor(KAFKA_TOPICS.TRADING_SIGNALS)).toBe(
       KAFKA_TOPICS.TRADING_SIGNALS_DLQ,
     );
+    expect(deadLetterTopicFor(KAFKA_TOPICS.FEATURES_INDICATORS)).toBe(
+      KAFKA_TOPICS.FEATURES_INDICATORS_DLQ,
+    );
     expect(deadLetterTopicFor(KAFKA_TOPICS.TRADES_APPROVED)).toBe(
       KAFKA_TOPICS.TRADES_APPROVED_DLQ,
     );

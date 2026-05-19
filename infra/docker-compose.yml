@@ -50,8 +50,20 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    extends:
+      file: docker-compose.base.yml
+      service: redis
+    container_name: tb_redis
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis_data:/data
+
 volumes:
   postgres_data:
     name: tb_postgres_data
   timescale_data:
     name: tb_timescale_data
+  redis_data:
+    name: tb_redis_data

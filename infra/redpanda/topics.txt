@@ -3,6 +3,7 @@ instrument.registered.dlq
 market.raw.data
 market.raw.data.dlq
 features.indicators
+features.indicators.dlq
 trading.signals
 trading.signals.portfolio
 trades.approved

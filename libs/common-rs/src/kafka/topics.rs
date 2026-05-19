@@ -5,6 +5,7 @@ pub const MARKET_RAW_DATA: &str = "market.raw.data";
 pub const MARKET_RAW_DATA_DLQ: &str = "market.raw.data.dlq";
 
 pub const FEATURES_INDICATORS: &str = "features.indicators";
+pub const FEATURES_INDICATORS_DLQ: &str = "features.indicators.dlq";
 
 pub const TRADING_SIGNALS: &str = "trading.signals";
 pub const TRADING_SIGNALS_DLQ: &str = "trading.signals.dlq";
@@ -28,6 +29,7 @@ pub mod schema_versions {
     pub const INSTRUMENT_REGISTERED: &str = "1";
     pub const MARKET_RAW_DATA: &str = "1";
     pub const FEATURES_INDICATORS: &str = "1";
+    pub const FEATURES_INDICATORS_DLQ: &str = "1";
     pub const TRADING_SIGNALS: &str = "1";
     pub const TRADING_SIGNALS_PORTFOLIO: &str = "1";
     pub const TRADES_APPROVED: &str = "1";
@@ -50,6 +52,8 @@ mod tests {
     #[test]
     fn exposes_feature_topic_contract() {
         assert_eq!(FEATURES_INDICATORS, "features.indicators");
+        assert_eq!(FEATURES_INDICATORS_DLQ, "features.indicators.dlq");
         assert_eq!(schema_versions::FEATURES_INDICATORS, "1");
+        assert_eq!(schema_versions::FEATURES_INDICATORS_DLQ, "1");
     }
 }
