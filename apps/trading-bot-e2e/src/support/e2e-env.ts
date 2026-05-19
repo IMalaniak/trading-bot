@@ -31,6 +31,7 @@ export const SYSTEM_PORTS = {
     'FEATURE_ENGINEERING_METRICS_PORT',
     19105,
   ),
+  predictionEngineMetrics: readEnvInt('PREDICTION_ENGINE_METRICS_PORT', 19106),
 } as const;
 
 export const TIMEOUTS = {
@@ -50,6 +51,7 @@ export const URLS = {
   externalApiFacadeMetrics: `http://${LOCALHOST}:${SYSTEM_PORTS.externalApiFacadeMetrics}/metrics`,
   dataIngestionMetrics: `http://${LOCALHOST}:${SYSTEM_PORTS.dataIngestionMetrics}/metrics`,
   featureEngineeringMetrics: `http://${LOCALHOST}:${SYSTEM_PORTS.featureEngineeringMetrics}/metrics`,
+  predictionEngineMetrics: `http://${LOCALHOST}:${SYSTEM_PORTS.predictionEngineMetrics}/metrics`,
 } as const;
 
 export const KAFKA_BROKERS = readEnv('KAFKA_BROKERS', `${LOCALHOST}:29092`);

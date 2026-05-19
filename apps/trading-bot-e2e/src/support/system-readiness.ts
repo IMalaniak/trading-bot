@@ -66,7 +66,9 @@ export const verifySystemReady = async (): Promise<void> => {
     waitForHttp(URLS.executionMetrics, 'execution-engine metrics'),
     waitForHttp(URLS.dataIngestionMetrics, 'data-ingestion metrics'),
     waitForHttp(URLS.featureEngineeringMetrics, 'feature-engineering metrics'),
+    waitForHttp(URLS.predictionEngineMetrics, 'prediction-engine metrics'),
     waitForHttp(URLS.externalApiFacadeMetrics, 'external-api-facade metrics'),
+    waitForHttp(`${URLS.apiBase}/signals`, 'api-gateway signals'),
     waitForHttp(`${URLS.apiBase}/portfolios`, 'api-gateway portfolios'),
     waitForHttp(URLS.dashboard, 'dashboard'),
   ]);

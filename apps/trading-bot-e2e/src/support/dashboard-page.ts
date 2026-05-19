@@ -23,6 +23,7 @@ export const expectDashboardPortfolioState = async (
   page: Page,
   orderId: string,
   fillIds: readonly string[],
+  quantity: string,
 ): Promise<void> => {
   const summary = page.locator('section[aria-labelledby="portfolio-summary"]');
   await expect(
@@ -37,7 +38,7 @@ export const expectDashboardPortfolioState = async (
   );
   const positionRow = positions.locator('tr').filter({ hasText: 'BTC/USDT' });
   await expect(positionRow).toBeVisible();
-  await expect(positionRow).toContainText('1');
+  await expect(positionRow).toContainText(quantity);
 
   const orders = page.locator('section[aria-labelledby="orders-heading"]');
   await expect(

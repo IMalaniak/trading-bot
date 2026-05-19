@@ -92,7 +92,7 @@ jobs:
         run: |
           changed_files=$(git diff --name-only "$BASE" "$HEAD" || true)
           echo "Changed files:\n$changed_files"
-          if echo "$changed_files" | grep -E '(^|/)package(-lock)?\.json$|.nvmrc' >/dev/null; then
+          if echo "$changed_files" | grep -E '(^|/)package(-lock)?\.json$|.nvmrc|(^|/)pyproject\.toml$|(^|/)uv\.lock$|(^|/)uv\.toml$' >/dev/null; then
             echo "run_all=true" >> $GITHUB_OUTPUT
           else
             echo "run_all=false" >> $GITHUB_OUTPUT
@@ -161,6 +161,9 @@ jobs:
       - name: Install dependencies
         if: steps.nm-cache.outputs.cache-hit != 'true'
         run: npm ci
+
+      - name: Install uv
+        run: python3 -m pip install --user uv
 
       - name: Install Rust system dependencies
         run: |
@@ -239,6 +242,9 @@ jobs:
         if: steps.nm-cache.outputs.cache-hit != 'true'
         run: npm ci
 
+      - name: Install uv
+        run: python3 -m pip install --user uv
+
       - name: "Full Run: Typecheck"
         if: needs.prepare.outputs.run_all == 'true'
         run: npx nx run-many --target=typecheck --all --parallel --outputStyle=static
@@ -297,6 +303,9 @@ jobs:
       - name: Install dependencies
         if: steps.nm-cache.outputs.cache-hit != 'true'
         run: npm ci
+
+      - name: Install uv
+        run: python3 -m pip install --user uv
 
       - name: Install Rust system dependencies
         run: |
@@ -373,6 +382,9 @@ jobs:
       - name: Install dependencies
         if: steps.nm-cache.outputs.cache-hit != 'true'
         run: npm ci
+
+      - name: Install uv
+        run: python3 -m pip install --user uv
 
       - name: Install Rust system dependencies
         run: |
@@ -458,6 +470,9 @@ jobs:
       - name: Install dependencies
         if: steps.nm-cache.outputs.cache-hit != 'true'
         run: npm ci
+
+      - name: Install uv
+        run: python3 -m pip install --user uv
 
       - name: Install Rust system dependencies
         run: |
@@ -551,6 +566,9 @@ jobs:
       - name: Install dependencies
         if: steps.nm-cache.outputs.cache-hit != 'true'
         run: npm ci
+
+      - name: Install uv
+        run: python3 -m pip install --user uv
 
       - name: Install Rust system dependencies
         run: |

@@ -5,11 +5,11 @@ import {
   type ExecutionFillDto,
   type ExecutionOrderDto,
   type PortfolioReadResponseDto,
+  type SignalDto,
 } from './api-client';
 import {
   SEEDED_INSTRUMENT_ID,
   SEEDED_PORTFOLIO_ID,
-  SIGNAL_ID,
 } from './signal-to-portfolio-flow';
 
 export interface PortfolioSnapshot {
@@ -43,17 +43,17 @@ export const expectReconciledPortfolioState = (
   firstFill: ExecutionFillDto | undefined,
   finalFill: ExecutionFillDto | undefined,
 ): void => {
-  expect(portfolio.summary.aggregateExposureNotional).toBe('100');
+  const position = portfolio.positions.find(
+    (candidate) => candidate.instrument.id === SEEDED_INSTRUMENT_ID,
+  );
+
+  expectDecimalCloseTo(portfolio.summary.aggregateExposureNotional, 100);
   expect(portfolio.summary.openPositionCount).toBe(1);
-  expect(
-    portfolio.positions.find(
-      (position) => position.instrument.id === SEEDED_INSTRUMENT_ID,
-    ),
-  ).toEqual(
-    expect.objectContaining({
-      exposureNotional: '100',
-      quantity: '1',
-    }),
+  expect(position).toBeDefined();
+  expectDecimalCloseTo(position?.exposureNotional, 100);
+  expectDecimalCloseTo(
+    position?.quantity,
+    Number.parseFloat(finalFill?.cumulativeFilledQuantity ?? ''),
   );
   expect(order.status).toBe('FILLED');
   expect(order.fills).toHaveLength(2);
@@ -85,19 +85,41 @@ export const summarizePortfolio = (
 
 export const findSignalOrder = (
   portfolio: PortfolioReadResponseDto,
+  signalId: string,
 ): ExecutionOrderDto => {
   const order = portfolio.recentOrders.find(
     (candidate) =>
       candidate.instrumentId === SEEDED_INSTRUMENT_ID &&
-      candidate.signalId === SIGNAL_ID,
+      candidate.signalId === signalId,
   );
 
   if (!order) {
-    throw new Error('Expected a recent execution order for the e2e signal.');
+    throw new Error(
+      `Expected a recent execution order for signal ${signalId}.`,
+    );
   }
 
   return order;
 };
+
+export const findSeededInstrumentSignal = (
+  signals: readonly SignalDto[],
+): SignalDto => {
+  const signal = signals.find(
+    (candidate) => candidate.instrumentId === SEEDED_INSTRUMENT_ID,
+  );
+
+  if (!signal) {
+    throw new Error(
+      'Expected a recent prediction signal for the seeded instrument.',
+    );
+  }
+
+  return signal;
+};
+
+export const quantityDashboardPrefix = (quantity: string): string =>
+  Number.parseFloat(quantity).toFixed(3);
 
 export const expectPortfolioStable = async (
   api: ApiClient,
@@ -115,4 +137,13 @@ export const expectPortfolioStable = async (
 
 const sleep = async (durationMs: number): Promise<void> => {
   await new Promise((resolve) => setTimeout(resolve, durationMs));
+};
+
+const expectDecimalCloseTo = (
+  value: string | undefined,
+  expected: number,
+): void => {
+  expect(value).toBeDefined();
+  expect(expected).not.toBeNaN();
+  expect(Number.parseFloat(value ?? '')).toBeCloseTo(expected, 6);
 };
