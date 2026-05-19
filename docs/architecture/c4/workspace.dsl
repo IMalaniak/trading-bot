@@ -40,8 +40,8 @@ workspace "Trading Bot System" {
             }
 
             group "Feature Engineering Service" {
-                featureEngineering = container "Feature Engineering" "Current post-MVP implementation target. Computes core per-instrument indicators from raw market data and publishes feature vectors for prediction." "Rust" {
-                    tags "Planned" "Current Target"
+                featureEngineering = container "Feature Engineering" "Computes core per-instrument indicators from raw market data and publishes feature vectors for prediction." "Rust" {
+                    tags "Implemented"
                     featureCalculator = component "Feature Calculator" "Computes core v1 indicators: SMA/EMA, RSI, MACD, returns, and volatility. Cross-instrument correlations are planned later." "Rust"
                     warmupClient = component "Data Ingestion Warm-up Client" "Fetches recent stored bars from Data Ingestion gRPC to rebuild rolling indicator state after startup." "Rust"
 
@@ -57,13 +57,15 @@ workspace "Trading Bot System" {
             }
 
             group "Prediction Engine Service" {
-                predictionEngine = container "Prediction Engine" "Runs ML/NLP models to generate trading signals. Owns Signal Cache." "Python" {
-                    tags "Planned"
+                predictionEngine = container "Prediction Engine" "Consumes engineered indicators, runs deterministic baseline inference, publishes trading signals, and owns Signal Cache." "Python" {
+                    tags "Implemented"
                     gRPC = component "Signal API" "Exposes signals and recommendations gRPC API to API Gateway." "gRPC" "API"
 
                     apiService = component "API Service" "Handles gRPC requests for current signals and recommendations." "Python"
-                    modelRunner = component "Model Runner" "Runs ML models (LSTMs, Transformers, RL)." "Python"
-                    newsAnalyzer = component "Newsfeed Analyzer" "Processes sentiment / news / social data and produces features." "Python"
+                    modelRunner = component "Baseline Model Runner" "Runs the deterministic baseline-core-v1 model before production ML models exist." "Python"
+                    newsAnalyzer = component "Future Newsfeed Analyzer" "Processes sentiment / news / social data and produces features after the baseline pipeline is implemented." "Python" {
+                        tags "Planned"
+                    }
                     signalCacheManager = component "Signal Cache Manager" "Manages Redis cache: deduplicates signals and keeps short-term history for fast internal retrieval." "Python"
 
                     kafkaConsumer = component "Kafka Consumer" "Consumes engineered features from Kafka." "Python"
@@ -262,7 +264,9 @@ workspace "Trading Bot System" {
                     metricsEndpoint = component "Metrics Endpoint" "Exposes API Gateway Prometheus metrics on GET /metrics outside the /api prefix." "Nest HTTP /metrics" {
                         tags "Implemented"
                     }
-                    signalProxy = component "Signal Proxy" "Forwards dashboard queries to Prediction Engine (Signal API)." "TypeScript"
+                    signalProxy = component "Signal Proxy" "Forwards dashboard queries to Prediction Engine (Signal API)." "TypeScript" {
+                        tags "Implemented"
+                    }
                     riskProxy = component "Risk Proxy" "Forwards strategy/risk config updates to Risk & Portfolio Manager (Risk API)." "TypeScript"
 
                     REST -> core "Handles API requests via"
@@ -295,7 +299,7 @@ workspace "Trading Bot System" {
                 core -> binanceClient "Sends requests to Binance via"
             }
 
-            dashboard = container "Dashboard" "React, Vite, Tailwind CSS" "Implemented portfolio dashboard for portfolio selection, portfolio visibility, and portfolio-scoped instrument configuration through API Gateway." "Single Page Application" {
+            dashboard = container "Dashboard" "React, Vite, Tailwind CSS" "Implemented portfolio dashboard for portfolio selection, portfolio visibility, recent signals, and portfolio-scoped instrument configuration through API Gateway." "Single Page Application" {
                 tags "Implemented"
                 router = component "Router" "Routes portfolio list, portfolio details, and later dashboard sections." "TypeScript/React" {
                     tags "Implemented"
@@ -321,8 +325,8 @@ workspace "Trading Bot System" {
                 marketChartsUI = component "Future Market Charts" "Visualizes market data and indicators after data ingestion and feature engineering exist." "TypeScript/React" {
                     tags "Planned"
                 }
-                signalMonitorUI = component "Future Signal Monitor" "Shows buy/sell signals and recommendations after the Prediction Engine exists." "TypeScript/React" {
-                    tags "Planned"
+                signalMonitorUI = component "Recent Signals View" "Shows recent BUY/SELL signals from API Gateway." "TypeScript/React" {
+                    tags "Implemented"
                 }
                 controlPanelUI = component "Future Control Panel" "Allows toggling risk modes and start/stop trading after control APIs exist." "TypeScript/React" {
                     tags "Planned"
@@ -340,7 +344,7 @@ workspace "Trading Bot System" {
                 router -> controlPanelUI "Will route start/stop trading actions via"
                 router -> strategyConfigUI "Will route strategy preferences configuration via"
                 router -> marketChartsUI "Will route market data and indicators via"
-                router -> signalMonitorUI "Will route buy/sell signals via"
+                router -> signalMonitorUI "Routes buy/sell signal visibility via"
 
                 portfolioListUI -> apiClient "Fetches GET /api/portfolios via"
                 portfolioUI -> apiClient "Fetches GET /api/portfolios/:portfolioId via"
@@ -350,7 +354,7 @@ workspace "Trading Bot System" {
                 controlPanelUI -> apiClient "Will send start/stop commands via"
                 strategyConfigUI -> apiClient "Will send strategy config updates via"
                 marketChartsUI -> apiClient "Will fetch market data and indicators via"
-                signalMonitorUI -> apiClient "Will fetch latest signals via"
+                signalMonitorUI -> apiClient "Fetches GET /api/signals via"
 
             }
 
@@ -360,10 +364,10 @@ workspace "Trading Bot System" {
                     localWalkthrough = component "Clean Checkout Walkthrough" "Documents the two supported validation paths: automated full-system e2e and interactive local stack inspection." "Markdown" {
                         tags "Implemented" "Documentation"
                     }
-                    productApiBoundary = component "Product API Boundary" "Documents that Dashboard/API Gateway use product portfolio endpoints only, while synthetic signal publishing remains test-harness behavior." "Markdown" {
+                    productApiBoundary = component "Product API Boundary" "Documents that Dashboard/API Gateway use product endpoints only, while synthetic signal publishing remains test-harness fallback behavior." "Markdown" {
                         tags "Implemented" "Documentation"
                     }
-                    mvpLimitations = component "MVP Limitations" "Documents missing capabilities: completed Feature Engineering service, feature persistence/read API, cross-instrument correlations, real Prediction Engine, signal cache/read API, model registry/training, exchange execution, auth, live Dashboard signal/indicator views, production deployment, and schema registry." "Markdown" {
+                    mvpLimitations = component "MVP Limitations" "Documents missing capabilities: feature persistence/read API, cross-instrument correlations, model registry/training, exchange execution, auth, live Dashboard indicator views, production deployment, and schema registry." "Markdown" {
                         tags "Implemented" "Documentation"
                     }
                 }
@@ -376,12 +380,12 @@ workspace "Trading Bot System" {
                     tags "Implemented" "Test Tooling"
                 }
 
-                e2eTestHarness = container "E2E Test Harness" "Test-only Nx/Playwright project that starts the isolated trading system through Nx targets, publishes synthetic Kafka events, verifies API state, and verifies browser-visible Dashboard state." "TypeScript/Playwright" "Test Tooling" {
+                e2eTestHarness = container "E2E Test Harness" "Test-only Nx/Playwright project that starts the isolated trading system through Nx targets, drives raw bars through feature/prediction flow, verifies API state, and verifies browser-visible Dashboard state. Synthetic signal publishing remains fallback tooling." "TypeScript/Playwright" "Test Tooling" {
                     tags "Implemented" "Test Tooling"
                     orchestrator = component "System Lifecycle Targets" "Nx targets load apps/trading-bot-e2e/.env.e2e plus app-scoped .env.e2e files, depend on infra:serve-e2e for isolated Redpanda/Postgres lifecycle, run migrations and seed data, start app-owned serve-e2e targets as continuous tasks, and wait for readiness." "Nx Project Configuration" {
                         tags "Implemented"
                     }
-                    signalPublisher = component "Synthetic Signal Publisher" "Publishes common.Signal protobuf messages directly to trading.signals using shared topic, key, and metadata helpers." "KafkaJS" {
+                    signalPublisher = component "Prediction Flow Publisher" "Publishes final MarketDataBar protobuf messages to market.raw.data for the real feature/prediction flow; can still publish synthetic common.Signal messages directly to trading.signals for fallback tests." "KafkaJS" {
                         tags "Implemented"
                     }
                     fillReplayPublisher = component "Duplicate Fill Replay Publisher" "Reconstructs and republishes a final OrderFill from the REST order/fill read model to verify fill idempotency." "KafkaJS" {
@@ -403,7 +407,7 @@ workspace "Trading Bot System" {
 
             // Databases (each owned/isolated to one service)
             redis = container "Signal Cache" "Owned by Prediction Engine. Stores recent signals for fast access." "Redis" "Datastore" {
-                tags "Planned"
+                tags "Implemented"
             }
 
             // Message bus
@@ -445,9 +449,9 @@ workspace "Trading Bot System" {
         tradingBot.validationGuide.localWalkthrough -> tradingBot.e2eTestHarness "Documents automated full-system validation through"
         tradingBot.validationGuide.localWalkthrough -> tradingBot.dashboard "Documents interactive Dashboard validation through"
         tradingBot.validationGuide.productApiBoundary -> tradingBot.apiGateway.REST "Documents product endpoints exposed by"
-        tradingBot.validationGuide.productApiBoundary -> tradingBot.e2eTestHarness.signalPublisher "Documents synthetic signal publishing as test tooling only"
-        tradingBot.validationGuide.mvpLimitations -> tradingBot.predictionEngine "Marks real signal production as missing"
-        tradingBot.validationGuide.mvpLimitations -> tradingBot.featureEngineering "Marks completed Feature Engineering, feature persistence/read API, and cross-instrument correlations as missing/current target"
+        tradingBot.validationGuide.productApiBoundary -> tradingBot.e2eTestHarness.signalPublisher "Documents synthetic signal publishing as fallback test tooling only"
+        tradingBot.validationGuide.mvpLimitations -> tradingBot.predictionEngine "Marks production model registry/training as missing while baseline prediction is implemented"
+        tradingBot.validationGuide.mvpLimitations -> tradingBot.featureEngineering "Marks completed Feature Engineering while feature persistence/read API and cross-instrument correlations remain missing"
         tradingBot.validationGuide.mvpLimitations -> tradingBot.externalAPIFacade "Marks real exchange order placement as missing"
         tradingBot.validationGuide.mvpLimitations -> tradingBot.schemaRegistry "Marks schema registry as missing"
         tradingBot.envExamples -> tradingBot.apiGateway "Configures local and e2e API Gateway runtime"
@@ -456,14 +460,17 @@ workspace "Trading Bot System" {
         tradingBot.envExamples -> tradingBot.dashboard "Configures local and e2e Dashboard runtime"
         tradingBot.envExamples -> tradingBot.localInfraProject "Configures local, integration, and e2e Docker lifecycle"
 
-        tradingBot.dashboard.apiClient -> tradingBot.apiGateway.REST "Uses portfolio list, portfolio read, and portfolio instrument endpoints"
+        tradingBot.dashboard.apiClient -> tradingBot.apiGateway.REST "Uses portfolio list, portfolio read, portfolio instrument, and signal read endpoints"
         tradingBot.e2eTestHarness.orchestrator -> tradingBot.portfolioManager "Starts through Nx target with isolated e2e env"
         tradingBot.e2eTestHarness.orchestrator -> tradingBot.executionEngine "Starts through Nx target with isolated e2e env"
+        tradingBot.e2eTestHarness.orchestrator -> tradingBot.dataIngestion "Starts through Nx target with isolated e2e env"
+        tradingBot.e2eTestHarness.orchestrator -> tradingBot.featureEngineering "Starts through Nx target with isolated e2e env"
+        tradingBot.e2eTestHarness.orchestrator -> tradingBot.predictionEngine "Starts through Nx target with isolated e2e env"
         tradingBot.e2eTestHarness.orchestrator -> tradingBot.apiGateway "Starts through Nx target with isolated e2e env"
         tradingBot.e2eTestHarness.orchestrator -> tradingBot.dashboard "Starts through Nx/Vite with VITE_API_BASE_URL pointed at the e2e API Gateway"
-        tradingBot.e2eTestHarness.signalPublisher -> tradingBot.messageBus "Publishes synthetic common.Signal to trading.signals"
+        tradingBot.e2eTestHarness.signalPublisher -> tradingBot.messageBus "Publishes final MarketDataBar to market.raw.data for real e2e flow; can publish synthetic common.Signal to trading.signals for fallback tests"
         tradingBot.e2eTestHarness.fillReplayPublisher -> tradingBot.messageBus "Publishes duplicate OrderFill to orders.fills"
-        tradingBot.e2eTestHarness.restProbe -> tradingBot.apiGateway.REST "Polls GET /api/portfolios/{portfolioId}"
+        tradingBot.e2eTestHarness.restProbe -> tradingBot.apiGateway.REST "Polls GET /api/portfolios/{portfolioId} and GET /api/signals"
         tradingBot.e2eTestHarness.browserAssertions -> tradingBot.dashboard.router "Verifies rendered portfolio state in Chromium"
         tradingBot.apiGateway.gRPC_Client -> tradingBot.dataIngestion.gRPC "Requests market data and subscription updates (Market Data API)"
         tradingBot.apiGateway.gRPC_Client -> tradingBot.predictionEngine.gRPC "Requests current signals / triggers (Signal API)"

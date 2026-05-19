@@ -47,9 +47,17 @@ The current implementation is still intentionally narrow:
 - `common` also owns the reusable Kafka consumer retry/DLQ wrapper and Prometheus metric helpers used by implemented services.
 - `external-api-facade` manages Binance WebSocket kline subscriptions and publishes raw market data directly to Kafka (no outbox — streaming workload where a missed candle is reproduced by the next tick).
 - `data-ingestion` consumes `instrument.registered` and `market.raw.data`, persists OHLCV bars to TimescaleDB, and exposes `GetMarketDataBars` over gRPC.
+- `feature-engineering` consumes final `market.raw.data` bars, warms rolling
+  state from Data Ingestion, computes core indicator feature vectors, and
+  publishes `features.indicators`.
+- `prediction-engine` consumes `features.indicators`, runs deterministic
+  `baseline-core-v1` inference, publishes BUY/SELL `common.Signal` events to
+  `trading.signals`, caches recent signals in Redis, and exposes
+  `Signals.GetLatestSignals` over gRPC.
 - `dashboard` provides the React portfolio dashboard for portfolio selection,
-  portfolio visibility, and portfolio-scoped instrument configuration.
-- Local infra provides Redpanda, Postgres, and TimescaleDB.
+  portfolio visibility, recent signal visibility, and portfolio-scoped
+  instrument configuration.
+- Local infra provides Redpanda, Postgres, TimescaleDB, and Redis.
 
 Everything else in this document should be read as either:
 
@@ -68,14 +76,14 @@ Everything else in this document should be read as either:
 | Portfolio DB (Postgres)          | Implemented    | Source of truth for instruments, outbox rows, portfolios, risk decisions, exposure reservations, reconciled orders/fills, positions, and portfolio summary snapshots.                                                                                                                                                                                                               |
 | Market Data Store (TimescaleDB)  | Implemented    | Provisioned locally and exercised by Data Ingestion. OHLCV bars are written by the `data-ingestion` service after consuming `market.raw.data` events.                                                                                                                                                                                                                               |
 | Data Ingestion Service           | Implemented    | Rust service. Consumes `instrument.registered` → starts Binance kline subscription via External API Facade. Consumes `market.raw.data` → persists OHLCV bars to TimescaleDB. Exposes `GetMarketDataBars` gRPC API for API Gateway. Startup re-subscription from portfolio-manager `ListInstruments`. DLQ publishing for both consumers. Integration tests require live TimescaleDB. |
-| Feature Engineering Service      | Current target | Current post-MVP implementation target. Planned as a Rust service that consumes final `market.raw.data`, warms rolling state from Data Ingestion, computes core per-instrument indicators, and publishes `features.indicators`. No feature persistence/read API yet.                                                                                                                |
-| Prediction Engine                | Planned        | Not implemented in this repo yet.                                                                                                                                                                                                                                                                                                                                                   |
+| Feature Engineering Service      | Implemented    | Rust service consumes final `market.raw.data`, warms rolling state from Data Ingestion, computes core per-instrument indicators, and publishes `features.indicators`. No feature persistence/read API yet.                                                                                                                                                                           |
+| Prediction Engine                | Implemented    | Python service consumes `features.indicators`, runs deterministic `baseline-core-v1` inference, skips neutral decisions, publishes BUY/SELL `common.Signal` events to `trading.signals`, writes recent signals to Redis, exposes `Signals.GetLatestSignals` over gRPC, and reports Prometheus metrics.                                                                             |
 | Execution Engine                 | Implemented    | Event simulator consumes approved trades, emits deterministic placed/fill lifecycle events, and exposes execution-owned order/fill read queries over gRPC.                                                                                                                                                                                                                          |
 | Execution DB (Postgres schema)   | Implemented    | Source of truth for simulated orders, fills, and execution outbox rows.                                                                                                                                                                                                                                                                                                             |
 | Reliability & Operability        | Implemented    | Implemented consumers use bounded retry, per-topic DLQs, correlation/causation headers, structured logs, and Prometheus metrics endpoints.                                                                                                                                                                                                                                          |
 | External API Facade              | Implemented    | NestJS service. Manages Binance WebSocket kline subscriptions. `StartMarketDataSubscription` / `StopMarketDataSubscription` gRPC API. Publishes `MarketDataBar` protobuf events directly to `market.raw.data` (no outbox — high-frequency streaming; a missed candle is reproduced by the next WebSocket tick). Prometheus metrics endpoint.                                        |
-| Dashboard                        | Implemented    | Nx React/Vite/Tailwind dashboard lists portfolios, reads selected portfolio state, and adds instruments to the selected portfolio through API Gateway only.                                                                                                                                                                                                                         |
-| Full-System E2E                  | Implemented    | Dedicated `trading-bot-e2e` Nx/Playwright project depends on the shared `infra` Nx project for isolated Docker lifecycle, runs both service migrations, seeds portfolio data, starts backend services and dashboard, publishes synthetic Kafka events from the test harness, and verifies REST plus browser-visible state.                                                          |
+| Dashboard                        | Implemented    | Nx React/Vite/Tailwind dashboard lists portfolios, reads selected portfolio state, displays recent BUY/SELL signals, and adds instruments to the selected portfolio through API Gateway only.                                                                                                                                                                                       |
+| Full-System E2E                  | Implemented    | Dedicated `trading-bot-e2e` Nx/Playwright project depends on the shared `infra` Nx project for isolated Docker lifecycle, runs migrations and seed data, starts backend services and dashboard, drives raw bars through Feature Engineering and Prediction Engine, and verifies REST plus browser-visible state.                                                                    |
 | Schema Registry                  | Planned        | Documented as a future capability; not provisioned in local infra.                                                                                                                                                                                                                                                                                                                  |
 
 ## Remaining MVP Gaps
@@ -105,18 +113,13 @@ Operational documentation gaps to keep visible:
 
 Current implementation limitations:
 
-- No real Prediction Engine.
-- No completed Feature Engineering service yet; this is the current post-MVP
-  implementation target.
-- No signal cache/read API for dashboard signal visibility.
 - No feature persistence/read API for indicator history or Dashboard overlays.
-- No model registry or training pipeline.
-- No cross-instrument correlations; the first Feature Engineering slice is
-  per-instrument/per-interval.
+- No production model registry or training pipeline.
+- No cross-instrument correlations; the implemented Feature Engineering slice
+  is per-instrument/per-interval.
 - No real exchange or paper exchange execution (External API Facade implements Binance kline subscriptions; order placement is planned).
 - No auth, users, or permissions.
-- No websocket/live Dashboard stream, signal monitor, or indicator chart
-  overlays.
+- No websocket/live Dashboard stream or indicator chart overlays.
 - No production deployment story.
 - No schema registry.
 
@@ -124,10 +127,12 @@ Implemented full-system e2e boundary:
 
 - `npx nx run trading-bot-e2e:e2e` starts an isolated Docker Compose project
   through `infra:serve-e2e`, runs both Prisma migration sets, seeds
-  `portfolio-alpha`, starts
-  `portfolio-manager`, `execution-engine`, `api-gateway`, and `dashboard`,
-  publishes a synthetic `common.Signal` directly to `trading.signals`, verifies
-  the REST read response, and verifies the rendered Dashboard in Chromium.
+  `portfolio-alpha`, starts `portfolio-manager`, `execution-engine`,
+  `external-api-facade`, `data-ingestion`, `feature-engineering`,
+  `prediction-engine`, `api-gateway`, and `dashboard`, publishes final raw bars
+  to `market.raw.data`, verifies the real feature/prediction/signal path,
+  verifies the REST read response, and verifies the rendered Dashboard in
+  Chromium.
 - The e2e suite includes replay checks for both duplicate source signal
   `event-id` handling and duplicate final fill replay.
 - Runtime values for Docker Compose e2e lifecycle live in `infra/.env.e2e`.
@@ -140,7 +145,9 @@ Implemented full-system e2e boundary:
   startup, and CI runs `infra:clean-e2e:e2e` again in an `always()` step after
   Nx has stopped continuous service targets.
 - Synthetic signal and fill publishing are test-harness behavior only; they are
-  not product APIs and are not exposed in the Dashboard.
+  not product APIs and are not exposed in the Dashboard. Synthetic signal
+  publishing remains only as a fallback for tests that intentionally bypass
+  Feature Engineering and Prediction Engine.
 
 Documentation correction:
 
@@ -154,11 +161,11 @@ Implemented Dashboard boundary:
   - `GET /api/portfolios`
   - `GET /api/portfolios/:portfolioId?recentOrdersLimit=20`
   - `POST /api/portfolios/:portfolioId/instrument`
+  - `GET /api/signals?instrumentId=&limit=`
 - The dashboard has no hardcoded default portfolio. Users select a portfolio
   before portfolio details are loaded.
-- Keep synthetic signal publishing out of product APIs. Until the Prediction
-  Engine exists, direct Kafka signal publishing is test harness behavior,
-  not a Dashboard or API Gateway feature.
+- Keep synthetic signal publishing out of product APIs. Direct Kafka signal
+  publishing is test harness behavior, not a Dashboard or API Gateway feature.
 - The dashboard intentionally has no signal injection, strategy editor, trading
   controls, market charts, websocket stream, or auth.
 
@@ -174,14 +181,16 @@ The intended MVP direction remains:
 - `portfolio.updated` is emitted by the risk and portfolio manager after reconciliation.
 
 That target architecture is still valid. Today the repo implements registration,
-the current two-stage risk pipeline, a durable execution simulator, and fill
-reconciliation. Prediction and real exchange execution remain planned.
+market data ingestion, feature engineering, baseline prediction, the current
+two-stage risk pipeline, a durable execution simulator, and fill
+reconciliation. Real exchange execution remains planned.
 
 For the MVP, the Dashboard exposes the implemented backend surface rather than
 introduce new trading control APIs. It lists portfolios, reads selected
-portfolio visibility, and configures portfolio instruments through API Gateway.
-Full-flow e2e tests may publish synthetic signals directly to Kafka, but that
-publisher is test tooling and is not part of the production container model.
+portfolio visibility, displays recent signals, and configures portfolio
+instruments through API Gateway. Tests may still publish synthetic signals
+directly to Kafka when intentionally bypassing prediction, but that publisher is
+test tooling and is not part of the production container model.
 
 ## Eventing, Ordering, and Consistency
 
@@ -366,9 +375,9 @@ Local development bootstraps all documented topics explicitly and disables broke
 | Topic                           | Status                | Producer                                                 | Main consumers                                                 | Partition key    | Ordering guarantee |
 | ------------------------------- | --------------------- | -------------------------------------------------------- | -------------------------------------------------------------- | ---------------- | ------------------ |
 | `instrument.registered`         | Implemented           | Risk & Portfolio Manager                                 | Implemented Data Ingestion                                     | `instrument_key` | Per instrument     |
-| `market.raw.data`               | Implemented           | Implemented External API Facade                          | Implemented Data Ingestion; current Feature Engineering target | `instrument_key` | Per instrument     |
-| `features.indicators`           | Current target        | Current Feature Engineering target                       | Planned Prediction Engine                                      | `instrument_key` | Per instrument     |
-| `trading.signals`               | Partially implemented | Planned Prediction Engine                                | Implemented Risk & Portfolio Manager (instrument stage)        | `instrument_key` | Per instrument     |
+| `market.raw.data`               | Implemented           | Implemented External API Facade                          | Implemented Data Ingestion; Implemented Feature Engineering    | `instrument_key` | Per instrument     |
+| `features.indicators`           | Implemented           | Implemented Feature Engineering                          | Implemented Prediction Engine                                 | `instrument_key` | Per instrument     |
+| `trading.signals`               | Implemented           | Implemented Prediction Engine                            | Implemented Risk & Portfolio Manager (instrument stage)        | `instrument_key` | Per instrument     |
 | `trading.signals.portfolio`     | Implemented           | Implemented Risk & Portfolio Manager (repartition stage) | Implemented Risk & Portfolio Manager (portfolio stage)         | `portfolio_key`  | Per portfolio      |
 | `trades.approved`               | Implemented           | Implemented Risk & Portfolio Manager                     | Implemented Execution Engine                                   | `portfolio_key`  | Per portfolio      |
 | `trades.rejected`               | Implemented           | Implemented Risk & Portfolio Manager                     | Planned downstream adapters                                    | `portfolio_key`  | Per portfolio      |
@@ -641,9 +650,9 @@ sequenceDiagram
 
 ### Current: Risk Pipeline
 
-This is implemented in `portfolio-manager` today. The upstream `Prediction Engine`
-producer is still planned, so integration tests publish `trading.signals`
-directly.
+This is implemented in `portfolio-manager` today. In the full system, the
+implemented Prediction Engine publishes `trading.signals`; narrower integration
+tests may still publish `trading.signals` directly as test harness input.
 
 ```mermaid
 sequenceDiagram
@@ -794,9 +803,10 @@ Current read semantics:
 
 ### Current: Signal-To-Portfolio E2E Flow
 
-This is the implemented full-system e2e shape. It uses the implemented backend
-path, the React Dashboard, and keeps synthetic signal publishing in the
-e2e/manual test harness rather than product APIs.
+This is the implemented full-system e2e shape. It uses the implemented market
+data, feature, prediction, risk, execution, API, and Dashboard path. Synthetic
+signal publishing remains available only for tests that intentionally bypass
+Feature Engineering and Prediction Engine.
 
 ```mermaid
 sequenceDiagram
@@ -805,6 +815,10 @@ sequenceDiagram
     participant APIGateway as API Gateway
     participant RiskManager as Risk & Portfolio Manager
     participant ExecutionEngine as Execution Engine
+    participant DataIngestion as Data Ingestion
+    participant FeatureEng as Feature Engineering
+    participant PredictionEngine as Prediction Engine
+    participant Redis as Signal Cache
     participant Kafka as Message Bus
     participant TestHarness as E2E Test Harness
 
@@ -826,8 +840,15 @@ sequenceDiagram
         APIGateway-->>Dashboard: Portfolio instrument config response
     end
 
-    TestHarness->>Kafka: Publish synthetic common.Signal to trading.signals
-    Kafka-->>RiskManager: Consume signal and publish decision via outbox
+    TestHarness->>Kafka: Publish final MarketDataBar events to market.raw.data
+    Kafka-->>DataIngestion: Persist final OHLCV bars
+    Kafka-->>FeatureEng: Consume final bars and publish features.indicators
+    Kafka-->>PredictionEngine: Consume features.indicators and publish trading.signals
+    PredictionEngine->>Redis: Cache latest signal
+    Dashboard->>APIGateway: GET /api/signals?limit=10
+    APIGateway->>PredictionEngine: gRPC GetLatestSignals()
+    APIGateway-->>Dashboard: Recent BUY/SELL signals
+    Kafka-->>RiskManager: Consume trading.signals and publish decision via outbox
     Kafka-->>ExecutionEngine: Consume trades.approved and publish order/fills via outbox
     Kafka-->>RiskManager: Consume orders.fills and reconcile portfolio state
 
@@ -840,7 +861,9 @@ sequenceDiagram
 E2E boundaries:
 
 - The Dashboard calls only API Gateway product endpoints.
-- Synthetic `trading.signals` publishing is owned by e2e/manual test tooling.
+- Current full-system e2e drives raw bars through Feature Engineering and
+  Prediction Engine. Synthetic `trading.signals` publishing is owned by
+  e2e/manual test tooling for fallback or narrower tests only.
 - The Dashboard does not expose signal injection, strategy editing,
   start/stop trading, market charts, websocket streaming, or auth.
 
