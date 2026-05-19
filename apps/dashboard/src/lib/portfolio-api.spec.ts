@@ -59,6 +59,18 @@ describe('portfolio API client', () => {
     );
   });
 
+  it('lists recent signals with the fixed signal limit', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ signals: [] }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await createDashboardApi('https://api.example/api').listSignals();
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://api.example/api/signals?limit=10',
+      expect.any(Object),
+    );
+  });
+
   it('posts portfolio instrument payloads unchanged', async () => {
     const fetchMock = vi
       .fn()

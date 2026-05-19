@@ -52,8 +52,10 @@ describe('dashboard formatters', () => {
   });
 
   it('formats signal sides', () => {
-    expect(formatSignalSide('buy')).toBe('Buy');
-    expect(formatSignalSide('sell')).toBe('Sell');
-    expect(formatSignalSide('hold')).toBe('Hold');
+    expect(formatSignalSide('BUY')).toBe('Buy');
+    expect(formatSignalSide('SELL')).toBe('Sell');
+    expect(formatSignalSide('SIGNAL_SIDE_UNSPECIFIED')).toBe(
+      'Signal Side Unspecified',
+    );
   });
 });
