@@ -202,7 +202,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "aiokafka", specifier = ">=0.12.0,<0.13" },
-    { name = "grpcio", specifier = ">=1.76.0,<2" },
+    { name = "grpcio", specifier = ">=1.80.0,<2" },
     { name = "prometheus-client", specifier = ">=0.23.0,<0.24" },
     { name = "python-dotenv", specifier = ">=1.2.0,<2" },
     { name = "redis", specifier = ">=7.0.0,<8" },
@@ -366,13 +366,13 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "grpcio", specifier = ">=1.76.0,<2" },
+    { name = "grpcio", specifier = ">=1.80.0,<2" },
     { name = "protobuf", specifier = ">=6.33.0,<7" },
 ]
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "grpcio-tools", specifier = ">=1.76.0,<2" },
+    { name = "grpcio-tools", specifier = ">=1.80.0,<2" },
     { name = "mypy", specifier = ">=1.19.0,<2" },
     { name = "pytest", specifier = ">=9.0.0,<10" },
     { name = "ruff", specifier = ">=0.14.0,<0.15" },

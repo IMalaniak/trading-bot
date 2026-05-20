@@ -50,15 +50,25 @@ export const expectReconciledPortfolioState = (
   expectDecimalCloseTo(portfolio.summary.aggregateExposureNotional, 100);
   expect(portfolio.summary.openPositionCount).toBe(1);
   expect(position).toBeDefined();
+  if (!finalFill) {
+    throw new Error('Expected final execution fill to be present.');
+  }
+  if (!finalFill.cumulativeFilledQuantity) {
+    throw new Error('Expected final execution fill quantity to be present.');
+  }
+  if (!firstFill) {
+    throw new Error('Expected first execution fill to be present.');
+  }
+
   expectDecimalCloseTo(position?.exposureNotional, 100);
   expectDecimalCloseTo(
     position?.quantity,
-    Number.parseFloat(finalFill?.cumulativeFilledQuantity ?? ''),
+    Number.parseFloat(finalFill.cumulativeFilledQuantity),
   );
   expect(order.status).toBe('FILLED');
   expect(order.fills).toHaveLength(2);
-  expect(firstFill?.sequence).toBe(1);
-  expect(finalFill?.sequence).toBe(2);
+  expect(firstFill.sequence).toBe(1);
+  expect(finalFill.sequence).toBe(2);
 };
 
 export const summarizePortfolio = (

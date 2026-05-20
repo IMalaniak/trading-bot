@@ -56,7 +56,7 @@ export function RecentSignalsView({
   }
 
   return (
-    <section aria-labelledby="signals-heading" className="space-y-3">
+    <section aria-label="Recent Signals" className="space-y-3">
       <SectionHeading
         Icon={RadioTower}
         subtitle="Latest Prediction Engine output"

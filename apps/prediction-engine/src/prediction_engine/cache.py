@@ -8,7 +8,59 @@ from tradingbot_common.protobuf import serialize_message
 
 GLOBAL_RECENT_KEY = "prediction:signals:recent"
 SIGNAL_BY_ID_KEY = "prediction:signals:by_id"
+SIGNAL_INSTRUMENT_BY_ID_KEY = "prediction:signals:instrument_by_id"
 INSTRUMENT_RECENT_PREFIX = "prediction:signals:instrument:"
+
+_STORE_SIGNAL_SCRIPT = """
+local signal_payload_key = KEYS[1]
+local signal_instrument_key = KEYS[2]
+local global_recent_key = KEYS[3]
+local instrument_recent_key = KEYS[4]
+
+local signal_id = ARGV[1]
+local payload = ARGV[2]
+local score = ARGV[3]
+local cache_limit = tonumber(ARGV[4])
+local ttl_seconds = tonumber(ARGV[5])
+local trim_end = -(cache_limit + 1)
+
+redis.call("HSET", signal_payload_key, signal_id, payload)
+redis.call("HSET", signal_instrument_key, signal_id, instrument_recent_key)
+redis.call("ZADD", global_recent_key, score, signal_id)
+redis.call("ZADD", instrument_recent_key, score, signal_id)
+
+local evicted_global = redis.call("ZRANGE", global_recent_key, 0, trim_end)
+local evicted_instrument = redis.call("ZRANGE", instrument_recent_key, 0, trim_end)
+
+redis.call("ZREMRANGEBYRANK", global_recent_key, 0, trim_end)
+redis.call("ZREMRANGEBYRANK", instrument_recent_key, 0, trim_end)
+
+local function prune_payloads(signal_ids, fallback_instrument_key)
+  for _, current_signal_id in ipairs(signal_ids) do
+    local current_instrument_key = redis.call("HGET", signal_instrument_key, current_signal_id)
+      or fallback_instrument_key
+    local still_global = redis.call("ZSCORE", global_recent_key, current_signal_id)
+    local still_instrument = nil
+
+    if current_instrument_key then
+      still_instrument = redis.call("ZSCORE", current_instrument_key, current_signal_id)
+    end
+
+    if not still_global and not still_instrument then
+      redis.call("HDEL", signal_payload_key, current_signal_id)
+      redis.call("HDEL", signal_instrument_key, current_signal_id)
+    end
+  end
+end
+
+prune_payloads(evicted_global, nil)
+prune_payloads(evicted_instrument, instrument_recent_key)
+
+redis.call("EXPIRE", signal_payload_key, ttl_seconds)
+redis.call("EXPIRE", signal_instrument_key, ttl_seconds)
+redis.call("EXPIRE", global_recent_key, ttl_seconds)
+redis.call("EXPIRE", instrument_recent_key, ttl_seconds)
+"""
 
 
 class SignalCache(Protocol):
@@ -35,17 +87,21 @@ class RedisSignalCache:
         payload = serialize_message(signal)
         score = signal.timestamp
         instrument_key = self._instrument_recent_key(signal.instrument_id)
+        redis = cast(Any, self._redis)
 
-        pipe = cast(Any, self._redis.pipeline(transaction=True))
-        pipe.hset(SIGNAL_BY_ID_KEY, signal.id, payload)
-        pipe.zadd(GLOBAL_RECENT_KEY, {signal.id: score})
-        pipe.zadd(instrument_key, {signal.id: score})
-        pipe.zremrangebyrank(GLOBAL_RECENT_KEY, 0, -(self._cache_limit + 1))
-        pipe.zremrangebyrank(instrument_key, 0, -(self._cache_limit + 1))
-        pipe.expire(SIGNAL_BY_ID_KEY, self._ttl_seconds)
-        pipe.expire(GLOBAL_RECENT_KEY, self._ttl_seconds)
-        pipe.expire(instrument_key, self._ttl_seconds)
-        await pipe.execute()
+        await redis.eval(
+            _STORE_SIGNAL_SCRIPT,
+            4,
+            SIGNAL_BY_ID_KEY,
+            SIGNAL_INSTRUMENT_BY_ID_KEY,
+            GLOBAL_RECENT_KEY,
+            instrument_key,
+            signal.id,
+            payload,
+            score,
+            self._cache_limit,
+            self._ttl_seconds,
+        )
 
     async def get_latest(self, instrument_id: str | None, limit: int) -> list[Signal]:
         resolved_limit = limit if limit > 0 else self._default_read_limit
