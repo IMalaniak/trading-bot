@@ -33,3 +33,8 @@ ignore_missing_imports = true
 module = ["common.*", "events.*", "services.*"]
 ignore_missing_imports = true
 follow_imports = "skip"
+
+[dependency-groups]
+dev = [
+    "uv>=0.11.15",
+]
