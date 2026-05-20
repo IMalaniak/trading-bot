@@ -1,8 +1,15 @@
 export const DEFAULT_API_BASE_URL = 'http://localhost:3000/api';
 export const RECENT_ORDERS_LIMIT = 20;
+export const RECENT_SIGNALS_LIMIT = 10;
 
 export type AssetClassName = 'unspecified' | 'crypto' | 'stock';
-export type SignalSideName = 'buy' | 'sell' | 'hold';
+export type SignalSideName =
+  | 'SIGNAL_SIDE_UNSPECIFIED'
+  | 'BUY'
+  | 'SELL'
+  | 'buy'
+  | 'sell'
+  | 'hold';
 export type OrderStatusName =
   | 'placed'
   | 'partially_filled'
@@ -92,6 +99,18 @@ export interface PortfolioReadResponseDto {
 
 export interface ListPortfoliosResponseDto {
   portfolios: PortfolioSummaryDto[];
+}
+
+export interface SignalDto {
+  id: string;
+  instrumentId: string;
+  side: SignalSideName;
+  price: number;
+  timestamp: number;
+}
+
+export interface GetLatestSignalsResponseDto {
+  signals: SignalDto[];
 }
 
 export interface RegisterPortfolioInstrumentRequestDto {
@@ -228,6 +247,13 @@ export const createDashboardApi = (
           method: 'POST',
           body: JSON.stringify(payload),
         },
+      ),
+
+    listSignals: async (
+      limit = RECENT_SIGNALS_LIMIT,
+    ): Promise<GetLatestSignalsResponseDto> =>
+      await requestJson<GetLatestSignalsResponseDto>(
+        `${baseUrl}/signals?limit=${limit}`,
       ),
   };
 };

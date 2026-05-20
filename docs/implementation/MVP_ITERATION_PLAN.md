@@ -97,6 +97,26 @@ Implemented baseline:
   - local infra bootstraps `instrument.registered.dlq` and
     `market.raw.data.dlq`, and Rust workspace/Nx targets exist for
     `data-ingestion` and `common-rs`
+- Feature Engineering:
+  - Rust `feature-engineering` service consumes final `market.raw.data` bars,
+    warms rolling indicator state from Data Ingestion gRPC, computes the core
+    indicator set, and publishes protobuf `IndicatorFeatureVector` events to
+    `features.indicators`
+  - deterministic feature-vector ids, Kafka metadata headers, shared topic and
+    schema constants, Prometheus metrics, DLQ handling, and e2e coverage for
+    duplicate raw-bar idempotency are implemented
+- Prediction Engine and signal visibility:
+  - Python `prediction-engine` service consumes `features.indicators`, runs the
+    deterministic `baseline-core-v1` model, skips neutral decisions, and
+    publishes `common.Signal` events to `trading.signals`
+  - recent BUY/SELL signals are cached in Redis and exposed through the
+    existing `Signals.GetLatestSignals` gRPC API
+  - API Gateway exposes `GET /api/signals?instrumentId=&limit=` and Dashboard
+    shows a compact Recent Signals view through API Gateway only
+  - full-system e2e now drives raw bars through Feature Engineering, Prediction
+    Engine, Portfolio Manager, Execution Engine, API Gateway, and Dashboard;
+    synthetic `trading.signals` publishing remains available only as
+    test-harness fallback code
 
 Current validation remains:
 
@@ -119,6 +139,16 @@ npx nx run data-ingestion:fmt
 npx nx run data-ingestion:lint
 npx nx run data-ingestion:test
 npx nx run data-ingestion:test-integration  # requires: npx nx run infra:serve-integration
+npx nx run feature-engineering:fmt
+npx nx run feature-engineering:lint
+npx nx run feature-engineering:test
+npx nx run common-python:lint
+npx nx run common-python:typecheck
+npx nx run common-python:test
+npx nx run prediction-engine:fmt
+npx nx run prediction-engine:lint
+npx nx run prediction-engine:typecheck
+npx nx run prediction-engine:test
 ```
 
 ## Post-MVP Roadmap
@@ -136,16 +166,21 @@ iterations.
       protobuf `IndicatorFeatureVector` events, deterministic event ids, Kafka
       metadata headers, shared topic/schema constants, and e2e coverage for
       duplicate raw-bar idempotency.
-- [ ] Real Prediction Engine producing `trading.signals`. Missing. Current
-      tests still publish synthetic `common.Signal` events directly to Kafka; only
-      the future Prediction Engine gRPC contract exists.
-- [ ] Signal cache and read API for dashboard signal visibility. Missing. There
-      is no implemented Prediction Engine service, Redis-backed signal cache, API
-      Gateway read route, or Dashboard signal view.
-- [ ] Model registry and training pipeline once prediction logic needs
-      lifecycle management. Missing.
+- [x] Real Prediction Engine producing `trading.signals`. Implemented as the
+      Python `prediction-engine` service consuming `features.indicators`,
+      running deterministic `baseline-core-v1` inference, publishing only BUY
+      and SELL `common.Signal` events, and sending unsupported/malformed inputs
+      through the DLQ path.
+- [x] Signal cache and read API for dashboard signal visibility. Implemented
+      with Redis-backed global and per-instrument recent signal lists,
+      `Signals.GetLatestSignals`, API Gateway `GET /api/signals`, and a
+      Dashboard Recent Signals view. Synthetic `trading.signals` publishing
+      remains test-only fallback code.
 - [ ] Feature persistence/read API. Missing. The v1 Feature Engineering service
       keeps rolling state in memory and publishes Kafka output only.
+- [ ] Model registry and training pipeline once prediction logic needs
+      lifecycle management. Missing beyond the planned local deterministic
+      baseline model.
 - [ ] Cross-instrument correlations. Missing. Current indicators are
       per-instrument/per-interval only.
 
@@ -206,7 +241,7 @@ iterations.
 1. Keep the remaining MVP focused on proving the implemented backend path.
 2. Prefer existing API Gateway product endpoints for UI work.
 3. Keep synthetic signal publishing inside e2e/manual test tooling until a real
-   Prediction Engine exists.
+   Prediction Engine path is unavailable or intentionally bypassed.
 4. Continue using shared proto contracts, topic constants, and key helpers.
 5. Every new event-producing feature must preserve deterministic keys,
    idempotency identity, and documented replay behavior.

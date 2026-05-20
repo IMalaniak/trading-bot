@@ -5,7 +5,8 @@ This folder contains the Docker Compose setups and Redpanda bootstrap assets use
 Compose files
 
 - `infra/docker-compose.base.yml`
-  - shared services definition for Redpanda, topic bootstrap, and Postgres
+  - shared services definition for Redpanda, topic bootstrap, Postgres,
+    TimescaleDB, and Redis
 - `infra/docker-compose.yml`
   - local development stack built from the shared base via `extends`
 - `infra/docker-compose.test.yml`
@@ -15,13 +16,15 @@ Services
 
 - `redpanda`: Kafka-compatible broker for local event flows
 - `postgres`: main application database used by `portfolio-manager`
-- `timescaledb`: time-series database reserved for planned market data workloads
+- `timescaledb`: time-series database used by `data-ingestion`
+- `redis`: recent signal cache used by `prediction-engine`
 
 Ports
 
 - Redpanda: `9092`
 - Postgres: `5432`
 - TimescaleDB: `5433`
+- Redis: `6379`
 
 Environment files
 
@@ -37,6 +40,9 @@ Environment files
   - `KAFKA_BROKERS`
   - `PORTFOLIO_MANAGER_GRPC_URL`
   - `EXECUTION_ENGINE_GRPC_URL`
+  - `DATA_INGESTION_GRPC_URL`
+  - `PREDICTION_ENGINE_GRPC_URL`
+  - `REDIS_URL`
   - optional Kafka retry overrides
 - `apps/api-gateway/.env`
   - API Gateway-owned runtime config loaded after root `.env`
@@ -46,6 +52,11 @@ Environment files
   - `PORTFOLIO_MANAGER_DATABASE_URL`
 - `apps/execution-engine/.env`
   - `EXECUTION_ENGINE_DATABASE_URL`
+- `apps/feature-engineering/.env`
+  - Feature Engineering-owned warm-up, consumer group, metrics, and log config
+- `apps/prediction-engine/.env`
+  - Prediction Engine-owned consumer group, gRPC port, metrics port, cache
+    limits, model thresholds, and log config
 - `apps/dashboard/.env`
   - optional `VITE_API_BASE_URL`
 - `apps/portfolio-manager/.env.test-integration`
@@ -88,6 +99,9 @@ npx nx run infra:serve
 ```bash
 npx nx serve portfolio-manager
 npx nx serve execution-engine
+npx nx run data-ingestion:serve
+npx nx run feature-engineering:serve
+npx nx run prediction-engine:serve
 npx nx serve api-gateway
 npx nx serve dashboard
 ```

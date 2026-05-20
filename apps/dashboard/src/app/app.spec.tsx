@@ -60,6 +60,20 @@ const emptyPortfolioFixture: PortfolioReadResponseDto = {
   },
 };
 
+const signalsFixture = {
+  signals: [
+    {
+      id: 'sig_alpha',
+      instrumentId: 'instrument-aapl',
+      side: 'BUY',
+      price: 100.5,
+      timestamp: 1775044800000,
+    },
+  ],
+};
+
+const emptySignalsFixture = { signals: [] };
+
 const jsonResponse = (body: unknown, status = 200): Response =>
   new Response(JSON.stringify(body), {
     status,
@@ -134,6 +148,10 @@ describe('App', () => {
         return Promise.resolve(jsonResponse(portfolioListFixture));
       }
 
+      if (url === 'http://localhost:3000/api/signals?limit=10') {
+        return Promise.resolve(jsonResponse(signalsFixture));
+      }
+
       return Promise.resolve(jsonResponse(portfolioFixture));
     });
     vi.stubGlobal('fetch', fetchMock);
@@ -150,12 +168,24 @@ describe('App', () => {
       'http://localhost:3000/api/portfolios/portfolio-alpha?recentOrdersLimit=20',
       expect.any(Object),
     );
+    expect(await screen.findByText('Recent Signals')).toBeInTheDocument();
+    expect(screen.getByText('instrument-aapl')).toBeInTheDocument();
   });
 
   it('renders empty configured instruments, positions, and orders states', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue(jsonResponse(emptyPortfolioFixture)),
+      vi
+        .fn()
+        .mockImplementation((url: string) =>
+          Promise.resolve(
+            jsonResponse(
+              url === 'http://localhost:3000/api/signals?limit=10'
+                ? emptySignalsFixture
+                : emptyPortfolioFixture,
+            ),
+          ),
+        ),
     );
 
     renderApp(['/portfolios/portfolio-alpha']);
@@ -189,6 +219,10 @@ describe('App', () => {
               updatedAt: '2026-03-25T12:00:05.000Z',
             }),
           );
+        }
+
+        if (url === 'http://localhost:3000/api/signals?limit=10') {
+          return Promise.resolve(jsonResponse(emptySignalsFixture));
         }
 
         return Promise.resolve(jsonResponse(emptyPortfolioFixture));
@@ -247,6 +281,10 @@ describe('App', () => {
               409,
             ),
           );
+        }
+
+        if (url === 'http://localhost:3000/api/signals?limit=10') {
+          return Promise.resolve(jsonResponse(emptySignalsFixture));
         }
 
         return Promise.resolve(jsonResponse(emptyPortfolioFixture));

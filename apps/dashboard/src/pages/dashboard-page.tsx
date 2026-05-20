@@ -7,10 +7,12 @@ import { PortfolioInstrumentsView } from '../components/portfolio-instruments-vi
 import { PortfolioSummary } from '../components/portfolio-summary';
 import { PositionsView } from '../components/positions-view';
 import { RecentOrdersView } from '../components/recent-orders-view';
+import { RecentSignalsView } from '../components/recent-signals-view';
 import {
   createDashboardApi,
   type PortfolioInstrumentConfigDto,
   type PortfolioReadResponseDto,
+  type SignalDto,
 } from '../lib/portfolio-api';
 import { ThemeToggle } from '../theme';
 import { EmptyState, getErrorMessage, LoadingState, StatusBanner } from '../ui';
@@ -24,6 +26,13 @@ interface PortfolioState {
   isRefreshing: boolean;
 }
 
+interface SignalsState {
+  data: SignalDto[];
+  error?: string;
+  status: LoadStatus;
+  isRefreshing: boolean;
+}
+
 const api = createDashboardApi();
 
 const initialPortfolioState: PortfolioState = {
@@ -31,9 +40,17 @@ const initialPortfolioState: PortfolioState = {
   isRefreshing: false,
 };
 
+const initialSignalsState: SignalsState = {
+  data: [],
+  status: 'idle',
+  isRefreshing: false,
+};
+
 export function DashboardPage() {
   const { portfolioId = '' } = useParams<{ portfolioId: string }>();
   const [state, setState] = useState<PortfolioState>(initialPortfolioState);
+  const [signalsState, setSignalsState] =
+    useState<SignalsState>(initialSignalsState);
 
   const loadPortfolio = useCallback(
     async (keepData = false) => {
@@ -68,9 +85,35 @@ export function DashboardPage() {
     [portfolioId],
   );
 
+  const loadSignals = useCallback(async (keepData = false) => {
+    setSignalsState((current) => ({
+      data: keepData ? current.data : [],
+      error: undefined,
+      status: keepData && current.data.length > 0 ? 'success' : 'loading',
+      isRefreshing: keepData && current.data.length > 0,
+    }));
+
+    try {
+      const data = await api.listSignals();
+      setSignalsState({
+        data: data.signals,
+        status: 'success',
+        isRefreshing: false,
+      });
+    } catch (error) {
+      setSignalsState((current) => ({
+        data: keepData ? current.data : [],
+        error: getErrorMessage(error),
+        status: 'error',
+        isRefreshing: false,
+      }));
+    }
+  }, []);
+
   useEffect(() => {
     void loadPortfolio();
-  }, [loadPortfolio]);
+    void loadSignals();
+  }, [loadPortfolio, loadSignals]);
 
   const handleInstrumentRegistered = useCallback(
     (configuredInstrument: PortfolioInstrumentConfigDto) => {
@@ -122,7 +165,10 @@ export function DashboardPage() {
             <button
               className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-cyan-600 px-4 text-sm font-semibold text-white transition hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-60"
               disabled={state.status === 'loading' || state.isRefreshing}
-              onClick={() => void loadPortfolio(true)}
+              onClick={() => {
+                void loadPortfolio(true);
+                void loadSignals(true);
+              }}
               type="button"
             >
               <RefreshCw
@@ -159,6 +205,11 @@ export function DashboardPage() {
           ) : null}
         </div>
         <aside className="space-y-5">
+          <RecentSignalsView
+            error={signalsState.error}
+            isLoading={signalsState.status === 'loading'}
+            signals={signalsState.data}
+          />
           <InstrumentRegistration
             onRegistered={handleInstrumentRegistered}
             portfolioId={portfolioId}

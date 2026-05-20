@@ -9,6 +9,7 @@
     "dashboard",
     "execution-engine",
     "feature-engineering",
+    "prediction-engine",
     "portfolio-manager",
     "common",
     "testing"
@@ -37,6 +38,10 @@
         },
         {
           "projects": "feature-engineering",
+          "target": "serve-e2e"
+        },
+        {
+          "projects": "prediction-engine",
           "target": "serve-e2e"
         },
         {
@@ -111,6 +116,10 @@
         },
         {
           "projects": "feature-engineering",
+          "target": "serve-e2e"
+        },
+        {
+          "projects": "prediction-engine",
           "target": "serve-e2e"
         },
         {

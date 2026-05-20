@@ -6,7 +6,12 @@ import {
   KAFKA_TOPICS,
   portfolioKey,
 } from '@trading-bot/common';
-import { OrderFill, Signal, SignalSide } from '@trading-bot/common/proto';
+import {
+  MarketDataBar,
+  OrderFill,
+  Signal,
+  SignalSide,
+} from '@trading-bot/common/proto';
 import { waitForCondition } from '@trading-bot/testing';
 import { Kafka, logLevel, type Producer } from 'kafkajs';
 
@@ -17,6 +22,14 @@ export const SEEDED_PORTFOLIO_ID = 'portfolio-alpha';
 export const SEEDED_INSTRUMENT_ID = 'seed-instrument-btc-usdt';
 export const SIGNAL_ID = 'e2e-signal-1';
 export const SOURCE_EVENT_ID = 'e2e-source-event-1';
+export const PREDICTION_E2E_SYMBOL = 'BTCUSDT';
+export const PREDICTION_E2E_VENUE = 'BINANCE';
+export const PREDICTION_E2E_INTERVAL = '1m';
+export const PREDICTION_E2E_CORRELATION_ID = 'e2e-prediction-workflow-1';
+export const PREDICTION_E2E_BASE_OPEN_TIME_MS = new Date(
+  '2026-05-14T12:00:00.000Z',
+).getTime();
+export const PREDICTION_E2E_READY_INDEX = 34;
 
 export const createKafka = (): Kafka =>
   new Kafka({
@@ -52,6 +65,29 @@ export const publishPortfolioSignal = async (
       },
     ],
     topic: KAFKA_TOPICS.TRADING_SIGNALS,
+  });
+};
+
+export const publishPredictionPipelineBars = async (
+  producer: Producer,
+  count = PREDICTION_E2E_READY_INDEX + 1,
+): Promise<void> => {
+  await producer.send({
+    topic: KAFKA_TOPICS.MARKET_RAW_DATA,
+    messages: Array.from({ length: count }, (_, index) =>
+      buildPredictionPipelineMarketDataMessage(index),
+    ),
+  });
+};
+
+export const publishDuplicateReadyPredictionBar = async (
+  producer: Producer,
+): Promise<void> => {
+  await producer.send({
+    topic: KAFKA_TOPICS.MARKET_RAW_DATA,
+    messages: [
+      buildPredictionPipelineMarketDataMessage(PREDICTION_E2E_READY_INDEX),
+    ],
   });
 };
 
@@ -96,9 +132,9 @@ export const waitForPortfolioReconciliationState = async (
       );
 
       return (
-        latest.summary.aggregateExposureNotional === '100' &&
+        decimalCloseTo(latest.summary.aggregateExposureNotional, 100) &&
         latest.summary.openPositionCount === 1 &&
-        btcPosition?.quantity === '1' &&
+        decimalCloseTo(btcPosition?.exposureNotional, 100) &&
         filledOrder !== undefined
       );
     },
@@ -112,4 +148,59 @@ export const waitForPortfolioReconciliationState = async (
   }
 
   return latest;
+};
+
+const buildPredictionPipelineMarketDataMessage = (
+  index: number,
+): {
+  key: string;
+  value: Buffer;
+  headers: Record<string, string>;
+} => {
+  const openTimeMs = PREDICTION_E2E_BASE_OPEN_TIME_MS + index * 60_000;
+  const closeTimeMs = openTimeMs + 59_999;
+  const close = 100 + index;
+  const sourceEventId = `e2e-prediction-market-data-${index}`;
+
+  const bar = MarketDataBar.fromPartial({
+    instrumentId: SEEDED_INSTRUMENT_ID,
+    symbol: PREDICTION_E2E_SYMBOL,
+    venue: PREDICTION_E2E_VENUE,
+    interval: PREDICTION_E2E_INTERVAL,
+    openTimeMs,
+    closeTimeMs,
+    open: String(close - 0.5),
+    high: String(close + 1),
+    low: String(close - 1),
+    close: String(close),
+    volume: '1',
+    quoteVolume: String(close),
+    tradeCount: 1,
+    isFinal: true,
+  });
+
+  return {
+    key: instrumentKey(PREDICTION_E2E_VENUE, SEEDED_INSTRUMENT_ID),
+    value: Buffer.from(MarketDataBar.encode(bar).finish()),
+    headers: buildEventMetadataHeaders({
+      eventId: sourceEventId,
+      eventType: KAFKA_TOPICS.MARKET_RAW_DATA,
+      occurredAt: new Date().toISOString(),
+      producer: KAFKA_EVENT_PRODUCERS.EXTERNAL_API_FACADE,
+      schemaVersion: KAFKA_EVENT_SCHEMA_VERSIONS.MARKET_RAW_DATA,
+      correlationId: PREDICTION_E2E_CORRELATION_ID,
+    }),
+  };
+};
+
+const decimalCloseTo = (
+  value: string | undefined,
+  expected: number,
+  precision = 6,
+): boolean => {
+  if (value === undefined) {
+    return false;
+  }
+
+  return Math.abs(Number.parseFloat(value) - expected) < 10 ** -precision;
 };

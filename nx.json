@@ -11,6 +11,17 @@
       "{projectRoot}/src/**/*.rs",
       "{projectRoot}/tests/**/*.rs"
     ],
+    "pythonFiles": [
+      "{workspaceRoot}/pyproject.toml",
+      "{workspaceRoot}/uv.lock",
+      "{projectRoot}/pyproject.toml",
+      "{projectRoot}/src/**/*.py",
+      "{projectRoot}/tests/**/*.py",
+      "{workspaceRoot}/libs/common-python/pyproject.toml",
+      "{workspaceRoot}/libs/common-python/src/**/*.py",
+      "{workspaceRoot}/libs/common-python/tests/**/*.py",
+      "{workspaceRoot}/proto/**/*.proto"
+    ],
     "production": [
       "default",
       "!{projectRoot}/.eslintrc.json",

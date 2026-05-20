@@ -100,6 +100,18 @@ export interface GetMarketDataBarsResponseDto {
   bars: MarketDataBarDto[];
 }
 
+export interface SignalDto {
+  id: string;
+  instrumentId: string;
+  side: SignalSideName;
+  price: number;
+  timestamp: number;
+}
+
+export interface GetLatestSignalsResponseDto {
+  signals: SignalDto[];
+}
+
 export interface GetMarketDataBarsQuery {
   instrumentId: string;
   interval: string;
@@ -151,6 +163,12 @@ export class ApiClient {
     if (query.limit !== undefined) params.set('limit', String(query.limit));
     return await requestJson<GetMarketDataBarsResponseDto>(
       `${this.apiBaseUrl}/market-data/bars?${params.toString()}`,
+    );
+  }
+
+  async getLatestSignals(limit = 10): Promise<GetLatestSignalsResponseDto> {
+    return await requestJson<GetLatestSignalsResponseDto>(
+      `${this.apiBaseUrl}/signals?limit=${limit}`,
     );
   }
 }

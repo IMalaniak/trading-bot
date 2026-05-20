@@ -7,6 +7,14 @@ out-tsc
 
 # dependencies
 node_modules
+.venv
+.uv-cache/
+.uv-python/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
 
 # IDEs and editors
 /.idea

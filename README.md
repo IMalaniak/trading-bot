@@ -3,11 +3,12 @@
 ## MVP Local Validation
 
 This README is the canonical local walkthrough for validating the MVP from a
-clean checkout. The MVP proves the implemented portfolio and market-data flows:
-seeded portfolio data, Dashboard visibility, instrument configuration through
-API Gateway, market data ingestion through Data Ingestion, and a test-harness
-Kafka signal that drives risk, execution, fill reconciliation, REST state, and
-browser-visible Dashboard state.
+clean checkout. The MVP proves the implemented portfolio, market-data,
+feature, prediction, execution, and dashboard flows: seeded portfolio data,
+instrument configuration through API Gateway, raw market data ingestion,
+Feature Engineering indicator publishing, Prediction Engine signal publishing,
+risk, execution, fill reconciliation, REST state, and browser-visible Dashboard
+state.
 
 Synthetic signal publishing is test tooling only. The product surface remains:
 
@@ -15,6 +16,7 @@ Synthetic signal publishing is test tooling only. The product surface remains:
 - `GET /api/portfolios/:portfolioId?recentOrdersLimit=20`
 - `POST /api/portfolios/:portfolioId/instrument`
 - `GET /api/market-data/bars`
+- `GET /api/signals?instrumentId=&limit=`
 
 ### Prerequisites
 
@@ -39,6 +41,11 @@ Synthetic signal publishing is test tooling only. The product surface remains:
   ```bash
   cargo install cargo-audit
   ```
+- **uv + Python 3.12** for the Python Prediction Engine workspace. The Nx
+  targets use `python3 -m uv`; install uv once if it is not already available:
+  ```bash
+  python3 -m pip install --user uv
+  ```
 
 Install dependencies:
 
@@ -57,6 +64,8 @@ cp apps/execution-engine/.env.example apps/execution-engine/.env
 cp apps/dashboard/.env.example apps/dashboard/.env
 cp apps/external-api-facade/.env.example apps/external-api-facade/.env
 cp apps/data-ingestion/.env.example apps/data-ingestion/.env
+cp apps/feature-engineering/.env.example apps/feature-engineering/.env
+cp apps/prediction-engine/.env.example apps/prediction-engine/.env
 ```
 
 The committed `.env.e2e` files provide deterministic defaults for the isolated
@@ -70,11 +79,13 @@ Run the automated MVP proof:
 npx nx run trading-bot-e2e:e2e
 ```
 
-This Nx target starts isolated Redpanda and Postgres through `infra:serve-e2e`,
-runs service migrations, seeds `portfolio-alpha`, starts `portfolio-manager`,
-`execution-engine`, `external-api-facade`, `data-ingestion`, `api-gateway`, and
-`dashboard`, publishes synthetic protobuf events from the e2e harness, then
-verifies REST state, market-data reads, and the Dashboard in Chromium.
+This Nx target starts isolated Redpanda, Postgres, TimescaleDB, and Redis
+through `infra:serve-e2e`, runs service migrations, seeds `portfolio-alpha`,
+starts `portfolio-manager`, `execution-engine`, `external-api-facade`,
+`data-ingestion`, `feature-engineering`, `prediction-engine`, `api-gateway`,
+and `dashboard`, publishes final raw market-data bars from the e2e harness,
+then verifies feature publishing, prediction, risk, execution, REST state,
+market-data reads, signal reads, and the Dashboard in Chromium.
 
 Clean the isolated e2e Docker stack after the run when needed:
 
@@ -109,14 +120,16 @@ npx nx run data-ingestion:build
 ./target/debug/data-ingestion
 npx nx run feature-engineering:build
 ./target/debug/feature-engineering
+npx nx run prediction-engine:serve
 npx nx serve api-gateway
 npx nx serve dashboard
 ```
 
 Open the Dashboard at `http://localhost:4200`, select `portfolio-alpha`, and
-inspect the seeded summary and configured instruments. Positions and recent
-orders remain empty until a test-harness signal drives the backend event chain.
-Use the instrument form to call the API Gateway product endpoint
+inspect the seeded summary, configured instruments, and recent signals.
+Positions and recent orders remain empty until market-data events drive the
+feature, prediction, risk, execution, and reconciliation chain. Use the
+instrument form to call the API Gateway product endpoint
 `POST /api/portfolios/:portfolioId/instrument`.
 
 Stop shared local infra without deleting volumes:
@@ -140,6 +153,13 @@ Run focused project checks through Nx:
 npx nx run dashboard:test
 npx nx run dashboard:typecheck
 npx nx run dashboard:build
+npx nx run common-python:lint
+npx nx run common-python:typecheck
+npx nx run common-python:test
+npx nx run prediction-engine:fmt
+npx nx run prediction-engine:lint
+npx nx run prediction-engine:typecheck
+npx nx run prediction-engine:test
 npx nx run trading-bot-e2e:test
 npx nx run trading-bot-e2e:typecheck
 ```
@@ -153,15 +173,11 @@ npx nx run execution-engine:test-integration
 
 ## MVP Limitations
 
-- No real Prediction Engine.
-- No completed Feature Engineering service yet; this is the current post-MVP
-  implementation target.
-- No signal cache/read API or feature persistence/read API.
+- No feature persistence/read API.
 - No model registry, training pipeline, or cross-instrument correlations.
 - No real exchange or paper exchange execution.
 - No auth, users, or permissions.
-- No websocket/live Dashboard stream, signal monitor, or indicator chart
-  overlays.
+- No websocket/live Dashboard stream or indicator chart overlays.
 - No production deployment story.
 - No schema registry.
 

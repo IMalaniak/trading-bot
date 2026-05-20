@@ -1,4 +1,4 @@
-import { test } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 import { ApiClient } from '../support/api-client';
 import {
@@ -11,13 +11,16 @@ import {
   expectPortfolioStable,
   expectReconciledPortfolioState,
   expectSeededPortfolioListed,
+  findSeededInstrumentSignal,
   findSignalOrder,
+  quantityDashboardPrefix,
   summarizePortfolio,
 } from '../support/portfolio-assertions';
 import {
   createKafka,
+  publishDuplicateReadyPredictionBar,
   publishFillReplay,
-  publishPortfolioSignal,
+  publishPredictionPipelineBars,
   waitForPortfolioReconciliationState,
 } from '../support/signal-to-portfolio-flow';
 
@@ -38,30 +41,35 @@ test('reconciles a Kafka signal into portfolio read and dashboard state with ide
       await openSeededPortfolio(page);
     });
 
-    await test.step('synthetic signal drives risk, execution, and reconciliation', async () => {
-      await publishPortfolioSignal(producer);
+    await test.step('market data drives feature engineering, prediction, execution, and reconciliation', async () => {
+      await publishPredictionPipelineBars(producer);
     });
 
     const portfolio = await waitForPortfolioReconciliationState(api);
-    const order = findSignalOrder(portfolio);
+    const latestSignals = await api.getLatestSignals();
+    const signal = findSeededInstrumentSignal(latestSignals.signals);
+    const order = findSignalOrder(portfolio, signal.id);
     const [firstFill, finalFill] = order.fills.sort(
       (left, right) => left.sequence - right.sequence,
     );
 
     expectReconciledPortfolioState(portfolio, order, firstFill, finalFill);
+    expect(signal.id).toBe(order.signalId);
 
     await test.step('dashboard renders the updated read model', async () => {
       await refreshDashboard(page);
-      await expectDashboardPortfolioState(page, order.orderId, [
-        firstFill?.fillId ?? '',
-        finalFill?.fillId ?? '',
-      ]);
+      await expectDashboardPortfolioState(
+        page,
+        order.orderId,
+        [firstFill?.fillId ?? '', finalFill?.fillId ?? ''],
+        quantityDashboardPrefix(finalFill?.cumulativeFilledQuantity ?? ''),
+      );
     });
 
     const stableSnapshot = summarizePortfolio(portfolio);
 
-    await test.step('duplicate source signal does not create another order', async () => {
-      await publishPortfolioSignal(producer);
+    await test.step('duplicate ready raw bar does not create another order', async () => {
+      await publishDuplicateReadyPredictionBar(producer);
       await expectPortfolioStable(api, stableSnapshot);
     });
 
@@ -73,10 +81,12 @@ test('reconciles a Kafka signal into portfolio read and dashboard state with ide
       await publishFillReplay(producer, buildOrderFillReplay(order, finalFill));
       await expectPortfolioStable(api, stableSnapshot);
       await refreshDashboard(page);
-      await expectDashboardPortfolioState(page, order.orderId, [
-        firstFill?.fillId ?? '',
-        finalFill.fillId,
-      ]);
+      await expectDashboardPortfolioState(
+        page,
+        order.orderId,
+        [firstFill?.fillId ?? '', finalFill.fillId],
+        quantityDashboardPrefix(finalFill.cumulativeFilledQuantity),
+      );
     });
   } finally {
     await producer.disconnect();
