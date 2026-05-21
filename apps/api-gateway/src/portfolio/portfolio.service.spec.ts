@@ -13,7 +13,15 @@ import { TimeoutError } from 'rxjs';
 import type { Mocked } from 'vitest';
 
 import { OrderStatusName } from './dto/order-status-name.enum';
+import {
+  ListRiskConfigAuditLogQueryDto,
+  ListRiskDecisionsQueryDto,
+} from './dto/portfolio-decisions.dto';
 import { RegisterPortfolioInstrumentRequestDto } from './dto/portfolio-instrument.dto';
+import {
+  UpdatePortfolioInstrumentConfigRestRequestDto,
+  UpdatePortfolioRestRequestDto,
+} from './dto/portfolio-write.dto';
 import { SignalSideName } from './dto/signal-side-name.enum';
 import { IExecutionEngine } from './execution-engine.client.interface';
 import { PortfolioService } from './portfolio.service';
@@ -30,6 +38,10 @@ describe('PortfolioService', () => {
       listPortfolios: vi.fn(),
       getPortfolio: vi.fn(),
       listInstruments: vi.fn(),
+      updatePortfolio: vi.fn(),
+      updatePortfolioInstrumentConfig: vi.fn(),
+      listRiskDecisions: vi.fn(),
+      listRiskConfigAuditLog: vi.fn(),
     };
     executionClient = {
       listPortfolioExecutionOrders: vi.fn(),
@@ -559,6 +571,284 @@ describe('PortfolioService', () => {
         code: AppResponseCode.UPSTREAM_TIMEOUT,
       },
       status: HttpStatus.GATEWAY_TIMEOUT,
+    });
+  });
+
+  describe('updatePortfolio', () => {
+    it('returns updated portfolio summary', async () => {
+      portfolioClient.updatePortfolio.mockReturnValue(
+        of({
+          summary: {
+            portfolioId: 'portfolio-alpha',
+            name: 'Alpha Portfolio',
+            isActive: false,
+            exposureCapNotional: '2000',
+            aggregateExposureNotional: '0',
+            openPositionCount: 0,
+            updatedAt: '2026-05-21T10:00:00.000Z',
+          },
+        }),
+      );
+
+      const dto = Object.assign(new UpdatePortfolioRestRequestDto(), {
+        isActive: false,
+        exposureCapNotional: '2000',
+      });
+
+      await expect(
+        lastValueFrom(service.updatePortfolio('portfolio-alpha', dto)),
+      ).resolves.toMatchObject({
+        portfolioId: 'portfolio-alpha',
+        isActive: false,
+        exposureCapNotional: '2000',
+      });
+
+      expect(portfolioClient.updatePortfolio.mock.calls).toEqual([
+        [
+          {
+            portfolioId: 'portfolio-alpha',
+            isActive: false,
+            exposureCapNotional: '2000',
+          },
+        ],
+      ]);
+    });
+
+    it('throws 404 for unknown portfolio', async () => {
+      portfolioClient.updatePortfolio.mockReturnValue(
+        throwError(() => ({
+          code: GrpcStatusCode.NOT_FOUND,
+          appCode: AppResponseCode.PORTFOLIO_NOT_FOUND,
+          details: 'Portfolio not found',
+        })),
+      );
+
+      const dto = Object.assign(new UpdatePortfolioRestRequestDto(), {
+        isActive: false,
+      });
+
+      await expect(
+        lastValueFrom(service.updatePortfolio('missing', dto)),
+      ).rejects.toMatchObject({
+        response: {
+          message: 'Portfolio not found',
+          code: AppResponseCode.PORTFOLIO_NOT_FOUND,
+        },
+        status: HttpStatus.NOT_FOUND,
+      });
+    });
+
+    it('throws 502 when upstream returns no summary', async () => {
+      portfolioClient.updatePortfolio.mockReturnValue(
+        of({ summary: undefined }),
+      );
+
+      const dto = Object.assign(new UpdatePortfolioRestRequestDto(), {});
+
+      await expect(
+        lastValueFrom(service.updatePortfolio('portfolio-alpha', dto)),
+      ).rejects.toMatchObject({
+        response: { code: AppResponseCode.UPSTREAM_UNAVAILABLE },
+        status: HttpStatus.BAD_GATEWAY,
+      });
+    });
+  });
+
+  describe('updatePortfolioInstrumentConfig', () => {
+    it('returns updated configured instrument', async () => {
+      portfolioClient.updatePortfolioInstrumentConfig.mockReturnValue(
+        of({
+          configuredInstrument: {
+            portfolioId: 'portfolio-alpha',
+            instrument: {
+              id: 'instrument-1',
+              assetClass: AssetClass.CRYPTO,
+              symbol: 'BTC/USDT',
+              venue: 'BINANCE',
+              externalSymbol: 'BTCUSDT',
+            },
+            enabled: false,
+            targetNotional: '100',
+            maxTradeNotional: '150',
+            maxPositionNotional: '400',
+            updatedAt: '2026-05-21T10:00:00.000Z',
+          },
+        }),
+      );
+
+      const dto = Object.assign(
+        new UpdatePortfolioInstrumentConfigRestRequestDto(),
+        { enabled: false },
+      );
+
+      await expect(
+        lastValueFrom(
+          service.updatePortfolioInstrumentConfig(
+            'portfolio-alpha',
+            'instrument-1',
+            dto,
+          ),
+        ),
+      ).resolves.toMatchObject({
+        portfolioId: 'portfolio-alpha',
+        enabled: false,
+      });
+
+      expect(
+        portfolioClient.updatePortfolioInstrumentConfig.mock.calls,
+      ).toEqual([
+        [
+          {
+            portfolioId: 'portfolio-alpha',
+            instrumentId: 'instrument-1',
+            enabled: false,
+          },
+        ],
+      ]);
+    });
+
+    it('throws 404 for unknown instrument config', async () => {
+      portfolioClient.updatePortfolioInstrumentConfig.mockReturnValue(
+        throwError(() => ({
+          code: GrpcStatusCode.NOT_FOUND,
+          appCode: AppResponseCode.INSTRUMENT_CONFIG_NOT_FOUND,
+          details: 'Instrument config not found',
+        })),
+      );
+
+      const dto = Object.assign(
+        new UpdatePortfolioInstrumentConfigRestRequestDto(),
+        { enabled: true },
+      );
+
+      await expect(
+        lastValueFrom(
+          service.updatePortfolioInstrumentConfig(
+            'portfolio-alpha',
+            'missing',
+            dto,
+          ),
+        ),
+      ).rejects.toMatchObject({
+        response: {
+          message: 'Instrument config not found',
+          code: AppResponseCode.INSTRUMENT_CONFIG_NOT_FOUND,
+        },
+        status: HttpStatus.NOT_FOUND,
+      });
+    });
+  });
+
+  describe('listRiskDecisions', () => {
+    it('returns decisions list', async () => {
+      portfolioClient.listRiskDecisions.mockReturnValue(
+        of({
+          decisions: [
+            {
+              id: 'dec-1',
+              portfolioId: 'portfolio-alpha',
+              instrumentId: 'instrument-1',
+              decision: 'REJECTED',
+              reasonCodes: ['TRADE_CAP_EXCEEDED'],
+              requestedNotional: '500',
+              referencePrice: '10000',
+              decidedAt: '2026-05-21T10:00:00.000Z',
+              sourceEventId: 'evt-1',
+            },
+          ],
+        }),
+      );
+
+      const query = Object.assign(new ListRiskDecisionsQueryDto(), {});
+
+      await expect(
+        lastValueFrom(service.listRiskDecisions('portfolio-alpha', query)),
+      ).resolves.toEqual({
+        decisions: [
+          {
+            id: 'dec-1',
+            portfolioId: 'portfolio-alpha',
+            instrumentId: 'instrument-1',
+            decision: 'REJECTED',
+            reasonCodes: ['TRADE_CAP_EXCEEDED'],
+            requestedNotional: '500',
+            referencePrice: '10000',
+            decidedAt: '2026-05-21T10:00:00.000Z',
+            sourceEventId: 'evt-1',
+          },
+        ],
+      });
+    });
+
+    it('forwards decisionFilter to the gRPC client', async () => {
+      portfolioClient.listRiskDecisions.mockReturnValue(of({ decisions: [] }));
+
+      const query = Object.assign(new ListRiskDecisionsQueryDto(), {
+        decisionFilter: 'REJECTED',
+        limit: 10,
+      });
+
+      await lastValueFrom(service.listRiskDecisions('portfolio-alpha', query));
+
+      expect(portfolioClient.listRiskDecisions.mock.calls).toEqual([
+        [
+          {
+            portfolioId: 'portfolio-alpha',
+            decisionFilter: 'REJECTED',
+            limit: 10,
+          },
+        ],
+      ]);
+    });
+  });
+
+  describe('listRiskConfigAuditLog', () => {
+    it('returns audit entries list', async () => {
+      portfolioClient.listRiskConfigAuditLog.mockReturnValue(
+        of({
+          entries: [
+            {
+              id: 'audit-1',
+              entityType: 'INSTRUMENT_CONFIG',
+              portfolioId: 'portfolio-alpha',
+              field: 'enabled',
+              oldValue: 'true',
+              newValue: 'false',
+              changedAt: '2026-05-21T10:00:00.000Z',
+            },
+          ],
+        }),
+      );
+
+      const query = Object.assign(new ListRiskConfigAuditLogQueryDto(), {});
+
+      await expect(
+        lastValueFrom(service.listRiskConfigAuditLog('portfolio-alpha', query)),
+      ).resolves.toEqual({
+        entries: [
+          {
+            id: 'audit-1',
+            entityType: 'INSTRUMENT_CONFIG',
+            portfolioId: 'portfolio-alpha',
+            field: 'enabled',
+            oldValue: 'true',
+            newValue: 'false',
+            changedAt: '2026-05-21T10:00:00.000Z',
+          },
+        ],
+      });
+    });
+
+    it('forwards nextCursor from the gRPC response', async () => {
+      portfolioClient.listRiskConfigAuditLog.mockReturnValue(
+        of({ entries: [], nextCursor: 'cursor-abc' }),
+      );
+
+      const query = Object.assign(new ListRiskConfigAuditLogQueryDto(), {});
+
+      await expect(
+        lastValueFrom(service.listRiskConfigAuditLog('portfolio-alpha', query)),
+      ).resolves.toMatchObject({ nextCursor: 'cursor-abc' });
     });
   });
 });

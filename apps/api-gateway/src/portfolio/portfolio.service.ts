@@ -31,6 +31,14 @@ import {
 import { grpcStatusToHttpStatus } from '../utils/grpc-status-to-http-status';
 import { InstrumentDto } from './dto/instrument.dto';
 import {
+  ListRiskConfigAuditLogQueryDto,
+  ListRiskDecisionsQueryDto,
+  RiskConfigAuditLogEntryDto,
+  RiskConfigAuditLogListResponseDto,
+  RiskDecisionDto,
+  RiskDecisionListResponseDto,
+} from './dto/portfolio-decisions.dto';
+import {
   RegisterPortfolioInstrumentRequestDto,
   RegisterPortfolioInstrumentResponseDto,
 } from './dto/portfolio-instrument.dto';
@@ -43,6 +51,10 @@ import {
   PortfolioReadResponseDto,
   PortfolioSummaryDto,
 } from './dto/portfolio-read.dto';
+import {
+  UpdatePortfolioInstrumentConfigRestRequestDto,
+  UpdatePortfolioRestRequestDto,
+} from './dto/portfolio-write.dto';
 import { IExecutionEngine } from './execution-engine.client.interface';
 import { IRiskAndPortfolioManager } from './risk-and-portfolio.client.interface';
 
@@ -293,6 +305,114 @@ export class PortfolioService implements OnModuleInit {
           HttpStatus.INTERNAL_SERVER_ERROR,
         ),
     );
+  }
+
+  public updatePortfolio(
+    portfolioId: string,
+    data: UpdatePortfolioRestRequestDto,
+  ): Observable<PortfolioSummaryDto> {
+    return this.portfolioManagerClient
+      .updatePortfolio(data.toGRPC(portfolioId))
+      .pipe(
+        timeout(REQUEST_TIMEOUT_MS),
+        map(({ summary }) => {
+          if (!summary) {
+            throw new HttpException(
+              {
+                message: 'Risk service returned no portfolio summary',
+                code: AppResponseCode.UPSTREAM_UNAVAILABLE,
+              },
+              HttpStatus.BAD_GATEWAY,
+            );
+          }
+
+          return PortfolioSummaryDto.fromGRPC(summary);
+        }),
+        catchError((err: unknown) =>
+          this.mapUpstreamError('update portfolio', err),
+        ),
+      );
+  }
+
+  public updatePortfolioInstrumentConfig(
+    portfolioId: string,
+    instrumentId: string,
+    data: UpdatePortfolioInstrumentConfigRestRequestDto,
+  ): Observable<PortfolioInstrumentConfigDto> {
+    return this.portfolioManagerClient
+      .updatePortfolioInstrumentConfig(data.toGRPC(portfolioId, instrumentId))
+      .pipe(
+        timeout(REQUEST_TIMEOUT_MS),
+        map(({ configuredInstrument }) => {
+          if (!configuredInstrument) {
+            throw new HttpException(
+              {
+                message: 'Risk service returned no configured instrument',
+                code: AppResponseCode.UPSTREAM_UNAVAILABLE,
+              },
+              HttpStatus.BAD_GATEWAY,
+            );
+          }
+
+          return PortfolioInstrumentConfigDto.fromGRPC(configuredInstrument);
+        }),
+        catchError((err: unknown) =>
+          this.mapUpstreamError('update portfolio instrument config', err),
+        ),
+      );
+  }
+
+  public listRiskDecisions(
+    portfolioId: string,
+    query: ListRiskDecisionsQueryDto,
+  ): Observable<RiskDecisionListResponseDto> {
+    return this.portfolioManagerClient
+      .listRiskDecisions({
+        portfolioId,
+        ...(query.decisionFilter !== undefined && {
+          decisionFilter: query.decisionFilter,
+        }),
+        ...(query.limit !== undefined && { limit: query.limit }),
+        ...(query.cursor !== undefined && { cursor: query.cursor }),
+      })
+      .pipe(
+        timeout(REQUEST_TIMEOUT_MS),
+        map((response) => ({
+          decisions: response.decisions.map((d) => RiskDecisionDto.fromGRPC(d)),
+          ...(response.nextCursor !== undefined && {
+            nextCursor: response.nextCursor,
+          }),
+        })),
+        catchError((err: unknown) =>
+          this.mapUpstreamError('list risk decisions', err),
+        ),
+      );
+  }
+
+  public listRiskConfigAuditLog(
+    portfolioId: string,
+    query: ListRiskConfigAuditLogQueryDto,
+  ): Observable<RiskConfigAuditLogListResponseDto> {
+    return this.portfolioManagerClient
+      .listRiskConfigAuditLog({
+        portfolioId,
+        ...(query.limit !== undefined && { limit: query.limit }),
+        ...(query.cursor !== undefined && { cursor: query.cursor }),
+      })
+      .pipe(
+        timeout(REQUEST_TIMEOUT_MS),
+        map((response) => ({
+          entries: response.entries.map((e) =>
+            RiskConfigAuditLogEntryDto.fromGRPC(e),
+          ),
+          ...(response.nextCursor !== undefined && {
+            nextCursor: response.nextCursor,
+          }),
+        })),
+        catchError((err: unknown) =>
+          this.mapUpstreamError('list risk config audit log', err),
+        ),
+      );
   }
 
   private getTransportAppCode(code: GrpcStatusCode): AppResponseCode {
