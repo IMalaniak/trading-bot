@@ -7,7 +7,14 @@
 /* eslint-disable */
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 import { AssetClass, Instrument } from "../common/instrument";
-import { PortfolioInstrumentConfig, PortfolioSummary, Position } from "../common/portfolio";
+import {
+  PortfolioInstrumentConfig,
+  PortfolioSummary,
+  Position,
+  RiskConfigAuditLogEntry,
+  RiskDecisionEntry,
+  Strategy,
+} from "../common/portfolio";
 
 export const protobufPackage = "tradingbot.portfolio_manager";
 
@@ -43,6 +50,7 @@ export interface GetPortfolioResponse {
   summary?: PortfolioSummary | undefined;
   positions: Position[];
   configuredInstruments: PortfolioInstrumentConfig[];
+  strategy?: Strategy | undefined;
 }
 
 export interface ListInstrumentsRequest {
@@ -51,6 +59,116 @@ export interface ListInstrumentsRequest {
 
 export interface ListInstrumentsResponse {
   instruments: Instrument[];
+}
+
+export interface UpdatePortfolioInstrumentConfigRequest {
+  portfolioId: string;
+  instrumentId: string;
+  enabled?: boolean | undefined;
+  targetNotional?: string | undefined;
+  maxTradeNotional?: string | undefined;
+  maxPositionNotional?: string | undefined;
+  maxOpenTrades?: number | undefined;
+  maxDailyTurnoverNotional?: string | undefined;
+  cooldownSeconds?: number | undefined;
+  maxConsecutiveRejections?: number | undefined;
+}
+
+export interface UpdatePortfolioInstrumentConfigResponse {
+  configuredInstrument?: PortfolioInstrumentConfig | undefined;
+}
+
+export interface UpdatePortfolioRequest {
+  portfolioId: string;
+  exposureCapNotional?: string | undefined;
+  isActive?: boolean | undefined;
+}
+
+export interface UpdatePortfolioResponse {
+  summary?: PortfolioSummary | undefined;
+}
+
+export interface ListRiskDecisionsRequest {
+  portfolioId: string;
+  /** "APPROVED" | "REJECTED" — omit for all */
+  decisionFilter?: string | undefined;
+  limit?:
+    | number
+    | undefined;
+  /** decidedAt cursor for pagination */
+  cursor?: string | undefined;
+}
+
+export interface ListRiskDecisionsResponse {
+  decisions: RiskDecisionEntry[];
+  nextCursor?: string | undefined;
+}
+
+export interface ListRiskConfigAuditLogRequest {
+  portfolioId: string;
+  limit?:
+    | number
+    | undefined;
+  /** changedAt cursor for pagination */
+  cursor?: string | undefined;
+}
+
+export interface ListRiskConfigAuditLogResponse {
+  entries: RiskConfigAuditLogEntry[];
+  nextCursor?: string | undefined;
+}
+
+export interface CreateStrategyRequest {
+  name: string;
+  description?: string | undefined;
+  allowedSides: number[];
+  minIntervalSecs?: number | undefined;
+  activeTimeStart?: string | undefined;
+  activeTimeEnd?: string | undefined;
+}
+
+export interface CreateStrategyResponse {
+  strategy?: Strategy | undefined;
+}
+
+export interface UpdateStrategyRequest {
+  strategyId: string;
+  name?: string | undefined;
+  description?: string | undefined;
+  allowedSides: number[];
+  minIntervalSecs?: number | undefined;
+  activeTimeStart?: string | undefined;
+  activeTimeEnd?: string | undefined;
+}
+
+export interface UpdateStrategyResponse {
+  strategy?: Strategy | undefined;
+}
+
+export interface GetStrategyRequest {
+  strategyId: string;
+}
+
+export interface GetStrategyResponse {
+  strategy?: Strategy | undefined;
+}
+
+export interface ListStrategiesRequest {
+}
+
+export interface ListStrategiesResponse {
+  strategies: Strategy[];
+}
+
+export interface AssignStrategyToPortfolioRequest {
+  portfolioId: string;
+  /** omit or null to clear assignment */
+  strategyId?: string | undefined;
+}
+
+export interface AssignStrategyToPortfolioResponse {
+  summary?: PortfolioSummary | undefined;
+  strategy?: Strategy | undefined;
 }
 
 function createBaseRegisterPortfolioInstrumentRequest(): RegisterPortfolioInstrumentRequest {
@@ -388,7 +506,7 @@ export const GetPortfolioRequest: MessageFns<GetPortfolioRequest> = {
 };
 
 function createBaseGetPortfolioResponse(): GetPortfolioResponse {
-  return { summary: undefined, positions: [], configuredInstruments: [] };
+  return { summary: undefined, positions: [], configuredInstruments: [], strategy: undefined };
 }
 
 export const GetPortfolioResponse: MessageFns<GetPortfolioResponse> = {
@@ -401,6 +519,9 @@ export const GetPortfolioResponse: MessageFns<GetPortfolioResponse> = {
     }
     for (const v of message.configuredInstruments) {
       PortfolioInstrumentConfig.encode(v!, writer.uint32(26).fork()).join();
+    }
+    if (message.strategy !== undefined) {
+      Strategy.encode(message.strategy, writer.uint32(34).fork()).join();
     }
     return writer;
   },
@@ -436,6 +557,14 @@ export const GetPortfolioResponse: MessageFns<GetPortfolioResponse> = {
           message.configuredInstruments.push(PortfolioInstrumentConfig.decode(reader, reader.uint32()));
           continue;
         }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.strategy = Strategy.decode(reader, reader.uint32());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -456,6 +585,9 @@ export const GetPortfolioResponse: MessageFns<GetPortfolioResponse> = {
     message.positions = object.positions?.map((e) => Position.fromPartial(e)) || [];
     message.configuredInstruments =
       object.configuredInstruments?.map((e) => PortfolioInstrumentConfig.fromPartial(e)) || [];
+    message.strategy = (object.strategy !== undefined && object.strategy !== null)
+      ? Strategy.fromPartial(object.strategy)
+      : undefined;
     return message;
   },
 };
@@ -548,6 +680,1278 @@ export const ListInstrumentsResponse: MessageFns<ListInstrumentsResponse> = {
   fromPartial<I extends Exact<DeepPartial<ListInstrumentsResponse>, I>>(object: I): ListInstrumentsResponse {
     const message = createBaseListInstrumentsResponse();
     message.instruments = object.instruments?.map((e) => Instrument.fromPartial(e)) || [];
+    return message;
+  },
+};
+
+function createBaseUpdatePortfolioInstrumentConfigRequest(): UpdatePortfolioInstrumentConfigRequest {
+  return {
+    portfolioId: "",
+    instrumentId: "",
+    enabled: undefined,
+    targetNotional: undefined,
+    maxTradeNotional: undefined,
+    maxPositionNotional: undefined,
+    maxOpenTrades: undefined,
+    maxDailyTurnoverNotional: undefined,
+    cooldownSeconds: undefined,
+    maxConsecutiveRejections: undefined,
+  };
+}
+
+export const UpdatePortfolioInstrumentConfigRequest: MessageFns<UpdatePortfolioInstrumentConfigRequest> = {
+  encode(message: UpdatePortfolioInstrumentConfigRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.portfolioId !== "") {
+      writer.uint32(10).string(message.portfolioId);
+    }
+    if (message.instrumentId !== "") {
+      writer.uint32(18).string(message.instrumentId);
+    }
+    if (message.enabled !== undefined) {
+      writer.uint32(24).bool(message.enabled);
+    }
+    if (message.targetNotional !== undefined) {
+      writer.uint32(34).string(message.targetNotional);
+    }
+    if (message.maxTradeNotional !== undefined) {
+      writer.uint32(42).string(message.maxTradeNotional);
+    }
+    if (message.maxPositionNotional !== undefined) {
+      writer.uint32(50).string(message.maxPositionNotional);
+    }
+    if (message.maxOpenTrades !== undefined) {
+      writer.uint32(56).int32(message.maxOpenTrades);
+    }
+    if (message.maxDailyTurnoverNotional !== undefined) {
+      writer.uint32(66).string(message.maxDailyTurnoverNotional);
+    }
+    if (message.cooldownSeconds !== undefined) {
+      writer.uint32(72).int32(message.cooldownSeconds);
+    }
+    if (message.maxConsecutiveRejections !== undefined) {
+      writer.uint32(80).int32(message.maxConsecutiveRejections);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): UpdatePortfolioInstrumentConfigRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseUpdatePortfolioInstrumentConfigRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.portfolioId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.instrumentId = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.enabled = reader.bool();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.targetNotional = reader.string();
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.maxTradeNotional = reader.string();
+          continue;
+        }
+        case 6: {
+          if (tag !== 50) {
+            break;
+          }
+
+          message.maxPositionNotional = reader.string();
+          continue;
+        }
+        case 7: {
+          if (tag !== 56) {
+            break;
+          }
+
+          message.maxOpenTrades = reader.int32();
+          continue;
+        }
+        case 8: {
+          if (tag !== 66) {
+            break;
+          }
+
+          message.maxDailyTurnoverNotional = reader.string();
+          continue;
+        }
+        case 9: {
+          if (tag !== 72) {
+            break;
+          }
+
+          message.cooldownSeconds = reader.int32();
+          continue;
+        }
+        case 10: {
+          if (tag !== 80) {
+            break;
+          }
+
+          message.maxConsecutiveRejections = reader.int32();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  create<I extends Exact<DeepPartial<UpdatePortfolioInstrumentConfigRequest>, I>>(
+    base?: I,
+  ): UpdatePortfolioInstrumentConfigRequest {
+    return UpdatePortfolioInstrumentConfigRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<UpdatePortfolioInstrumentConfigRequest>, I>>(
+    object: I,
+  ): UpdatePortfolioInstrumentConfigRequest {
+    const message = createBaseUpdatePortfolioInstrumentConfigRequest();
+    message.portfolioId = object.portfolioId ?? "";
+    message.instrumentId = object.instrumentId ?? "";
+    message.enabled = object.enabled ?? undefined;
+    message.targetNotional = object.targetNotional ?? undefined;
+    message.maxTradeNotional = object.maxTradeNotional ?? undefined;
+    message.maxPositionNotional = object.maxPositionNotional ?? undefined;
+    message.maxOpenTrades = object.maxOpenTrades ?? undefined;
+    message.maxDailyTurnoverNotional = object.maxDailyTurnoverNotional ?? undefined;
+    message.cooldownSeconds = object.cooldownSeconds ?? undefined;
+    message.maxConsecutiveRejections = object.maxConsecutiveRejections ?? undefined;
+    return message;
+  },
+};
+
+function createBaseUpdatePortfolioInstrumentConfigResponse(): UpdatePortfolioInstrumentConfigResponse {
+  return { configuredInstrument: undefined };
+}
+
+export const UpdatePortfolioInstrumentConfigResponse: MessageFns<UpdatePortfolioInstrumentConfigResponse> = {
+  encode(message: UpdatePortfolioInstrumentConfigResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.configuredInstrument !== undefined) {
+      PortfolioInstrumentConfig.encode(message.configuredInstrument, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): UpdatePortfolioInstrumentConfigResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseUpdatePortfolioInstrumentConfigResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.configuredInstrument = PortfolioInstrumentConfig.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  create<I extends Exact<DeepPartial<UpdatePortfolioInstrumentConfigResponse>, I>>(
+    base?: I,
+  ): UpdatePortfolioInstrumentConfigResponse {
+    return UpdatePortfolioInstrumentConfigResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<UpdatePortfolioInstrumentConfigResponse>, I>>(
+    object: I,
+  ): UpdatePortfolioInstrumentConfigResponse {
+    const message = createBaseUpdatePortfolioInstrumentConfigResponse();
+    message.configuredInstrument = (object.configuredInstrument !== undefined && object.configuredInstrument !== null)
+      ? PortfolioInstrumentConfig.fromPartial(object.configuredInstrument)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseUpdatePortfolioRequest(): UpdatePortfolioRequest {
+  return { portfolioId: "", exposureCapNotional: undefined, isActive: undefined };
+}
+
+export const UpdatePortfolioRequest: MessageFns<UpdatePortfolioRequest> = {
+  encode(message: UpdatePortfolioRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.portfolioId !== "") {
+      writer.uint32(10).string(message.portfolioId);
+    }
+    if (message.exposureCapNotional !== undefined) {
+      writer.uint32(18).string(message.exposureCapNotional);
+    }
+    if (message.isActive !== undefined) {
+      writer.uint32(24).bool(message.isActive);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): UpdatePortfolioRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseUpdatePortfolioRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.portfolioId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.exposureCapNotional = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.isActive = reader.bool();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  create<I extends Exact<DeepPartial<UpdatePortfolioRequest>, I>>(base?: I): UpdatePortfolioRequest {
+    return UpdatePortfolioRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<UpdatePortfolioRequest>, I>>(object: I): UpdatePortfolioRequest {
+    const message = createBaseUpdatePortfolioRequest();
+    message.portfolioId = object.portfolioId ?? "";
+    message.exposureCapNotional = object.exposureCapNotional ?? undefined;
+    message.isActive = object.isActive ?? undefined;
+    return message;
+  },
+};
+
+function createBaseUpdatePortfolioResponse(): UpdatePortfolioResponse {
+  return { summary: undefined };
+}
+
+export const UpdatePortfolioResponse: MessageFns<UpdatePortfolioResponse> = {
+  encode(message: UpdatePortfolioResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.summary !== undefined) {
+      PortfolioSummary.encode(message.summary, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): UpdatePortfolioResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseUpdatePortfolioResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.summary = PortfolioSummary.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  create<I extends Exact<DeepPartial<UpdatePortfolioResponse>, I>>(base?: I): UpdatePortfolioResponse {
+    return UpdatePortfolioResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<UpdatePortfolioResponse>, I>>(object: I): UpdatePortfolioResponse {
+    const message = createBaseUpdatePortfolioResponse();
+    message.summary = (object.summary !== undefined && object.summary !== null)
+      ? PortfolioSummary.fromPartial(object.summary)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseListRiskDecisionsRequest(): ListRiskDecisionsRequest {
+  return { portfolioId: "", decisionFilter: undefined, limit: undefined, cursor: undefined };
+}
+
+export const ListRiskDecisionsRequest: MessageFns<ListRiskDecisionsRequest> = {
+  encode(message: ListRiskDecisionsRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.portfolioId !== "") {
+      writer.uint32(10).string(message.portfolioId);
+    }
+    if (message.decisionFilter !== undefined) {
+      writer.uint32(18).string(message.decisionFilter);
+    }
+    if (message.limit !== undefined) {
+      writer.uint32(24).int32(message.limit);
+    }
+    if (message.cursor !== undefined) {
+      writer.uint32(34).string(message.cursor);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ListRiskDecisionsRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseListRiskDecisionsRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.portfolioId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.decisionFilter = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.limit = reader.int32();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.cursor = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  create<I extends Exact<DeepPartial<ListRiskDecisionsRequest>, I>>(base?: I): ListRiskDecisionsRequest {
+    return ListRiskDecisionsRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ListRiskDecisionsRequest>, I>>(object: I): ListRiskDecisionsRequest {
+    const message = createBaseListRiskDecisionsRequest();
+    message.portfolioId = object.portfolioId ?? "";
+    message.decisionFilter = object.decisionFilter ?? undefined;
+    message.limit = object.limit ?? undefined;
+    message.cursor = object.cursor ?? undefined;
+    return message;
+  },
+};
+
+function createBaseListRiskDecisionsResponse(): ListRiskDecisionsResponse {
+  return { decisions: [], nextCursor: undefined };
+}
+
+export const ListRiskDecisionsResponse: MessageFns<ListRiskDecisionsResponse> = {
+  encode(message: ListRiskDecisionsResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.decisions) {
+      RiskDecisionEntry.encode(v!, writer.uint32(10).fork()).join();
+    }
+    if (message.nextCursor !== undefined) {
+      writer.uint32(18).string(message.nextCursor);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ListRiskDecisionsResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseListRiskDecisionsResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.decisions.push(RiskDecisionEntry.decode(reader, reader.uint32()));
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.nextCursor = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  create<I extends Exact<DeepPartial<ListRiskDecisionsResponse>, I>>(base?: I): ListRiskDecisionsResponse {
+    return ListRiskDecisionsResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ListRiskDecisionsResponse>, I>>(object: I): ListRiskDecisionsResponse {
+    const message = createBaseListRiskDecisionsResponse();
+    message.decisions = object.decisions?.map((e) => RiskDecisionEntry.fromPartial(e)) || [];
+    message.nextCursor = object.nextCursor ?? undefined;
+    return message;
+  },
+};
+
+function createBaseListRiskConfigAuditLogRequest(): ListRiskConfigAuditLogRequest {
+  return { portfolioId: "", limit: undefined, cursor: undefined };
+}
+
+export const ListRiskConfigAuditLogRequest: MessageFns<ListRiskConfigAuditLogRequest> = {
+  encode(message: ListRiskConfigAuditLogRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.portfolioId !== "") {
+      writer.uint32(10).string(message.portfolioId);
+    }
+    if (message.limit !== undefined) {
+      writer.uint32(16).int32(message.limit);
+    }
+    if (message.cursor !== undefined) {
+      writer.uint32(26).string(message.cursor);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ListRiskConfigAuditLogRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseListRiskConfigAuditLogRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.portfolioId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.limit = reader.int32();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.cursor = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  create<I extends Exact<DeepPartial<ListRiskConfigAuditLogRequest>, I>>(base?: I): ListRiskConfigAuditLogRequest {
+    return ListRiskConfigAuditLogRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ListRiskConfigAuditLogRequest>, I>>(
+    object: I,
+  ): ListRiskConfigAuditLogRequest {
+    const message = createBaseListRiskConfigAuditLogRequest();
+    message.portfolioId = object.portfolioId ?? "";
+    message.limit = object.limit ?? undefined;
+    message.cursor = object.cursor ?? undefined;
+    return message;
+  },
+};
+
+function createBaseListRiskConfigAuditLogResponse(): ListRiskConfigAuditLogResponse {
+  return { entries: [], nextCursor: undefined };
+}
+
+export const ListRiskConfigAuditLogResponse: MessageFns<ListRiskConfigAuditLogResponse> = {
+  encode(message: ListRiskConfigAuditLogResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.entries) {
+      RiskConfigAuditLogEntry.encode(v!, writer.uint32(10).fork()).join();
+    }
+    if (message.nextCursor !== undefined) {
+      writer.uint32(18).string(message.nextCursor);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ListRiskConfigAuditLogResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseListRiskConfigAuditLogResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.entries.push(RiskConfigAuditLogEntry.decode(reader, reader.uint32()));
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.nextCursor = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  create<I extends Exact<DeepPartial<ListRiskConfigAuditLogResponse>, I>>(base?: I): ListRiskConfigAuditLogResponse {
+    return ListRiskConfigAuditLogResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ListRiskConfigAuditLogResponse>, I>>(
+    object: I,
+  ): ListRiskConfigAuditLogResponse {
+    const message = createBaseListRiskConfigAuditLogResponse();
+    message.entries = object.entries?.map((e) => RiskConfigAuditLogEntry.fromPartial(e)) || [];
+    message.nextCursor = object.nextCursor ?? undefined;
+    return message;
+  },
+};
+
+function createBaseCreateStrategyRequest(): CreateStrategyRequest {
+  return {
+    name: "",
+    description: undefined,
+    allowedSides: [],
+    minIntervalSecs: undefined,
+    activeTimeStart: undefined,
+    activeTimeEnd: undefined,
+  };
+}
+
+export const CreateStrategyRequest: MessageFns<CreateStrategyRequest> = {
+  encode(message: CreateStrategyRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.name !== "") {
+      writer.uint32(10).string(message.name);
+    }
+    if (message.description !== undefined) {
+      writer.uint32(18).string(message.description);
+    }
+    writer.uint32(26).fork();
+    for (const v of message.allowedSides) {
+      writer.int32(v);
+    }
+    writer.join();
+    if (message.minIntervalSecs !== undefined) {
+      writer.uint32(32).int32(message.minIntervalSecs);
+    }
+    if (message.activeTimeStart !== undefined) {
+      writer.uint32(42).string(message.activeTimeStart);
+    }
+    if (message.activeTimeEnd !== undefined) {
+      writer.uint32(50).string(message.activeTimeEnd);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): CreateStrategyRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseCreateStrategyRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.name = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.description = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag === 24) {
+            message.allowedSides.push(reader.int32());
+
+            continue;
+          }
+
+          if (tag === 26) {
+            const end2 = reader.uint32() + reader.pos;
+            while (reader.pos < end2) {
+              message.allowedSides.push(reader.int32());
+            }
+
+            continue;
+          }
+
+          break;
+        }
+        case 4: {
+          if (tag !== 32) {
+            break;
+          }
+
+          message.minIntervalSecs = reader.int32();
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.activeTimeStart = reader.string();
+          continue;
+        }
+        case 6: {
+          if (tag !== 50) {
+            break;
+          }
+
+          message.activeTimeEnd = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  create<I extends Exact<DeepPartial<CreateStrategyRequest>, I>>(base?: I): CreateStrategyRequest {
+    return CreateStrategyRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<CreateStrategyRequest>, I>>(object: I): CreateStrategyRequest {
+    const message = createBaseCreateStrategyRequest();
+    message.name = object.name ?? "";
+    message.description = object.description ?? undefined;
+    message.allowedSides = object.allowedSides?.map((e) => e) || [];
+    message.minIntervalSecs = object.minIntervalSecs ?? undefined;
+    message.activeTimeStart = object.activeTimeStart ?? undefined;
+    message.activeTimeEnd = object.activeTimeEnd ?? undefined;
+    return message;
+  },
+};
+
+function createBaseCreateStrategyResponse(): CreateStrategyResponse {
+  return { strategy: undefined };
+}
+
+export const CreateStrategyResponse: MessageFns<CreateStrategyResponse> = {
+  encode(message: CreateStrategyResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.strategy !== undefined) {
+      Strategy.encode(message.strategy, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): CreateStrategyResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseCreateStrategyResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.strategy = Strategy.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  create<I extends Exact<DeepPartial<CreateStrategyResponse>, I>>(base?: I): CreateStrategyResponse {
+    return CreateStrategyResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<CreateStrategyResponse>, I>>(object: I): CreateStrategyResponse {
+    const message = createBaseCreateStrategyResponse();
+    message.strategy = (object.strategy !== undefined && object.strategy !== null)
+      ? Strategy.fromPartial(object.strategy)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseUpdateStrategyRequest(): UpdateStrategyRequest {
+  return {
+    strategyId: "",
+    name: undefined,
+    description: undefined,
+    allowedSides: [],
+    minIntervalSecs: undefined,
+    activeTimeStart: undefined,
+    activeTimeEnd: undefined,
+  };
+}
+
+export const UpdateStrategyRequest: MessageFns<UpdateStrategyRequest> = {
+  encode(message: UpdateStrategyRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.strategyId !== "") {
+      writer.uint32(10).string(message.strategyId);
+    }
+    if (message.name !== undefined) {
+      writer.uint32(18).string(message.name);
+    }
+    if (message.description !== undefined) {
+      writer.uint32(26).string(message.description);
+    }
+    writer.uint32(34).fork();
+    for (const v of message.allowedSides) {
+      writer.int32(v);
+    }
+    writer.join();
+    if (message.minIntervalSecs !== undefined) {
+      writer.uint32(40).int32(message.minIntervalSecs);
+    }
+    if (message.activeTimeStart !== undefined) {
+      writer.uint32(50).string(message.activeTimeStart);
+    }
+    if (message.activeTimeEnd !== undefined) {
+      writer.uint32(58).string(message.activeTimeEnd);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): UpdateStrategyRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseUpdateStrategyRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.strategyId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.name = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.description = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag === 32) {
+            message.allowedSides.push(reader.int32());
+
+            continue;
+          }
+
+          if (tag === 34) {
+            const end2 = reader.uint32() + reader.pos;
+            while (reader.pos < end2) {
+              message.allowedSides.push(reader.int32());
+            }
+
+            continue;
+          }
+
+          break;
+        }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.minIntervalSecs = reader.int32();
+          continue;
+        }
+        case 6: {
+          if (tag !== 50) {
+            break;
+          }
+
+          message.activeTimeStart = reader.string();
+          continue;
+        }
+        case 7: {
+          if (tag !== 58) {
+            break;
+          }
+
+          message.activeTimeEnd = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  create<I extends Exact<DeepPartial<UpdateStrategyRequest>, I>>(base?: I): UpdateStrategyRequest {
+    return UpdateStrategyRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<UpdateStrategyRequest>, I>>(object: I): UpdateStrategyRequest {
+    const message = createBaseUpdateStrategyRequest();
+    message.strategyId = object.strategyId ?? "";
+    message.name = object.name ?? undefined;
+    message.description = object.description ?? undefined;
+    message.allowedSides = object.allowedSides?.map((e) => e) || [];
+    message.minIntervalSecs = object.minIntervalSecs ?? undefined;
+    message.activeTimeStart = object.activeTimeStart ?? undefined;
+    message.activeTimeEnd = object.activeTimeEnd ?? undefined;
+    return message;
+  },
+};
+
+function createBaseUpdateStrategyResponse(): UpdateStrategyResponse {
+  return { strategy: undefined };
+}
+
+export const UpdateStrategyResponse: MessageFns<UpdateStrategyResponse> = {
+  encode(message: UpdateStrategyResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.strategy !== undefined) {
+      Strategy.encode(message.strategy, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): UpdateStrategyResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseUpdateStrategyResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.strategy = Strategy.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  create<I extends Exact<DeepPartial<UpdateStrategyResponse>, I>>(base?: I): UpdateStrategyResponse {
+    return UpdateStrategyResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<UpdateStrategyResponse>, I>>(object: I): UpdateStrategyResponse {
+    const message = createBaseUpdateStrategyResponse();
+    message.strategy = (object.strategy !== undefined && object.strategy !== null)
+      ? Strategy.fromPartial(object.strategy)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseGetStrategyRequest(): GetStrategyRequest {
+  return { strategyId: "" };
+}
+
+export const GetStrategyRequest: MessageFns<GetStrategyRequest> = {
+  encode(message: GetStrategyRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.strategyId !== "") {
+      writer.uint32(10).string(message.strategyId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): GetStrategyRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseGetStrategyRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.strategyId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  create<I extends Exact<DeepPartial<GetStrategyRequest>, I>>(base?: I): GetStrategyRequest {
+    return GetStrategyRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<GetStrategyRequest>, I>>(object: I): GetStrategyRequest {
+    const message = createBaseGetStrategyRequest();
+    message.strategyId = object.strategyId ?? "";
+    return message;
+  },
+};
+
+function createBaseGetStrategyResponse(): GetStrategyResponse {
+  return { strategy: undefined };
+}
+
+export const GetStrategyResponse: MessageFns<GetStrategyResponse> = {
+  encode(message: GetStrategyResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.strategy !== undefined) {
+      Strategy.encode(message.strategy, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): GetStrategyResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseGetStrategyResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.strategy = Strategy.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  create<I extends Exact<DeepPartial<GetStrategyResponse>, I>>(base?: I): GetStrategyResponse {
+    return GetStrategyResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<GetStrategyResponse>, I>>(object: I): GetStrategyResponse {
+    const message = createBaseGetStrategyResponse();
+    message.strategy = (object.strategy !== undefined && object.strategy !== null)
+      ? Strategy.fromPartial(object.strategy)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseListStrategiesRequest(): ListStrategiesRequest {
+  return {};
+}
+
+export const ListStrategiesRequest: MessageFns<ListStrategiesRequest> = {
+  encode(_: ListStrategiesRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ListStrategiesRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseListStrategiesRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  create<I extends Exact<DeepPartial<ListStrategiesRequest>, I>>(base?: I): ListStrategiesRequest {
+    return ListStrategiesRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ListStrategiesRequest>, I>>(_: I): ListStrategiesRequest {
+    const message = createBaseListStrategiesRequest();
+    return message;
+  },
+};
+
+function createBaseListStrategiesResponse(): ListStrategiesResponse {
+  return { strategies: [] };
+}
+
+export const ListStrategiesResponse: MessageFns<ListStrategiesResponse> = {
+  encode(message: ListStrategiesResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.strategies) {
+      Strategy.encode(v!, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ListStrategiesResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseListStrategiesResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.strategies.push(Strategy.decode(reader, reader.uint32()));
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  create<I extends Exact<DeepPartial<ListStrategiesResponse>, I>>(base?: I): ListStrategiesResponse {
+    return ListStrategiesResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ListStrategiesResponse>, I>>(object: I): ListStrategiesResponse {
+    const message = createBaseListStrategiesResponse();
+    message.strategies = object.strategies?.map((e) => Strategy.fromPartial(e)) || [];
+    return message;
+  },
+};
+
+function createBaseAssignStrategyToPortfolioRequest(): AssignStrategyToPortfolioRequest {
+  return { portfolioId: "", strategyId: undefined };
+}
+
+export const AssignStrategyToPortfolioRequest: MessageFns<AssignStrategyToPortfolioRequest> = {
+  encode(message: AssignStrategyToPortfolioRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.portfolioId !== "") {
+      writer.uint32(10).string(message.portfolioId);
+    }
+    if (message.strategyId !== undefined) {
+      writer.uint32(18).string(message.strategyId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): AssignStrategyToPortfolioRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseAssignStrategyToPortfolioRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.portfolioId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.strategyId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  create<I extends Exact<DeepPartial<AssignStrategyToPortfolioRequest>, I>>(
+    base?: I,
+  ): AssignStrategyToPortfolioRequest {
+    return AssignStrategyToPortfolioRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<AssignStrategyToPortfolioRequest>, I>>(
+    object: I,
+  ): AssignStrategyToPortfolioRequest {
+    const message = createBaseAssignStrategyToPortfolioRequest();
+    message.portfolioId = object.portfolioId ?? "";
+    message.strategyId = object.strategyId ?? undefined;
+    return message;
+  },
+};
+
+function createBaseAssignStrategyToPortfolioResponse(): AssignStrategyToPortfolioResponse {
+  return { summary: undefined, strategy: undefined };
+}
+
+export const AssignStrategyToPortfolioResponse: MessageFns<AssignStrategyToPortfolioResponse> = {
+  encode(message: AssignStrategyToPortfolioResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.summary !== undefined) {
+      PortfolioSummary.encode(message.summary, writer.uint32(10).fork()).join();
+    }
+    if (message.strategy !== undefined) {
+      Strategy.encode(message.strategy, writer.uint32(18).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): AssignStrategyToPortfolioResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseAssignStrategyToPortfolioResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.summary = PortfolioSummary.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.strategy = Strategy.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  create<I extends Exact<DeepPartial<AssignStrategyToPortfolioResponse>, I>>(
+    base?: I,
+  ): AssignStrategyToPortfolioResponse {
+    return AssignStrategyToPortfolioResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<AssignStrategyToPortfolioResponse>, I>>(
+    object: I,
+  ): AssignStrategyToPortfolioResponse {
+    const message = createBaseAssignStrategyToPortfolioResponse();
+    message.summary = (object.summary !== undefined && object.summary !== null)
+      ? PortfolioSummary.fromPartial(object.summary)
+      : undefined;
+    message.strategy = (object.strategy !== undefined && object.strategy !== null)
+      ? Strategy.fromPartial(object.strategy)
+      : undefined;
     return message;
   },
 };
