@@ -1,6 +1,12 @@
 import {
+  AssignStrategyToPortfolioRequest,
+  AssignStrategyToPortfolioResponse,
+  CreateStrategyRequest,
+  CreateStrategyResponse,
   GetPortfolioRequest,
   GetPortfolioResponse,
+  GetStrategyRequest,
+  GetStrategyResponse,
   ListInstrumentsRequest,
   ListInstrumentsResponse,
   ListPortfoliosRequest,
@@ -9,12 +15,16 @@ import {
   ListRiskConfigAuditLogResponse,
   ListRiskDecisionsRequest,
   ListRiskDecisionsResponse,
+  ListStrategiesRequest,
+  ListStrategiesResponse,
   RegisterPortfolioInstrumentRequest,
   RegisterPortfolioInstrumentResponse,
   UpdatePortfolioInstrumentConfigRequest,
   UpdatePortfolioInstrumentConfigResponse,
   UpdatePortfolioRequest,
   UpdatePortfolioResponse,
+  UpdateStrategyRequest,
+  UpdateStrategyResponse,
 } from '@trading-bot/common/proto';
 import { Observable } from 'rxjs';
 
@@ -48,4 +58,22 @@ export interface IRiskAndPortfolioManager {
   listRiskConfigAuditLog(
     data: ListRiskConfigAuditLogRequest,
   ): Observable<ListRiskConfigAuditLogResponse>;
+
+  createStrategy(
+    data: CreateStrategyRequest,
+  ): Observable<CreateStrategyResponse>;
+
+  updateStrategy(
+    data: UpdateStrategyRequest,
+  ): Observable<UpdateStrategyResponse>;
+
+  getStrategy(data: GetStrategyRequest): Observable<GetStrategyResponse>;
+
+  listStrategies(
+    data: ListStrategiesRequest,
+  ): Observable<ListStrategiesResponse>;
+
+  assignStrategyToPortfolio(
+    data: AssignStrategyToPortfolioRequest,
+  ): Observable<AssignStrategyToPortfolioResponse>;
 }

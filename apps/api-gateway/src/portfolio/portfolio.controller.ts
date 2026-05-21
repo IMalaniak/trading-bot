@@ -41,6 +41,10 @@ import {
   UpdatePortfolioInstrumentConfigRestRequestDto,
   UpdatePortfolioRestRequestDto,
 } from './dto/portfolio-write.dto';
+import {
+  AssignStrategyBodyDto,
+  AssignStrategyToPortfolioResponseDto,
+} from './dto/strategy.dto';
 import { PortfolioService } from './portfolio.service';
 
 class PortfolioInstrumentParamsDto extends GetPortfolioParamsDto {
@@ -146,6 +150,22 @@ export class PortfolioController {
     return this.portfolioService.listRiskConfigAuditLog(
       params.portfolioId,
       query,
+    );
+  }
+
+  @Post(':portfolioId/strategy')
+  @ApiOkResponse()
+  @ApiBadRequestResponse({ type: AppErrorResponseDto })
+  @ApiBadGatewayResponse({ type: AppErrorResponseDto })
+  @ApiGatewayTimeoutResponse({ type: AppErrorResponseDto })
+  @ApiNotFoundResponse({ type: AppErrorResponseDto })
+  assignStrategyToPortfolio(
+    @Param() params: GetPortfolioParamsDto,
+    @Body() body: AssignStrategyBodyDto,
+  ): Observable<AssignStrategyToPortfolioResponseDto> {
+    return this.portfolioService.assignStrategyToPortfolio(
+      params.portfolioId,
+      body,
     );
   }
 }

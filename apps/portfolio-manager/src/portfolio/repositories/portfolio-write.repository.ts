@@ -10,6 +10,7 @@ import {
   PortfolioModel,
   RiskConfigAuditLogModel,
   RiskDecisionModel,
+  StrategyModel,
 } from '../../prisma/generated/models';
 import { PrismaService } from '../../prisma/prisma.service';
 import { PrismaDecimal } from '../../prisma/prisma-decimal';
@@ -181,5 +182,52 @@ export class PortfolioWriteRepository {
       : undefined;
 
     return { entries: page, nextCursor };
+  }
+
+  async createStrategy(data: {
+    name: string;
+    description?: string;
+    allowedSides: number[];
+    minIntervalSecs?: number;
+    activeTimeStart?: string;
+    activeTimeEnd?: string;
+  }): Promise<StrategyModel> {
+    return this.prisma.strategy.create({ data });
+  }
+
+  async findStrategyById(id: string): Promise<StrategyModel | null> {
+    return this.prisma.strategy.findUnique({ where: { id } });
+  }
+
+  async findStrategyByName(name: string): Promise<StrategyModel | null> {
+    return this.prisma.strategy.findUnique({ where: { name } });
+  }
+
+  async updateStrategy(
+    id: string,
+    data: {
+      name?: string;
+      description?: string;
+      allowedSides?: number[];
+      minIntervalSecs?: number | null;
+      activeTimeStart?: string | null;
+      activeTimeEnd?: string | null;
+    },
+  ): Promise<StrategyModel> {
+    return this.prisma.strategy.update({ where: { id }, data });
+  }
+
+  async listStrategies(): Promise<StrategyModel[]> {
+    return this.prisma.strategy.findMany({ orderBy: { name: 'asc' } });
+  }
+
+  async assignStrategyToPortfolio(
+    portfolioId: string,
+    strategyId?: string,
+  ): Promise<PortfolioModel> {
+    return this.prisma.portfolio.update({
+      where: { id: portfolioId },
+      data: { strategyId: strategyId ?? null },
+    });
   }
 }

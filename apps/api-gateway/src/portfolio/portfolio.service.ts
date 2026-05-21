@@ -55,8 +55,44 @@ import {
   UpdatePortfolioInstrumentConfigRestRequestDto,
   UpdatePortfolioRestRequestDto,
 } from './dto/portfolio-write.dto';
+import {
+  AssignStrategyBodyDto,
+  AssignStrategyToPortfolioResponseDto,
+  CreateStrategyBodyDto,
+  ListStrategiesResponseDto,
+  StrategyDto,
+  UpdateStrategyBodyDto,
+} from './dto/strategy.dto';
 import { IExecutionEngine } from './execution-engine.client.interface';
 import { IRiskAndPortfolioManager } from './risk-and-portfolio.client.interface';
+
+function mapStrategy(s: {
+  id: string;
+  name: string;
+  description?: string;
+  allowedSides: number[];
+  minIntervalSecs?: number;
+  activeTimeStart?: string;
+  activeTimeEnd?: string;
+  createdAt: string;
+  updatedAt: string;
+}): StrategyDto {
+  return {
+    id: s.id,
+    name: s.name,
+    ...(s.description !== undefined && { description: s.description }),
+    allowedSides: s.allowedSides,
+    ...(s.minIntervalSecs !== undefined && {
+      minIntervalSecs: s.minIntervalSecs,
+    }),
+    ...(s.activeTimeStart !== undefined && {
+      activeTimeStart: s.activeTimeStart,
+    }),
+    ...(s.activeTimeEnd !== undefined && { activeTimeEnd: s.activeTimeEnd }),
+    createdAt: s.createdAt,
+    updatedAt: s.updatedAt,
+  };
+}
 
 const REQUEST_TIMEOUT_MS = 5000;
 
@@ -425,5 +461,106 @@ export class PortfolioService implements OnModuleInit {
     }
 
     return AppResponseCode.INTERNAL_ERROR;
+  }
+
+  public createStrategy(body: CreateStrategyBodyDto): Observable<StrategyDto> {
+    return this.portfolioManagerClient
+      .createStrategy({
+        name: body.name,
+        allowedSides: body.allowedSides,
+        ...(body.description !== undefined && {
+          description: body.description,
+        }),
+        ...(body.minIntervalSecs !== undefined && {
+          minIntervalSecs: body.minIntervalSecs,
+        }),
+        ...(body.activeTimeStart !== undefined && {
+          activeTimeStart: body.activeTimeStart,
+        }),
+        ...(body.activeTimeEnd !== undefined && {
+          activeTimeEnd: body.activeTimeEnd,
+        }),
+      })
+      .pipe(
+        timeout(REQUEST_TIMEOUT_MS),
+        map((response) => mapStrategy(response.strategy!)),
+        catchError((err: unknown) =>
+          this.mapUpstreamError('create strategy', err),
+        ),
+      );
+  }
+
+  public updateStrategy(
+    strategyId: string,
+    body: UpdateStrategyBodyDto,
+  ): Observable<StrategyDto> {
+    return this.portfolioManagerClient
+      .updateStrategy({
+        strategyId,
+        allowedSides: body.allowedSides ?? [],
+        ...(body.name !== undefined && { name: body.name }),
+        ...(body.description !== undefined && {
+          description: body.description,
+        }),
+        ...(body.minIntervalSecs !== undefined && {
+          minIntervalSecs: body.minIntervalSecs,
+        }),
+        ...(body.activeTimeStart !== undefined && {
+          activeTimeStart: body.activeTimeStart,
+        }),
+        ...(body.activeTimeEnd !== undefined && {
+          activeTimeEnd: body.activeTimeEnd,
+        }),
+      })
+      .pipe(
+        timeout(REQUEST_TIMEOUT_MS),
+        map((response) => mapStrategy(response.strategy!)),
+        catchError((err: unknown) =>
+          this.mapUpstreamError('update strategy', err),
+        ),
+      );
+  }
+
+  public getStrategy(strategyId: string): Observable<StrategyDto> {
+    return this.portfolioManagerClient.getStrategy({ strategyId }).pipe(
+      timeout(REQUEST_TIMEOUT_MS),
+      map((response) => mapStrategy(response.strategy!)),
+      catchError((err: unknown) => this.mapUpstreamError('get strategy', err)),
+    );
+  }
+
+  public listStrategies(): Observable<ListStrategiesResponseDto> {
+    return this.portfolioManagerClient.listStrategies({}).pipe(
+      timeout(REQUEST_TIMEOUT_MS),
+      map((response) => ({
+        strategies: response.strategies.map(mapStrategy),
+      })),
+      catchError((err: unknown) =>
+        this.mapUpstreamError('list strategies', err),
+      ),
+    );
+  }
+
+  public assignStrategyToPortfolio(
+    portfolioId: string,
+    body: AssignStrategyBodyDto,
+  ): Observable<AssignStrategyToPortfolioResponseDto> {
+    return this.portfolioManagerClient
+      .assignStrategyToPortfolio({
+        portfolioId,
+        strategyId: body.strategyId,
+      })
+      .pipe(
+        timeout(REQUEST_TIMEOUT_MS),
+        map((response) => ({
+          ...(response.summary !== undefined && { summary: response.summary }),
+          ...(response.strategy !== undefined && {
+            strategy: mapStrategy(response.strategy),
+          }),
+        })),
+        catchError((err: unknown) =>
+          this.mapUpstreamError('assign strategy to portfolio', err),
+        ),
+      );
   }
 }

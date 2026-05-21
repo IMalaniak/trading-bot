@@ -1,12 +1,16 @@
 import type {
   AssignStrategyToPortfolioRequest,
+  CreateStrategyRequest,
+  GetStrategyRequest,
   ListRiskConfigAuditLogRequest,
   ListRiskDecisionsRequest,
   UpdatePortfolioInstrumentConfigRequest,
   UpdatePortfolioRequest,
+  UpdateStrategyRequest,
 } from '@trading-bot/common/proto';
 import { DECIMAL_STRING_PATTERN } from '@trading-bot/common/validation';
 import {
+  IsArray,
   IsBoolean,
   IsInt,
   IsNotEmpty,
@@ -123,4 +127,69 @@ export class AssignStrategyToPortfolioRequestDto implements AssignStrategyToPort
   @IsOptional()
   @IsString()
   strategyId?: string;
+}
+
+export class CreateStrategyRequestDto implements CreateStrategyRequest {
+  @IsString()
+  @IsNotEmpty()
+  name: string;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @IsArray()
+  @IsInt({ each: true })
+  allowedSides: number[];
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  minIntervalSecs?: number;
+
+  @IsOptional()
+  @IsString()
+  activeTimeStart?: string;
+
+  @IsOptional()
+  @IsString()
+  activeTimeEnd?: string;
+}
+
+export class UpdateStrategyRequestDto implements UpdateStrategyRequest {
+  @IsString()
+  @IsNotEmpty()
+  strategyId: string;
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  name?: string;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @IsArray()
+  @IsInt({ each: true })
+  allowedSides: number[];
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  minIntervalSecs?: number;
+
+  @IsOptional()
+  @IsString()
+  activeTimeStart?: string;
+
+  @IsOptional()
+  @IsString()
+  activeTimeEnd?: string;
+}
+
+export class GetStrategyRequestDto implements GetStrategyRequest {
+  @IsString()
+  @IsNotEmpty()
+  strategyId: string;
 }
