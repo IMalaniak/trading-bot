@@ -6,11 +6,11 @@ import {
 } from '@trading-bot/common/proto';
 import type { Mock, MockedFunction } from 'vitest';
 
-import { EventDispatcherService } from '../event-dispatcher/event-dispatcher.service';
-import { PrismaService } from '../prisma/prisma.service';
-import { InstrumentRegisteredEventFactory } from './events/instrument-registered-event.factory';
-import { InstrumentMapper } from './mapper/instrument.mapper';
-import { PortfolioReadMapper } from './mapper/portfolio-read.mapper';
+import { EventDispatcherService } from '../../event-dispatcher/event-dispatcher.service';
+import { PrismaService } from '../../prisma/prisma.service';
+import { InstrumentRegisteredEventFactory } from '../events/instrument-registered-event.factory';
+import { InstrumentMapper } from '../mapper/instrument.mapper';
+import { PortfolioReadMapper } from '../mapper/portfolio-read.mapper';
 import {
   INSTRUMENT_ALREADY_ATTACHED_ERROR,
   INSTRUMENT_METADATA_CONFLICT_ERROR,

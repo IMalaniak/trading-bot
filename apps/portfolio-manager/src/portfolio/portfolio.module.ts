@@ -6,9 +6,14 @@ import { InstrumentRegisteredEventFactory } from './events/instrument-registered
 import { InstrumentMapper } from './mapper/instrument.mapper';
 import { PortfolioReadMapper } from './mapper/portfolio-read.mapper';
 import { PortfolioController } from './portfolio.controller';
-import { PortfolioService } from './portfolio.service';
 import { PortfolioQueryRepository } from './repositories/portfolio-query.repository';
+import { PortfolioWriteRepository } from './repositories/portfolio-write.repository';
+import { ListRiskConfigAuditLogService } from './services/list-risk-config-audit-log.service';
+import { ListRiskDecisionsService } from './services/list-risk-decisions.service';
+import { PortfolioService } from './services/portfolio.service';
 import { PortfolioQueryService } from './services/portfolio-query.service';
+import { UpdatePortfolioService } from './services/update-portfolio.service';
+import { UpdatePortfolioInstrumentConfigService } from './services/update-portfolio-instrument-config.service';
 
 @Module({
   imports: [PrismaModule, EventDispatcherModule],
@@ -17,6 +22,11 @@ import { PortfolioQueryService } from './services/portfolio-query.service';
     PortfolioService,
     PortfolioQueryService,
     PortfolioQueryRepository,
+    PortfolioWriteRepository,
+    UpdatePortfolioInstrumentConfigService,
+    UpdatePortfolioService,
+    ListRiskDecisionsService,
+    ListRiskConfigAuditLogService,
     InstrumentMapper,
     PortfolioReadMapper,
     InstrumentRegisteredEventFactory,

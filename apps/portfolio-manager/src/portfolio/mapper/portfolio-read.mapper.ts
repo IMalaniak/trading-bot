@@ -57,6 +57,20 @@ export class PortfolioReadMapper {
       maxTradeNotional: prismaDecimalToString(config.maxTradeNotional),
       maxPositionNotional: prismaDecimalToString(config.maxPositionNotional),
       updatedAt: config.updatedAt.toISOString(),
+      ...(config.maxOpenTrades != null && {
+        maxOpenTrades: config.maxOpenTrades,
+      }),
+      ...(config.maxDailyTurnoverNotional != null && {
+        maxDailyTurnoverNotional: prismaDecimalToString(
+          config.maxDailyTurnoverNotional,
+        ),
+      }),
+      ...(config.cooldownSeconds != null && {
+        cooldownSeconds: config.cooldownSeconds,
+      }),
+      ...(config.maxConsecutiveRejections != null && {
+        maxConsecutiveRejections: config.maxConsecutiveRejections,
+      }),
     };
   }
 
