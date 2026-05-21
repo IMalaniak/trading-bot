@@ -172,4 +172,89 @@ describe('portfolio API client', () => {
     ]);
     expect((error as DashboardApiError).status).toBe(400);
   });
+
+  it('sends PATCH to update portfolio', async () => {
+    const summary = {
+      portfolioId: 'portfolio-alpha',
+      name: 'Alpha Portfolio',
+      isActive: false,
+      exposureCapNotional: '2000',
+      aggregateExposureNotional: '0',
+      openPositionCount: 0,
+      updatedAt: '2026-05-21T10:00:00.000Z',
+    };
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(summary));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await createDashboardApi(
+      'https://api.example/api',
+    ).updatePortfolio('portfolio-alpha', {
+      isActive: false,
+      exposureCapNotional: '2000',
+    });
+
+    expect(result).toEqual(summary);
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://api.example/api/portfolios/portfolio-alpha',
+      expect.objectContaining({
+        method: 'PATCH',
+        body: JSON.stringify({ isActive: false, exposureCapNotional: '2000' }),
+      }),
+    );
+  });
+
+  it('sends PATCH to update portfolio instrument config', async () => {
+    const config = {
+      portfolioId: 'portfolio-alpha',
+      instrument: { id: 'inst-1', symbol: 'BTC/USDT' },
+      enabled: false,
+    };
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(config));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await createDashboardApi(
+      'https://api.example/api',
+    ).updatePortfolioInstrumentConfig('portfolio-alpha', 'inst-1', {
+      enabled: false,
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://api.example/api/portfolios/portfolio-alpha/instrument/inst-1',
+      expect.objectContaining({
+        method: 'PATCH',
+        body: JSON.stringify({ enabled: false }),
+      }),
+    );
+  });
+
+  it('fetches risk decisions with optional filter', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(jsonResponse({ decisions: [] }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await createDashboardApi('https://api.example/api').listRiskDecisions(
+      'portfolio-alpha',
+      { decision: 'REJECTED', limit: 25 },
+    );
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://api.example/api/portfolios/portfolio-alpha/decisions?decisionFilter=REJECTED&limit=25',
+      expect.any(Object),
+    );
+  });
+
+  it('fetches risk config audit log', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ entries: [] }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await createDashboardApi('https://api.example/api').listRiskConfigAuditLog(
+      'portfolio-alpha',
+    );
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://api.example/api/portfolios/portfolio-alpha/audit',
+      expect.any(Object),
+    );
+  });
 });

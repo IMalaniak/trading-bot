@@ -124,6 +124,55 @@ export interface RegisterPortfolioInstrumentRequestDto {
   maxPositionNotional: string;
 }
 
+export interface UpdatePortfolioRequestDto {
+  exposureCapNotional?: string;
+  isActive?: boolean;
+}
+
+export interface UpdatePortfolioInstrumentConfigRequestDto {
+  enabled?: boolean;
+  targetNotional?: string;
+  maxTradeNotional?: string;
+  maxPositionNotional?: string;
+  maxOpenTrades?: number;
+  maxDailyTurnoverNotional?: string;
+  cooldownSeconds?: number;
+  maxConsecutiveRejections?: number;
+}
+
+export interface RiskDecisionDto {
+  id: string;
+  portfolioId: string;
+  instrumentId: string;
+  decision: string;
+  reasonCodes: string[];
+  requestedNotional: string;
+  referencePrice: string;
+  decidedAt: string;
+  sourceEventId: string;
+}
+
+export interface RiskDecisionListResponseDto {
+  decisions: RiskDecisionDto[];
+  nextCursor?: string;
+}
+
+export interface RiskConfigAuditLogEntryDto {
+  id: string;
+  entityType: string;
+  portfolioId: string;
+  portfolioInstrumentConfigId?: string;
+  field: string;
+  oldValue?: string;
+  newValue?: string;
+  changedAt: string;
+}
+
+export interface RiskConfigAuditLogListResponseDto {
+  entries: RiskConfigAuditLogEntryDto[];
+  nextCursor?: string;
+}
+
 export class DashboardApiError extends Error {
   constructor(
     message: string,
@@ -248,6 +297,60 @@ export const createDashboardApi = (
           body: JSON.stringify(payload),
         },
       ),
+
+    updatePortfolio: async (
+      portfolioId: string,
+      payload: UpdatePortfolioRequestDto,
+    ): Promise<PortfolioSummaryDto> =>
+      await requestJson<PortfolioSummaryDto>(
+        `${baseUrl}/portfolios/${encodeURIComponent(portfolioId)}`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify(payload),
+        },
+      ),
+
+    updatePortfolioInstrumentConfig: async (
+      portfolioId: string,
+      instrumentId: string,
+      payload: UpdatePortfolioInstrumentConfigRequestDto,
+    ): Promise<PortfolioInstrumentConfigDto> =>
+      await requestJson<PortfolioInstrumentConfigDto>(
+        `${baseUrl}/portfolios/${encodeURIComponent(portfolioId)}/instrument/${encodeURIComponent(instrumentId)}`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify(payload),
+        },
+      ),
+
+    listRiskDecisions: async (
+      portfolioId: string,
+      params?: { decision?: string; limit?: number; cursor?: string },
+    ): Promise<RiskDecisionListResponseDto> => {
+      const query = new URLSearchParams();
+      if (params?.decision) query.set('decisionFilter', params.decision);
+      if (params?.limit != null) query.set('limit', String(params.limit));
+      if (params?.cursor) query.set('cursor', params.cursor);
+      const qs = query.toString() ? `?${query.toString()}` : '';
+
+      return await requestJson<RiskDecisionListResponseDto>(
+        `${baseUrl}/portfolios/${encodeURIComponent(portfolioId)}/decisions${qs}`,
+      );
+    },
+
+    listRiskConfigAuditLog: async (
+      portfolioId: string,
+      params?: { limit?: number; cursor?: string },
+    ): Promise<RiskConfigAuditLogListResponseDto> => {
+      const query = new URLSearchParams();
+      if (params?.limit != null) query.set('limit', String(params.limit));
+      if (params?.cursor) query.set('cursor', params.cursor);
+      const qs = query.toString() ? `?${query.toString()}` : '';
+
+      return await requestJson<RiskConfigAuditLogListResponseDto>(
+        `${baseUrl}/portfolios/${encodeURIComponent(portfolioId)}/audit${qs}`,
+      );
+    },
 
     listSignals: async (
       limit = RECENT_SIGNALS_LIMIT,

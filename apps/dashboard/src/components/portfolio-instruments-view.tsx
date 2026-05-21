@@ -1,4 +1,4 @@
-import { Settings2 } from 'lucide-react';
+import { RefreshCw, Settings2 } from 'lucide-react';
 
 import { formatDateTime, formatNotional } from '../lib/formatters';
 import type { PortfolioInstrumentConfigDto } from '../lib/portfolio-api';
@@ -6,8 +6,16 @@ import { EmptyState, Metric, SectionHeading } from '../ui';
 
 export function PortfolioInstrumentsView({
   instruments,
+  onToggleEnabled,
+  togglingInstrumentId,
 }: {
   instruments: PortfolioInstrumentConfigDto[];
+  onToggleEnabled?: (
+    portfolioId: string,
+    instrumentId: string,
+    enabled: boolean,
+  ) => void;
+  togglingInstrumentId?: string;
 }) {
   if (instruments.length === 0) {
     return (
@@ -36,7 +44,11 @@ export function PortfolioInstrumentsView({
             className="rounded-md border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-950"
             key={`${config.portfolioId}-${config.instrument.id}`}
           >
-            <InstrumentHeader config={config} />
+            <InstrumentHeader
+              config={config}
+              isToggling={togglingInstrumentId === config.instrument.id}
+              onToggleEnabled={onToggleEnabled}
+            />
             <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
               <Metric
                 label="Target"
@@ -69,6 +81,7 @@ export function PortfolioInstrumentsView({
               <th className="px-4 py-3">Trade cap</th>
               <th className="px-4 py-3">Position cap</th>
               <th className="px-4 py-3">Updated</th>
+              {onToggleEnabled ? <th className="px-4 py-3" /> : null}
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
@@ -97,6 +110,15 @@ export function PortfolioInstrumentsView({
                 <td className="px-4 py-3">
                   {formatDateTime(config.updatedAt)}
                 </td>
+                {onToggleEnabled ? (
+                  <td className="px-4 py-3">
+                    <ToggleButton
+                      config={config}
+                      isToggling={togglingInstrumentId === config.instrument.id}
+                      onToggleEnabled={onToggleEnabled}
+                    />
+                  </td>
+                ) : null}
               </tr>
             ))}
           </tbody>
@@ -106,10 +128,63 @@ export function PortfolioInstrumentsView({
   );
 }
 
-function InstrumentHeader({
+function ToggleButton({
   config,
+  isToggling,
+  onToggleEnabled,
 }: {
   config: PortfolioInstrumentConfigDto;
+  isToggling: boolean;
+  onToggleEnabled: (
+    portfolioId: string,
+    instrumentId: string,
+    enabled: boolean,
+  ) => void;
+}) {
+  const label = isToggling
+    ? `Updating ${config.instrument.symbol}`
+    : config.enabled
+      ? `Disable ${config.instrument.symbol}`
+      : `Enable ${config.instrument.symbol}`;
+
+  return (
+    <button
+      aria-label={label}
+      className={`inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-xs font-medium transition ${
+        config.enabled
+          ? 'border border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800'
+          : 'border border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-200 dark:hover:bg-emerald-900'
+      } disabled:cursor-not-allowed disabled:opacity-60`}
+      disabled={isToggling}
+      onClick={() =>
+        onToggleEnabled(
+          config.portfolioId,
+          config.instrument.id,
+          !config.enabled,
+        )
+      }
+      type="button"
+    >
+      {isToggling ? (
+        <RefreshCw aria-hidden="true" className="h-3 w-3 animate-spin" />
+      ) : null}
+      {isToggling ? 'Updating\u2026' : config.enabled ? 'Disable' : 'Enable'}
+    </button>
+  );
+}
+
+function InstrumentHeader({
+  config,
+  isToggling,
+  onToggleEnabled,
+}: {
+  config: PortfolioInstrumentConfigDto;
+  isToggling: boolean;
+  onToggleEnabled?: (
+    portfolioId: string,
+    instrumentId: string,
+    enabled: boolean,
+  ) => void;
 }) {
   return (
     <div className="flex items-start justify-between gap-3">
@@ -121,7 +196,15 @@ function InstrumentHeader({
           {config.instrument.venue}
         </p>
       </div>
-      <StatusBadge enabled={config.enabled} />
+      {onToggleEnabled ? (
+        <ToggleButton
+          config={config}
+          isToggling={isToggling}
+          onToggleEnabled={onToggleEnabled}
+        />
+      ) : (
+        <StatusBadge enabled={config.enabled} />
+      )}
     </div>
   );
 }
