@@ -79,6 +79,7 @@ export interface PortfolioReadResponseDto {
   recentOrders: ExecutionOrderDto[];
   summary: PortfolioSummaryDto;
   configuredInstruments: PortfolioInstrumentConfigDto[];
+  strategy?: StrategyDto;
 }
 
 export interface ListPortfoliosResponseDto {

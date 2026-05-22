@@ -284,6 +284,9 @@ export class PortfolioService implements OnModuleInit {
                   instrumentsById.get(order.instrumentId),
                 ),
               ),
+              strategy: portfolio.strategy
+                ? mapStrategy(portfolio.strategy)
+                : undefined,
             };
           }),
         );

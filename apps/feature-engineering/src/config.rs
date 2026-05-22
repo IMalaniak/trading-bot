@@ -24,10 +24,13 @@ pub enum ConfigError {
 
 impl AppConfig {
     pub fn from_env() -> Result<Self, ConfigError> {
-        let workspace_root = find_workspace_root();
-        dotenvy::from_path(workspace_root.join(".env")).ok();
-        dotenvy::from_path(workspace_root.join("apps/feature-engineering/.env")).ok();
-        dotenvy::dotenv().ok();
+        #[cfg(not(test))]
+        {
+            let workspace_root = find_workspace_root();
+            dotenvy::from_path(workspace_root.join(".env")).ok();
+            dotenvy::from_path(workspace_root.join("apps/feature-engineering/.env")).ok();
+            dotenvy::dotenv().ok();
+        }
 
         Ok(Self {
             kafka_brokers: require_var("KAFKA_BROKERS")?,

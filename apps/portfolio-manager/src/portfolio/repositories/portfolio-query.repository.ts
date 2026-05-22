@@ -5,6 +5,7 @@ import {
   PortfolioInstrumentConfigModel,
   PortfolioModel,
   PortfolioPositionModel,
+  StrategyModel,
 } from '../../prisma/generated/models';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
@@ -29,6 +30,7 @@ export interface PortfolioSummaryReadModel {
 }
 
 export interface PortfolioReadModel extends PortfolioSummaryReadModel {
+  strategy: StrategyModel | null;
   positions: PortfolioPositionReadModel[];
   configuredInstruments: PortfolioInstrumentConfigReadModel[];
 }
@@ -121,16 +123,17 @@ export class PortfolioQueryRepository {
   }
 
   async findPortfolio(portfolioId: string): Promise<PortfolioReadModel | null> {
-    const portfolio = await this.prisma.portfolio.findUnique({
+    const portfolioWithStrategy = await this.prisma.portfolio.findUnique({
       where: { id: portfolioId },
+      include: { strategy: true },
     });
 
-    if (!portfolio) {
+    if (!portfolioWithStrategy) {
       return null;
     }
 
     const [summary, positions, configuredInstruments] = await Promise.all([
-      this.buildPortfolioSummary(portfolio),
+      this.buildPortfolioSummary(portfolioWithStrategy),
       this.prisma.portfolioPosition.findMany({
         where: {
           portfolioId,
@@ -154,6 +157,7 @@ export class PortfolioQueryRepository {
 
     return {
       ...summary,
+      strategy: portfolioWithStrategy.strategy,
       positions,
       configuredInstruments,
     };

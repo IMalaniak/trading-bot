@@ -36,7 +36,7 @@ describe('PortfolioSummary', () => {
   it('shows strategy badge when strategy is assigned', () => {
     const data: PortfolioReadResponseDto = {
       ...baseData,
-      summary: { ...baseData.summary, strategy },
+      strategy,
     };
 
     render(<PortfolioSummary data={data} />);

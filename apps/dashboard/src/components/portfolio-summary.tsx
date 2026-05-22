@@ -61,13 +61,13 @@ export function PortfolioSummary({ data }: { data: PortfolioReadResponseDto }) {
           <span className="h-2 w-2 rounded-full bg-current" />
           {summary.isActive ? 'Active' : 'Inactive'}
         </span>
-        {summary.strategy ? (
+        {data.strategy ? (
           <span className="inline-flex w-fit items-center gap-1.5 rounded-md bg-violet-100 px-2.5 py-1 text-sm font-medium text-violet-800 dark:bg-violet-950 dark:text-violet-200">
             <BookOpen aria-hidden="true" className="h-3.5 w-3.5" />
             <span className="text-xs text-violet-500 dark:text-violet-400">
               Strategy
             </span>
-            {summary.strategy.name}
+            {data.strategy.name}
           </span>
         ) : null}
       </div>

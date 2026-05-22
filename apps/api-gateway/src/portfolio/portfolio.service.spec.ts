@@ -45,6 +45,11 @@ describe('PortfolioService', () => {
       updatePortfolioInstrumentConfig: vi.fn(),
       listRiskDecisions: vi.fn(),
       listRiskConfigAuditLog: vi.fn(),
+      createStrategy: vi.fn(),
+      updateStrategy: vi.fn(),
+      getStrategy: vi.fn(),
+      listStrategies: vi.fn(),
+      assignStrategyToPortfolio: vi.fn(),
     };
     executionClient = {
       listPortfolioExecutionOrders: vi.fn(),

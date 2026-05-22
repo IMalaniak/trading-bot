@@ -23,6 +23,7 @@ import {
 } from 'class-validator';
 
 import { InstrumentDto } from './instrument.dto';
+import { StrategyDto } from './strategy.dto';
 
 export const DEFAULT_RECENT_ORDER_LIMIT = 20;
 export const MAX_RECENT_ORDER_LIMIT = 100;
@@ -328,4 +329,7 @@ export class PortfolioReadResponseDto {
 
   @ApiProperty({ type: [ExecutionOrderDto] })
   recentOrders: ExecutionOrderDto[];
+
+  @ApiPropertyOptional({ type: StrategyDto })
+  strategy?: StrategyDto;
 }

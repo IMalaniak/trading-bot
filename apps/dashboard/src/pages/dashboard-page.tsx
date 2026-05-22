@@ -290,7 +290,11 @@ export function DashboardPage() {
         if (!current.data) return current;
         return {
           ...current,
-          data: { ...current.data, summary: updated.summary },
+          data: {
+            ...current.data,
+            summary: updated.summary,
+            strategy: updated.strategy,
+          },
         };
       });
     },
@@ -382,7 +386,7 @@ export function DashboardPage() {
           ) : null}
           {state.data ? (
             <StrategyAssignmentControl
-              assignedStrategyId={state.data.summary.strategy?.id}
+              assignedStrategyId={state.data.strategy?.id}
               onAssign={handleAssignStrategy}
               portfolioId={portfolioId}
               strategies={strategiesState.data}

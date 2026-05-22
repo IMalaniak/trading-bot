@@ -37,6 +37,7 @@ export class PortfolioReadMapper {
       configuredInstruments: state.configuredInstruments.map((config) =>
         this.mapConfiguredInstrument(config),
       ),
+      strategy: state.strategy ? this.mapStrategy(state.strategy) : undefined,
     };
   }
 

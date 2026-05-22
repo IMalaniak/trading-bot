@@ -33,7 +33,6 @@ export interface PortfolioSummaryDto {
   aggregateExposureNotional: string;
   openPositionCount: number;
   updatedAt: string;
-  strategy?: StrategyDto;
 }
 
 export interface PortfolioPositionDto {
@@ -96,6 +95,7 @@ export interface PortfolioReadResponseDto {
   positions: PortfolioPositionDto[];
   configuredInstruments: PortfolioInstrumentConfigDto[];
   recentOrders: ExecutionOrderDto[];
+  strategy?: StrategyDto;
 }
 
 export interface ListPortfoliosResponseDto {
