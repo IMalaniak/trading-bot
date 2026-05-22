@@ -166,9 +166,12 @@ describe('Risk pipeline expanded rules integration', () => {
     await prisma.exposureReservation.create({
       data: {
         id: 'existing-reservation',
+        riskDecisionId: 'existing-reservation',
+        candidateIdempotencyKey: 'existing-reservation',
         portfolioId: 'portfolio-alpha',
         instrumentId: 'instrument-1',
         reservedNotional: 100,
+        reservedQuantity: 1,
         status: 'ACTIVE',
       },
     });
@@ -187,9 +190,12 @@ describe('Risk pipeline expanded rules integration', () => {
     await prisma.exposureReservation.create({
       data: {
         id: 'existing-reservation',
+        riskDecisionId: 'existing-reservation',
+        candidateIdempotencyKey: 'existing-reservation',
         portfolioId: 'portfolio-alpha',
         instrumentId: 'instrument-1',
         reservedNotional: 100,
+        reservedQuantity: 1,
         status: 'ACTIVE',
       },
     });

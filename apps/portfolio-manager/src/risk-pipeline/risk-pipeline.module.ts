@@ -16,6 +16,7 @@ import { AutoDisableService } from './services/auto-disable.service';
 import { InstrumentStageService } from './services/instrument-stage.service';
 import { PortfolioStageService } from './services/portfolio-stage.service';
 import { RiskRuleEngine } from './services/risk-rule-engine.service';
+import { StrategyFilterService } from './services/strategy-filter.service';
 import { TradeSizingService } from './services/trade-sizing.service';
 import { SignalTopicConsumer } from './signal-topic.consumer';
 
@@ -36,6 +37,7 @@ import { SignalTopicConsumer } from './signal-topic.consumer';
     TradeDecisionEventFactory,
     TradeSizingService,
     RiskRuleEngine,
+    StrategyFilterService,
     SignalTopicConsumer,
     PortfolioTopicConsumer,
   ],

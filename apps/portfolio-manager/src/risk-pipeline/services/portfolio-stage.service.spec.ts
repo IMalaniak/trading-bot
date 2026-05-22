@@ -22,6 +22,7 @@ import { RiskConfigRepository } from '../repositories/risk-config.repository';
 import { AutoDisableService } from './auto-disable.service';
 import { PortfolioStageService } from './portfolio-stage.service';
 import { RiskRuleEngine } from './risk-rule-engine.service';
+import { StrategyFilterService } from './strategy-filter.service';
 import { TradeSizingService } from './trade-sizing.service';
 
 type TransactionMethod = <T>(
@@ -66,6 +67,9 @@ type MockPositionExposureRepository = {
 type MockAutoDisableService = {
   handleRejection: MockedFunction<AutoDisableService['handleRejection']>;
 };
+type MockStrategyFilterService = {
+  evaluate: MockedFunction<StrategyFilterService['evaluate']>;
+};
 type MockRiskConfigRepository = {
   instrumentExists: MockedFunction<RiskConfigRepository['instrumentExists']>;
   findConfigsByInstrumentId: MockedFunction<
@@ -102,6 +106,7 @@ describe('PortfolioStageService', () => {
   let eventFactory: MockTradeDecisionEventFactory;
   let eventDispatcher: MockEventDispatcher;
   let autoDisableService: MockAutoDisableService;
+  let strategyFilterService: MockStrategyFilterService;
 
   const candidateMessage = PortfolioSignalCandidate.fromPartial({
     signal: Signal.fromPartial({
@@ -144,7 +149,15 @@ describe('PortfolioStageService', () => {
   };
 
   beforeEach(() => {
-    transactionMock = vi.fn((callback) => callback({}));
+    const tx = {
+      portfolio: {
+        findUnique: vi.fn().mockResolvedValue({ strategy: null }),
+      },
+      riskDecision: {
+        findFirst: vi.fn().mockResolvedValue(null),
+      },
+    };
+    transactionMock = vi.fn((callback) => callback(tx));
     prisma = {
       $transaction: transactionMock as unknown as TransactionMethod,
     };
@@ -196,6 +209,9 @@ describe('PortfolioStageService', () => {
     autoDisableService = {
       handleRejection: vi.fn().mockResolvedValue(undefined),
     };
+    strategyFilterService = {
+      evaluate: vi.fn().mockReturnValue(null),
+    };
 
     service = new PortfolioStageService(
       prisma as unknown as PrismaService,
@@ -209,6 +225,7 @@ describe('PortfolioStageService', () => {
       eventFactory,
       eventDispatcher as unknown as EventDispatcherService,
       autoDisableService as unknown as AutoDisableService,
+      strategyFilterService as unknown as StrategyFilterService,
     );
   });
 

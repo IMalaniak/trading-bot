@@ -14,6 +14,7 @@ import { ReservationRepository } from '../repositories/reservation.repository';
 import { RiskConfigRepository } from '../repositories/risk-config.repository';
 import { AutoDisableService } from './auto-disable.service';
 import { RiskRuleEngine } from './risk-rule-engine.service';
+import { StrategyFilterService } from './strategy-filter.service';
 import { TradeSizingService } from './trade-sizing.service';
 
 const isUniqueConstraintViolation = (
@@ -53,6 +54,7 @@ export class PortfolioStageService {
     private readonly tradeDecisionEventFactory: TradeDecisionEventFactory,
     private readonly eventDispatcher: EventDispatcherService,
     private readonly autoDisableService: AutoDisableService,
+    private readonly strategyFilterService: StrategyFilterService,
   ) {}
 
   async handleCandidate(
@@ -96,6 +98,41 @@ export class PortfolioStageService {
           config?.targetNotional ?? candidate.targetNotionalSnapshot,
           candidate.referencePrice,
         );
+
+        const portfolio = await tx.portfolio.findUnique({
+          where: { id: candidate.portfolioId },
+          select: {
+            strategy: {
+              select: {
+                allowedSides: true,
+                minIntervalSecs: true,
+                activeTimeStart: true,
+                activeTimeEnd: true,
+              },
+            },
+          },
+        });
+
+        let lastApprovedAt: Date | null = null;
+        if (portfolio?.strategy?.minIntervalSecs) {
+          const lastApproved = await tx.riskDecision.findFirst({
+            where: {
+              portfolioId: candidate.portfolioId,
+              decision: RiskDecisionStatus.APPROVED,
+            },
+            orderBy: { decidedAt: 'desc' },
+            select: { decidedAt: true },
+          });
+          lastApprovedAt = lastApproved?.decidedAt ?? null;
+        }
+
+        const strategyFilterResult = this.strategyFilterService.evaluate({
+          candidate,
+          strategy: portfolio?.strategy ?? null,
+          trade: sizedTrade,
+          lastApprovedAt,
+        });
+
         const activeInstrumentReservedNotional =
           await this.reservationRepository.sumActiveInstrumentReservedNotional(
             candidate.portfolioId,
@@ -131,22 +168,26 @@ export class PortfolioStageService {
             candidate.signalTimestamp,
             tx,
           );
-        const evaluation = config
-          ? this.riskRuleEngine.evaluate({
-              config,
-              trade: sizedTrade,
-              activeInstrumentReservedNotional:
-                activeInstrumentReservedNotional.plus(filledInstrumentExposure),
-              activePortfolioReservedNotional:
-                activePortfolioReservedNotional.plus(filledPortfolioExposure),
-              activeInstrumentReservationCount,
-              dailyTradedNotional,
-            })
-          : {
-              ...sizedTrade,
-              decision: RiskDecisionStatus.REJECTED,
-              reasonCodes: [RiskDecisionReasonCode.SUBSCRIPTION_DISABLED],
-            };
+        const evaluation =
+          strategyFilterResult ??
+          (config
+            ? this.riskRuleEngine.evaluate({
+                config,
+                trade: sizedTrade,
+                activeInstrumentReservedNotional:
+                  activeInstrumentReservedNotional.plus(
+                    filledInstrumentExposure,
+                  ),
+                activePortfolioReservedNotional:
+                  activePortfolioReservedNotional.plus(filledPortfolioExposure),
+                activeInstrumentReservationCount,
+                dailyTradedNotional,
+              })
+            : {
+                ...sizedTrade,
+                decision: RiskDecisionStatus.REJECTED,
+                reasonCodes: [RiskDecisionReasonCode.SUBSCRIPTION_DISABLED],
+              });
         const decisionRecord = await this.decisionRepository.create(
           {
             candidateRecordId: candidate.id,
