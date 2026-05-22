@@ -160,13 +160,56 @@ describe('Risk pipeline expanded rules integration', () => {
     );
   };
 
-  it('rejects when active reservation count equals maxOpenTrades', async () => {
-    await createInstrumentAndPortfolio({ maxOpenTrades: 1 });
-
+  const createExistingReservation = async () => {
+    await prisma.signalReceipt.create({
+      data: {
+        id: 'existing-signal-receipt',
+        sourceEventId: 'existing-source-event',
+        signalId: 'existing-signal',
+        instrumentId: 'instrument-1',
+        kafkaKey: 'BINANCE:instrument-1',
+        receivedAt: new Date(),
+        status: 'FANNED_OUT',
+      },
+    });
+    await prisma.portfolioSignalCandidateRecord.create({
+      data: {
+        id: 'existing-candidate-record',
+        candidateIdempotencyKey: 'existing-reservation',
+        signalReceiptId: 'existing-signal-receipt',
+        sourceEventId: 'existing-source-event',
+        portfolioId: 'portfolio-alpha',
+        instrumentId: 'instrument-1',
+        signalId: 'existing-signal',
+        side: 1,
+        referencePrice: 100,
+        targetNotionalSnapshot: 100,
+        signalTimestamp: new Date(),
+        receivedAt: new Date(),
+        status: 'DECIDED',
+      },
+    });
+    await prisma.riskDecision.create({
+      data: {
+        id: 'existing-decision',
+        candidateRecordId: 'existing-candidate-record',
+        candidateIdempotencyKey: 'existing-reservation',
+        sourceEventId: 'existing-source-event',
+        portfolioId: 'portfolio-alpha',
+        instrumentId: 'instrument-1',
+        decision: 'APPROVED',
+        reasonCodes: [],
+        requestedNotional: 100,
+        requestedQuantity: 1,
+        referencePrice: 100,
+        emittedTopic: KAFKA_TOPICS.TRADES_APPROVED,
+        decidedAt: new Date(),
+      },
+    });
     await prisma.exposureReservation.create({
       data: {
         id: 'existing-reservation',
-        riskDecisionId: 'existing-reservation',
+        riskDecisionId: 'existing-decision',
         candidateIdempotencyKey: 'existing-reservation',
         portfolioId: 'portfolio-alpha',
         instrumentId: 'instrument-1',
@@ -175,35 +218,32 @@ describe('Risk pipeline expanded rules integration', () => {
         status: 'ACTIVE',
       },
     });
+  };
+
+  it('rejects when active reservation count equals maxOpenTrades', async () => {
+    await createInstrumentAndPortfolio({ maxOpenTrades: 1 });
+    await createExistingReservation();
 
     await publishSignal('source-event-max-open', 'signal-max-open');
-    await waitForDecisions(1);
+    await waitForDecisions(2);
 
-    const decision = await prisma.riskDecision.findFirstOrThrow();
+    const decision = await prisma.riskDecision.findFirstOrThrow({
+      where: { sourceEventId: 'source-event-max-open' },
+    });
     expect(decision.reasonCodes).toContain('MAX_OPEN_TRADES_EXCEEDED');
     expect(decision.decision).toBe('REJECTED');
   });
 
   it('approves when active reservation count is below maxOpenTrades', async () => {
     await createInstrumentAndPortfolio({ maxOpenTrades: 2 });
-
-    await prisma.exposureReservation.create({
-      data: {
-        id: 'existing-reservation',
-        riskDecisionId: 'existing-reservation',
-        candidateIdempotencyKey: 'existing-reservation',
-        portfolioId: 'portfolio-alpha',
-        instrumentId: 'instrument-1',
-        reservedNotional: 100,
-        reservedQuantity: 1,
-        status: 'ACTIVE',
-      },
-    });
+    await createExistingReservation();
 
     await publishSignal('source-event-below-max', 'signal-below-max');
-    await waitForDecisions(1);
+    await waitForDecisions(2);
 
-    const decision = await prisma.riskDecision.findFirstOrThrow();
+    const decision = await prisma.riskDecision.findFirstOrThrow({
+      where: { sourceEventId: 'source-event-below-max' },
+    });
     expect(decision.decision).toBe('APPROVED');
   });
 
@@ -267,11 +307,6 @@ describe('Risk pipeline expanded rules integration', () => {
     await publishSignal('source-event-reject-1', 'signal-reject-1');
     await waitForDecisions(1);
 
-    await prisma.riskDecision.deleteMany();
-    await prisma.portfolioSignalCandidateRecord.deleteMany();
-    await prisma.signalReceipt.deleteMany();
-    await prisma.outboxEvent.deleteMany();
-
     for (const topic of [
       KAFKA_TOPICS.TRADING_SIGNALS,
       KAFKA_TOPICS.TRADING_SIGNALS_PORTFOLIO,
@@ -286,7 +321,7 @@ describe('Risk pipeline expanded rules integration', () => {
     await waitForCondition(
       async () => {
         await eventDispatcher.dispatchOutboxBatch();
-        return (await prisma.riskDecision.count()) === 1;
+        return (await prisma.riskDecision.count()) === 2;
       },
       15000,
       'Timed out waiting for second risk decision.',
