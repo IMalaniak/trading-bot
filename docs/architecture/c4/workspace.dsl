@@ -84,13 +84,19 @@ workspace "Trading Bot System" {
             group "Risk & Portfolio Manager Service" {
                 portfolioManager = container "Risk & Portfolio Manager" "Implements instrument registration, portfolio-scoped instrument configuration, the current two-stage risk pipeline, fill reconciliation, exposure state, and portfolio update publishing today." "Nest.js" {
                     tags "Implemented"
-                    gRPC = component "Risk & Portfolio API" "Exposes portfolio listing, portfolio-scoped instrument configuration, portfolio read queries, and instrument resolution today; remains the planned gRPC surface for broader risk/strategy configuration workflows." "gRPC" "API"
+                    gRPC = component "Risk & Portfolio API" "Exposes portfolio listing, portfolio-scoped instrument configuration, portfolio read queries, instrument resolution, risk config updates, risk config audit log queries, risk decision history queries, and strategy management (create, update, list, get, assign) today." "gRPC" "API"
 
-                    riskRules = component "Risk Rules Engine" "Applies the current deterministic portfolio-stage checks in order, using exact decimals: subscription enabled, per-trade cap, per-instrument reserved exposure cap, then per-portfolio reserved exposure cap." "TypeScript" {
+                    riskRules = component "Risk Rules Engine" "Evaluates portfolio-stage checks in order using exact decimals: subscription enabled, strategy side/time/cooldown filters, per-trade cap, max open trades, per-instrument reserved exposure cap, per-portfolio reserved exposure cap, and daily loss notional. Logs all decisions to RiskDecision. Triggers auto-disable via AutoDisableService after maxConsecutiveRejections." "TypeScript" {
                         tags "Implemented"
                     }
-                    strategyConfigManager = component "Strategy Config Manager" "Receives strategy updates and start/stop commands from API Gateway and manages rule sets." "TypeScript" {
-                        tags "Planned"
+                    strategyConfigManager = component "Strategy Config Manager" "Manages strategy profiles (create, update, list, get) and portfolio-instrument strategy assignments. Strategy profiles define allowedSides, activeTimeStart/End, and minIntervalSecs." "TypeScript" {
+                        tags "Implemented"
+                    }
+                    strategyFilterService = component "Strategy Filter Service" "Evaluates STRATEGY_SIDE_FILTER, STRATEGY_TIME_FILTER, and STRATEGY_COOLDOWN_FILTER rules in the portfolio stage before numeric risk rules." "TypeScript" {
+                        tags "Implemented"
+                    }
+                    autoDisableService = component "Auto-Disable Service" "Writes a portfolio-instrument disable record and a RiskConfigAuditLog entry after maxConsecutiveRejections consecutive rejections for a config." "TypeScript" {
+                        tags "Implemented"
                     }
                     portfolioManager = component "Portfolio Manager" "Handles instrument registration, portfolio instrument configuration, and portfolio-facing workflows inside the service." "TypeScript" {
                         tags "Implemented"
@@ -147,7 +153,7 @@ workspace "Trading Bot System" {
                         tags "Implemented"
                     }
 
-                    gRPC -> strategyConfigManager "Handles planned risk/strategy config updates via"
+                    gRPC -> strategyConfigManager "Handles strategy management and portfolio-instrument strategy assignment via"
                     gRPC -> portfolioManager "Handles portfolio listing and instrument configuration via"
                     gRPC -> portfolioQueryService "Handles portfolio read and instrument resolution requests via"
                     portfolioQueryService -> portfolioStateRepository "Reads summary, positions, orders/fills-derived state, and instruments via"
@@ -160,6 +166,8 @@ workspace "Trading Bot System" {
                     portfolioStageConsumer -> consumerReliabilityWrapper "Processes messages through"
                     portfolioStageService -> tradeSizingService "Derives requested size via"
                     portfolioStageService -> riskRules "Evaluates candidates against"
+                    portfolioStageService -> strategyFilterService "Applies strategy filter rules via"
+                    portfolioStageService -> autoDisableService "Triggers auto-disable checks via"
                     portfolioStageService -> riskConfigRepository "Loads portfolio caps from"
                     portfolioStageService -> riskStateRepository "Writes decisions, reservations, and outbox rows via"
                     portfolioStageService -> kafkaPublisher "Publishes trades.approved and trades.rejected via outbox"
@@ -170,7 +178,10 @@ workspace "Trading Bot System" {
                     fillReconciliationService -> portfolioStateRepository "Writes orders, fills, positions, snapshots, and reservation releases via"
                     fillReconciliationService -> kafkaPublisher "Publishes portfolio.updated via outbox"
                     executionUpdatesConsumer -> portfolioManager "Will feed orders.placed updates into"
-                    strategyConfigManager -> riskRules "Provides rule updates to"
+                    strategyConfigManager -> riskRules "Provides strategy rule updates to"
+                    strategyFilterService -> riskStateRepository "Logs strategy filter decisions via"
+                    autoDisableService -> riskConfigRepository "Writes disable records via"
+                    autoDisableService -> riskStateRepository "Writes RiskConfigAuditLog entries via"
                     riskRules -> riskStateRepository "Logs risk decisions via"
                     portfolioManager -> riskStateRepository "Persists instrument state and outbox rows via"
                     outboxDispatcher -> riskStateRepository "Claims outbox rows from"
@@ -178,7 +189,7 @@ workspace "Trading Bot System" {
                     outboxDispatcher -> metricsEndpoint "Records dispatch and backlog metrics via"
                 }
 
-                postgres = container "Portfolio DB" "Stores instruments, outbox rows, portfolios, signal receipts, candidate audit rows, risk decisions, exposure reservations, reconciled orders/fills, signed positions, and summary snapshots today; later it can also store users and trade history." "PostgreSQL" "Datastore" {
+                postgres = container "Portfolio DB" "Stores instruments, outbox rows, portfolios, signal receipts, candidate audit rows, risk decisions, exposure reservations, reconciled orders/fills, signed positions, portfolio summary snapshots, Strategy records, and RiskConfigAuditLog entries." "PostgreSQL" "Datastore" {
                     tags "Implemented"
                 }
 
@@ -246,7 +257,7 @@ workspace "Trading Bot System" {
             group "API Gateway Service" {
                 apiGateway = container "API Gateway" "Routes portfolio listing, selected portfolio reads, and portfolio-scoped instrument configuration today; planned coordination layer for broader dashboard-facing workflows." "Nest.js" {
                     tags "Implemented"
-                    REST = component "API" "Exposes portfolio listing, portfolio reads, and portfolio-scoped instrument configuration today; will later expand to strategy and market-data endpoints." "REST" "API"
+                    REST = component "API" "Exposes portfolio listing, portfolio reads, portfolio-scoped instrument configuration, risk config updates, risk decision history, risk config audit log, strategy management, and signal reads today." "REST" "API"
                     gRPC_Client = component "gRPC Client" "Handles internal service-to-service communication." "gRPC"
 
                     core = component "Core Orchestration" "Coordinates the current registration workflow and portfolio visibility aggregation." "TypeScript"
@@ -254,7 +265,7 @@ workspace "Trading Bot System" {
                     marketDataProxy = component "Market Data Proxy" "Forwards dashboard queries to Data Ingestion (Market Data API)." "TypeScript" {
                         tags "Implemented"
                     }
-                    portfolioProxy = component "Portfolio Proxy" "Forwards portfolio listing, portfolio-scoped instrument configuration, portfolio reads, and instrument resolution to Risk & Portfolio Manager." "TypeScript"
+                    portfolioProxy = component "Portfolio Proxy" "Forwards portfolio listing, portfolio-scoped instrument configuration, risk config updates, risk decision history, risk config audit log, portfolio reads, instrument resolution, and strategy management to Risk & Portfolio Manager." "TypeScript"
                     executionProxy = component "Execution Proxy" "Fetches recent execution-owned orders and fills from Execution Engine." "TypeScript" {
                         tags "Implemented"
                     }
@@ -319,8 +330,20 @@ workspace "Trading Bot System" {
                 themeUI = component "Theme Controller" "Uses system preference by default and cycles System/Light/Dark with a compact control." "TypeScript/React" {
                     tags "Implemented"
                 }
-                strategyConfigUI = component "Future Strategy Config UI" "Lets users define and edit strategy preferences after MVP." "TypeScript/React" {
-                    tags "Planned"
+                strategyConfigUI = component "Strategy Config UI" "Lists strategies, shows strategy details, creates and edits strategy profiles, assigns strategies to portfolio-instruments, and shows strategy badge in portfolio summary." "TypeScript/React" {
+                    tags "Implemented"
+                }
+                riskDecisionHistoryUI = component "Risk Decision History View" "Displays paginated risk decision history with reason codes for a selected portfolio." "TypeScript/React" {
+                    tags "Implemented"
+                }
+                riskConfigAuditUI = component "Config Change Audit Log View" "Displays field-level risk config change history for a selected portfolio." "TypeScript/React" {
+                    tags "Implemented"
+                }
+                portfolioSettingsUI = component "Portfolio Settings Editor" "Edits portfolio-level and instrument-level risk configuration via PATCH endpoints." "TypeScript/React" {
+                    tags "Implemented"
+                }
+                instrumentToggleUI = component "Instrument Enable/Disable Toggle" "Toggles instrument subscription enabled/disabled state via PATCH instrument config endpoint." "TypeScript/React" {
+                    tags "Implemented"
                 }
                 marketChartsUI = component "Future Market Charts" "Visualizes market data and indicators after data ingestion and feature engineering exist." "TypeScript/React" {
                     tags "Planned"
@@ -342,7 +365,11 @@ workspace "Trading Bot System" {
                 router -> refreshStateUI "Routes request states via"
                 router -> themeUI "Routes theme shell via"
                 router -> controlPanelUI "Will route start/stop trading actions via"
-                router -> strategyConfigUI "Will route strategy preferences configuration via"
+                router -> strategyConfigUI "Routes strategy management via"
+                router -> riskDecisionHistoryUI "Routes risk decision history via"
+                router -> riskConfigAuditUI "Routes config change audit log via"
+                router -> portfolioSettingsUI "Routes portfolio settings editor via"
+                router -> instrumentToggleUI "Routes instrument enable/disable toggle via"
                 router -> marketChartsUI "Will route market data and indicators via"
                 router -> signalMonitorUI "Routes buy/sell signal visibility via"
 
@@ -352,7 +379,11 @@ workspace "Trading Bot System" {
                 refreshStateUI -> apiClient "Normalizes loading and upstream errors from"
                 refreshStateUI -> portfolioUI "Displays request state for"
                 controlPanelUI -> apiClient "Will send start/stop commands via"
-                strategyConfigUI -> apiClient "Will send strategy config updates via"
+                strategyConfigUI -> apiClient "Sends strategy management requests via"
+                riskDecisionHistoryUI -> apiClient "Fetches GET /api/portfolios/:portfolioId/decisions via"
+                riskConfigAuditUI -> apiClient "Fetches GET /api/portfolios/:portfolioId/audit via"
+                portfolioSettingsUI -> apiClient "Sends PATCH /api/portfolios/:portfolioId and PATCH /api/portfolios/:portfolioId/instrument/:instrumentId via"
+                instrumentToggleUI -> apiClient "Sends PATCH /api/portfolios/:portfolioId/instrument/:instrumentId via"
                 marketChartsUI -> apiClient "Will fetch market data and indicators via"
                 signalMonitorUI -> apiClient "Fetches GET /api/signals via"
 
@@ -603,6 +634,8 @@ workspace "Trading Bot System" {
             include tradingBot.portfolioManager.riskRules
             include tradingBot.portfolioManager.tradeSizingService
             include tradingBot.portfolioManager.strategyConfigManager
+            include tradingBot.portfolioManager.strategyFilterService
+            include tradingBot.portfolioManager.autoDisableService
             include tradingBot.portfolioManager.kafkaPublisher
             include tradingBot.portfolioManager.outboxDispatcher
             include tradingBot.portfolioManager.metricsEndpoint
@@ -674,6 +707,10 @@ workspace "Trading Bot System" {
             include tradingBot.dashboard.refreshStateUI
             include tradingBot.dashboard.themeUI
             include tradingBot.dashboard.strategyConfigUI
+            include tradingBot.dashboard.riskDecisionHistoryUI
+            include tradingBot.dashboard.riskConfigAuditUI
+            include tradingBot.dashboard.portfolioSettingsUI
+            include tradingBot.dashboard.instrumentToggleUI
             include tradingBot.dashboard.marketChartsUI
             include tradingBot.dashboard.signalMonitorUI
             include tradingBot.dashboard.controlPanelUI

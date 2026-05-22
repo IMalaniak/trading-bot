@@ -24,6 +24,8 @@
     - [Current: Execution Simulator](#current-execution-simulator)
     - [Current: Fill Reconciliation](#current-fill-reconciliation)
     - [Current: Portfolio Read API and Execution Visibility](#current-portfolio-read-api-and-execution-visibility)
+    - [Current: Strategy Signal Filter](#current-strategy-signal-filter)
+    - [Current: Risk Config Update](#current-risk-config-update)
     - [Current: Signal-To-Portfolio E2E Flow](#current-signal-to-portfolio-e2e-flow)
     - [Planned: End-to-End Trading Flow](#planned-end-to-end-trading-flow)
 
@@ -39,11 +41,16 @@ Two principles are already active in the current codebase and should remain stab
 The current implementation is still intentionally narrow:
 
 - `api-gateway` exposes portfolio listing, portfolio visibility reads,
-  portfolio-scoped instrument configuration, and CORS for the local dashboard
-  origin.
-- `portfolio-manager` stores instruments, runs the current two-stage risk pipeline, writes outbox records, and dispatches Kafka events.
+  portfolio-scoped instrument configuration, risk config updates, risk decision
+  history, risk config audit log, strategy management, and CORS for the local
+  dashboard origin.
+- `portfolio-manager` stores instruments, runs the two-stage risk pipeline with
+  strategy signal filter and expanded risk rules, manages strategies and risk
+  config audit log, writes outbox records, and dispatches Kafka events.
 - `execution-engine` consumes approved trades, persists deterministic simulated order lifecycles, writes outbox records, and dispatches order events.
-- `common` owns shared proto contracts and Kafka contract helpers.
+- `common` owns shared proto contracts, Kafka contract helpers, shared REST
+  name enums (`AssetClassName`, `OrderStatusName`, `SignalSideName`), and
+  proto↔REST mapper functions.
 - `common` also owns the reusable Kafka consumer retry/DLQ wrapper and Prometheus metric helpers used by implemented services.
 - `external-api-facade` manages Binance WebSocket kline subscriptions and publishes raw market data directly to Kafka (no outbox — streaming workload where a missed candle is reproduced by the next tick).
 - `data-ingestion` consumes `instrument.registered` and `market.raw.data`, persists OHLCV bars to TimescaleDB, and exposes `GetMarketDataBars` over gRPC.
@@ -55,8 +62,9 @@ The current implementation is still intentionally narrow:
   `trading.signals`, caches recent signals in Redis, and exposes
   `Signals.GetLatestSignals` over gRPC.
 - `dashboard` provides the React portfolio dashboard for portfolio selection,
-  portfolio visibility, recent signal visibility, and portfolio-scoped
-  instrument configuration.
+  portfolio visibility, recent signal visibility, portfolio-scoped instrument
+  configuration, instrument enable/disable toggle, portfolio settings editing,
+  risk decision history, config audit log, and strategy management.
 - Local infra provides Redpanda, Postgres, TimescaleDB, and Redis.
 
 Everything else in this document should be read as either:
@@ -68,12 +76,12 @@ Everything else in this document should be read as either:
 
 | Area                             | Status         | Notes                                                                                                                                                                                                                                                                                                                                                                               |
 | -------------------------------- | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| API Gateway                      | Implemented    | REST entrypoint lists portfolios, forwards portfolio-scoped instrument configuration to `portfolio-manager`, aggregates portfolio/execution visibility over gRPC, and allows configured dashboard CORS origins.                                                                                                                                                                     |
-| Risk & Portfolio Manager         | Implemented    | Instrument registration, the two-stage risk pipeline, fill reconciliation, portfolio read queries, and instrument resolution are implemented in `portfolio-manager`.                                                                                                                                                                                                                |
+| API Gateway                      | Implemented    | REST entrypoint lists portfolios, forwards portfolio-scoped instrument configuration, risk config updates, and strategy management to `portfolio-manager`, aggregates portfolio/execution visibility over gRPC, exposes risk decision history and config audit log queries, and allows configured dashboard CORS origins.                                                           |
+| Risk & Portfolio Manager         | Implemented    | Instrument registration, two-stage risk pipeline, strategy signal filter (`STRATEGY_SIDE_FILTER`, `STRATEGY_TIME_FILTER`, `STRATEGY_COOLDOWN_FILTER`), expanded risk rules (`MAX_OPEN_TRADES_EXCEEDED`, `DAILY_LOSS_LIMIT_EXCEEDED`), auto-disable after `maxConsecutiveRejections`, fill reconciliation, portfolio read queries, instrument resolution, risk config update, risk config audit log, risk decision history query, and strategy management (create, update, list, get, assign) are all implemented in `portfolio-manager`. |
 | Outbox Dispatcher                | Implemented    | Kafka publish happens from the outbox, not inline with the DB write; shared dispatch mechanics live in `common`.                                                                                                                                                                                                                                                                    |
-| Shared Contracts (`common`)      | Implemented    | Proto types, topic constants, key builders, Kafka header helpers, and reusable outbox dispatch ports live here.                                                                                                                                                                                                                                                                     |
+| Shared Contracts (`common`)      | Implemented    | Proto types, topic constants, key builders, Kafka header helpers, reusable outbox dispatch ports, shared REST name enums (`AssetClassName`, `OrderStatusName`, `SignalSideName`), and proto↔REST mapper functions live here.                                                                                                                                                         |
 | Message Bus (Redpanda/Kafka API) | Implemented    | Local development uses Redpanda.                                                                                                                                                                                                                                                                                                                                                    |
-| Portfolio DB (Postgres)          | Implemented    | Source of truth for instruments, outbox rows, portfolios, risk decisions, exposure reservations, reconciled orders/fills, positions, and portfolio summary snapshots.                                                                                                                                                                                                               |
+| Portfolio DB (Postgres)          | Implemented    | Source of truth for instruments, outbox rows, portfolios, risk decisions, exposure reservations, reconciled orders/fills, positions, portfolio summary snapshots, `Strategy` records, and `RiskConfigAuditLog` entries.                                                                                                                                                              |
 | Market Data Store (TimescaleDB)  | Implemented    | Provisioned locally and exercised by Data Ingestion. OHLCV bars are written by the `data-ingestion` service after consuming `market.raw.data` events.                                                                                                                                                                                                                               |
 | Data Ingestion Service           | Implemented    | Rust service. Consumes `instrument.registered` → starts Binance kline subscription via External API Facade. Consumes `market.raw.data` → persists OHLCV bars to TimescaleDB. Exposes `GetMarketDataBars` gRPC API for API Gateway. Startup re-subscription from portfolio-manager `ListInstruments`. DLQ publishing for both consumers. Integration tests require live TimescaleDB. |
 | Feature Engineering Service      | Implemented    | Rust service consumes final `market.raw.data`, warms rolling state from Data Ingestion, computes core per-instrument indicators, and publishes `features.indicators`. No feature persistence/read API yet.                                                                                                                                                                           |
@@ -82,8 +90,8 @@ Everything else in this document should be read as either:
 | Execution DB (Postgres schema)   | Implemented    | Source of truth for simulated orders, fills, and execution outbox rows.                                                                                                                                                                                                                                                                                                             |
 | Reliability & Operability        | Implemented    | Implemented consumers use bounded retry, per-topic DLQs, correlation/causation headers, structured logs, and Prometheus metrics endpoints.                                                                                                                                                                                                                                          |
 | External API Facade              | Implemented    | NestJS service. Manages Binance WebSocket kline subscriptions. `StartMarketDataSubscription` / `StopMarketDataSubscription` gRPC API. Publishes `MarketDataBar` protobuf events directly to `market.raw.data` (no outbox — high-frequency streaming; a missed candle is reproduced by the next WebSocket tick). Prometheus metrics endpoint.                                        |
-| Dashboard                        | Implemented    | Nx React/Vite/Tailwind dashboard lists portfolios, reads selected portfolio state, displays recent BUY/SELL signals, and adds instruments to the selected portfolio through API Gateway only.                                                                                                                                                                                       |
-| Full-System E2E                  | Implemented    | Dedicated `trading-bot-e2e` Nx/Playwright project depends on the shared `infra` Nx project for isolated Docker lifecycle, runs migrations and seed data, starts backend services and dashboard, drives raw bars through Feature Engineering and Prediction Engine, and verifies REST plus browser-visible state.                                                                    |
+| Dashboard                        | Implemented    | Nx React/Vite/Tailwind dashboard lists portfolios, reads selected portfolio state, displays recent BUY/SELL signals, adds instruments to the selected portfolio, toggles instrument enable/disable, edits portfolio settings, views risk decision history, views config change audit log, and manages strategies (create, edit, list, assign, badge display) through API Gateway only. |
+| Full-System E2E                  | Implemented    | Dedicated `trading-bot-e2e` Nx/Playwright project depends on the shared `infra` Nx project for isolated Docker lifecycle, runs migrations and seed data, starts backend services and dashboard, drives raw bars through Feature Engineering and Prediction Engine, and verifies REST plus browser-visible state. Includes specs for risk config update, risk rejection, instrument enable/disable, and strategy signal filter flows. |
 | Schema Registry                  | Planned        | Documented as a future capability; not provisioned in local infra.                                                                                                                                                                                                                                                                                                                  |
 
 ## Remaining MVP Gaps
@@ -123,8 +131,6 @@ Current implementation limitations:
 - No production deployment story.
 - No schema registry.
 
-Implemented full-system e2e boundary:
-
 - `npx nx run trading-bot-e2e:e2e` starts an isolated Docker Compose project
   through `infra:serve-e2e`, runs both Prisma migration sets, seeds
   `portfolio-alpha`, starts `portfolio-manager`, `execution-engine`,
@@ -161,13 +167,22 @@ Implemented Dashboard boundary:
   - `GET /api/portfolios`
   - `GET /api/portfolios/:portfolioId?recentOrdersLimit=20`
   - `POST /api/portfolios/:portfolioId/instrument`
+  - `PATCH /api/portfolios/:portfolioId`
+  - `PATCH /api/portfolios/:portfolioId/instrument/:instrumentId`
+  - `GET /api/portfolios/:portfolioId/decisions`
+  - `GET /api/portfolios/:portfolioId/audit`
   - `GET /api/signals?instrumentId=&limit=`
+  - `POST /api/strategies`
+  - `PATCH /api/strategies/:strategyId`
+  - `GET /api/strategies`
+  - `GET /api/strategies/:strategyId`
+  - `POST /api/portfolios/:portfolioId/strategy`
 - The dashboard has no hardcoded default portfolio. Users select a portfolio
   before portfolio details are loaded.
 - Keep synthetic signal publishing out of product APIs. Direct Kafka signal
   publishing is test harness behavior, not a Dashboard or API Gateway feature.
-- The dashboard intentionally has no signal injection, strategy editor, trading
-  controls, market charts, websocket stream, or auth.
+- The dashboard intentionally has no start/stop trading controls, market charts,
+  websocket stream, or auth.
 
 ## Target Architecture
 
@@ -686,9 +701,14 @@ sequenceDiagram
 Current rule evaluation order in the portfolio stage:
 
 1. subscription enabled
-2. per-trade cap
-3. per-instrument reserved exposure cap
-4. per-portfolio reserved exposure cap
+2. strategy side filter (`STRATEGY_SIDE_FILTER`)
+3. strategy time window filter (`STRATEGY_TIME_FILTER`)
+4. strategy cooldown filter (`STRATEGY_COOLDOWN_FILTER`)
+5. per-trade cap
+6. max open trades (`MAX_OPEN_TRADES_EXCEEDED`)
+7. per-instrument reserved exposure cap
+8. per-portfolio reserved exposure cap
+9. daily loss notional (`DAILY_LOSS_LIMIT_EXCEEDED`)
 
 Current reservation semantics:
 
@@ -800,6 +820,62 @@ Current read semantics:
 - Inactive portfolios are still readable.
 - `recentOrdersLimit` defaults to `20` and is capped at `100`.
 - API Gateway fails the whole request if either upstream read fails; partial portfolio/execution responses are intentionally not returned.
+
+### Current: Strategy Signal Filter
+
+Strategy signal filter rules are evaluated before the numeric risk rules in the
+portfolio stage. A portfolio-instrument config can reference a named `Strategy`
+profile. If no strategy is assigned, all three strategy checks pass.
+
+Strategy filter reason codes:
+
+| Reason code               | Condition                                                                    |
+| ------------------------- | ---------------------------------------------------------------------------- |
+| `STRATEGY_SIDE_FILTER`    | Signal side is not in the strategy's `allowedSides` set.                     |
+| `STRATEGY_TIME_FILTER`    | Signal timestamp is outside the strategy's `activeTimeStart`/`activeTimeEnd` window. |
+| `STRATEGY_COOLDOWN_FILTER`| Time since last approved signal for this portfolio-instrument is less than the strategy's `minIntervalSecs`. |
+
+Auto-disable behavior: after `maxConsecutiveRejections` consecutive rejections
+for a portfolio-instrument config, `AutoDisableService` writes a disable record
+and a `RiskConfigAuditLog` entry so the operator can review why trading stopped.
+
+### Current: Risk Config Update
+
+Portfolio settings and per-instrument risk configuration can be updated at
+runtime via PATCH endpoints. Every field-level change is persisted to
+`RiskConfigAuditLog` so configuration drift is auditable.
+
+```mermaid
+sequenceDiagram
+    participant Dashboard
+    participant APIGateway as API Gateway
+    participant PortfolioManager as Risk & Portfolio Manager
+    participant DB as Portfolio DB
+
+    Dashboard->>APIGateway: PATCH /api/portfolios/:portfolioId
+    APIGateway->>PortfolioManager: gRPC UpdatePortfolio()
+    PortfolioManager->>DB: Update portfolio row, insert RiskConfigAuditLog entries
+    PortfolioManager-->>APIGateway: Updated portfolio config response
+    APIGateway-->>Dashboard: Updated config
+
+    Dashboard->>APIGateway: PATCH /api/portfolios/:portfolioId/instrument/:instrumentId
+    APIGateway->>PortfolioManager: gRPC UpdatePortfolioInstrumentConfig()
+    PortfolioManager->>DB: Update instrument config row, insert RiskConfigAuditLog entries
+    PortfolioManager-->>APIGateway: Updated instrument config response
+    APIGateway-->>Dashboard: Updated config
+
+    Dashboard->>APIGateway: GET /api/portfolios/:portfolioId/audit
+    APIGateway->>PortfolioManager: gRPC ListRiskConfigAuditLog()
+    PortfolioManager->>DB: Query RiskConfigAuditLog
+    PortfolioManager-->>APIGateway: Paginated audit log
+    APIGateway-->>Dashboard: Field-level change history
+
+    Dashboard->>APIGateway: GET /api/portfolios/:portfolioId/decisions
+    APIGateway->>PortfolioManager: gRPC ListRiskDecisions()
+    PortfolioManager->>DB: Query RiskDecision
+    PortfolioManager-->>APIGateway: Paginated risk decisions
+    APIGateway-->>Dashboard: Decision history with reason codes
+```
 
 ### Current: Signal-To-Portfolio E2E Flow
 
