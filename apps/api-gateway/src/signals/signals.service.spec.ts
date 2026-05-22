@@ -1,5 +1,6 @@
 import { type ClientGrpc } from '@nestjs/microservices';
 import { Test, TestingModule } from '@nestjs/testing';
+import { SignalSideName } from '@trading-bot/common';
 import {
   GetLatestSignalsRequest,
   GetLatestSignalsResponse,
@@ -9,7 +10,6 @@ import {
 import { lastValueFrom, Observable, of, throwError } from 'rxjs';
 import type { Mock, Mocked } from 'vitest';
 
-import { SignalSideName } from '../portfolio/dto/signal-side-name.enum';
 import { SignalsService } from './signals.service';
 
 describe('SignalsService', () => {

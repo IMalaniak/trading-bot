@@ -1,12 +1,15 @@
 import { URLS } from './e2e-env';
 
-export type SignalSideName = 'BUY' | 'SELL' | 'SIGNAL_SIDE_UNSPECIFIED';
-export type AssetClassName = 'crypto' | 'stock' | 'unspecified';
-export type OrderStatusName =
-  | 'FILLED'
-  | 'ORDER_STATUS_UNSPECIFIED'
-  | 'PARTIALLY_FILLED'
-  | 'PLACED';
+export {
+  AssetClassName,
+  OrderStatusName,
+  SignalSideName,
+} from '@trading-bot/common';
+import {
+  AssetClassName,
+  OrderStatusName,
+  SignalSideName,
+} from '@trading-bot/common';
 
 export interface InstrumentDto {
   assetClass: string;

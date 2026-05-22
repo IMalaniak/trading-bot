@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import {
+  AssetClassName,
   buildEventMetadataHeaders,
   instrumentKey,
   KAFKA_EVENT_PRODUCERS,
@@ -32,7 +33,7 @@ test.describe('Risk rejection flow', () => {
         SEEDED_PORTFOLIO_ID,
         {
           symbol: REJECTION_SYMBOL,
-          assetClass: 'crypto',
+          assetClass: AssetClassName.CRYPTO,
           venue: 'BINANCE',
           externalSymbol: 'REJTESTUSDT',
           enabled: true,

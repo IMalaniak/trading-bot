@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import {
+  AssetClassName,
   buildEventMetadataHeaders,
   instrumentKey,
   KAFKA_EVENT_PRODUCERS,
@@ -67,7 +68,7 @@ test.describe('Instrument enable / disable flow', () => {
         SEEDED_PORTFOLIO_ID,
         {
           symbol: ENABLE_DISABLE_SYMBOL,
-          assetClass: 'crypto',
+          assetClass: AssetClassName.CRYPTO,
           venue: 'BINANCE',
           externalSymbol: 'ENABLETESTUSDT',
           enabled: true,

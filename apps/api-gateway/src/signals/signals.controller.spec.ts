@@ -1,9 +1,9 @@
 import { PATH_METADATA } from '@nestjs/common/constants';
 import { Test, TestingModule } from '@nestjs/testing';
+import { SignalSideName } from '@trading-bot/common';
 import { of } from 'rxjs';
 import type { Mocked } from 'vitest';
 
-import { SignalSideName } from '../portfolio/dto/signal-side-name.enum';
 import { GetLatestSignalsQueryDto } from './dto/signals.dto';
 import { SignalsController } from './signals.controller';
 import { SignalsService } from './signals.service';

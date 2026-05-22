@@ -1,4 +1,8 @@
 import { ApiProperty } from '@nestjs/swagger';
+import {
+  AssetClassName,
+  assetClassNameToAssetClass,
+} from '@trading-bot/common';
 import { RegisterPortfolioInstrumentRequest } from '@trading-bot/common/proto';
 import { DECIMAL_STRING_PATTERN } from '@trading-bot/common/validation';
 import {
@@ -9,8 +13,6 @@ import {
   Matches,
 } from 'class-validator';
 
-import { assetClassNameToAssetClass } from '../mapper/enum.mapper';
-import { AssetClassName } from './asset-class-name.enum';
 import { PortfolioInstrumentConfigDto } from './portfolio-read.dto';
 
 export class RegisterPortfolioInstrumentRequestDto implements Omit<

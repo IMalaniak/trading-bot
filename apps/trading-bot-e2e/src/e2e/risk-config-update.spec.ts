@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { AssetClassName } from '@trading-bot/common';
 
 import { ApiClient } from '../support/api-client';
 import { SEEDED_PORTFOLIO_ID } from '../support/signal-to-portfolio-flow';
@@ -16,7 +17,7 @@ test.describe('Risk config PATCH and audit log', () => {
         SEEDED_PORTFOLIO_ID,
         {
           symbol: RISK_E2E_SYMBOL,
-          assetClass: 'crypto',
+          assetClass: AssetClassName.CRYPTO,
           venue: 'BINANCE',
           externalSymbol: 'RISKTESTUSDT',
           enabled: true,

@@ -1,10 +1,11 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import {
+  SignalSideName,
+  signalSideToSignalSideName,
+} from '@trading-bot/common';
 import { type Signal } from '@trading-bot/common/proto';
 import { Type } from 'class-transformer';
 import { IsInt, IsOptional, IsString, Min } from 'class-validator';
-
-import { SignalSideName } from '../../portfolio/dto/signal-side-name.enum';
-import { signalSideToSignalSideName } from '../../portfolio/mapper/enum.mapper';
 
 export class GetLatestSignalsQueryDto {
   @ApiPropertyOptional({

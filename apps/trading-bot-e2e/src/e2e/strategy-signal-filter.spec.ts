@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import {
+  AssetClassName,
   buildEventMetadataHeaders,
   instrumentKey,
   KAFKA_EVENT_PRODUCERS,
@@ -32,7 +33,7 @@ test.describe('Strategy signal filter (SELL-only strategy rejects BUY)', () => {
         SEEDED_PORTFOLIO_ID,
         {
           symbol: STRATEGY_FILTER_SYMBOL,
-          assetClass: 'crypto',
+          assetClass: AssetClassName.CRYPTO,
           venue: 'BINANCE',
           externalSymbol: 'STRATTESTUSDT',
           enabled: true,

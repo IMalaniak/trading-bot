@@ -1,6 +1,11 @@
 import { HttpStatus } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { AppResponseCode, GrpcStatusCode } from '@trading-bot/common';
+import {
+  AppResponseCode,
+  GrpcStatusCode,
+  OrderStatusName,
+  SignalSideName,
+} from '@trading-bot/common';
 import {
   AssetClass,
   EXECUTION_ENGINE_CLIENT,
@@ -12,7 +17,6 @@ import { lastValueFrom, of, throwError } from 'rxjs';
 import { TimeoutError } from 'rxjs';
 import type { Mocked } from 'vitest';
 
-import { OrderStatusName } from './dto/order-status-name.enum';
 import {
   ListRiskConfigAuditLogQueryDto,
   ListRiskDecisionsQueryDto,
@@ -22,7 +26,6 @@ import {
   UpdatePortfolioInstrumentConfigRestRequestDto,
   UpdatePortfolioRestRequestDto,
 } from './dto/portfolio-write.dto';
-import { SignalSideName } from './dto/signal-side-name.enum';
 import { IExecutionEngine } from './execution-engine.client.interface';
 import { PortfolioService } from './portfolio.service';
 import { IRiskAndPortfolioManager } from './risk-and-portfolio.client.interface';

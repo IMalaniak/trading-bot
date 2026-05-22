@@ -1,5 +1,11 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  OrderStatusName,
+  orderStatusToOrderStatusName,
+  SignalSideName,
+  signalSideToSignalSideName,
+} from '@trading-bot/common';
+import {
   ExecutionFill,
   ExecutionOrder,
   PortfolioInstrumentConfig,
@@ -16,13 +22,7 @@ import {
   Min,
 } from 'class-validator';
 
-import {
-  orderStatusToOrderStatusName,
-  signalSideToSignalSideName,
-} from '../mapper/enum.mapper';
 import { InstrumentDto } from './instrument.dto';
-import { OrderStatusName } from './order-status-name.enum';
-import { SignalSideName } from './signal-side-name.enum';
 
 export const DEFAULT_RECENT_ORDER_LIMIT = 20;
 export const MAX_RECENT_ORDER_LIMIT = 100;
