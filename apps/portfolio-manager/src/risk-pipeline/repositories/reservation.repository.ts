@@ -54,6 +54,20 @@ export class ReservationRepository {
     return result._sum.reservedNotional ?? zeroPrismaDecimal();
   }
 
+  async countActiveInstrumentReservations(
+    portfolioId: string,
+    instrumentId: string,
+    client: PrismaDbClient = this.prisma,
+  ): Promise<number> {
+    return client.exposureReservation.count({
+      where: {
+        portfolioId,
+        instrumentId,
+        status: ExposureReservationStatus.ACTIVE,
+      },
+    });
+  }
+
   async create(
     input: CreateReservationInput,
     client: PrismaDbClient = this.prisma,

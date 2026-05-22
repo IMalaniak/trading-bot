@@ -24,6 +24,10 @@ export interface PortfolioRiskConfig {
   maxPositionNotional: PrismaDecimal;
   portfolioExposureCapNotional: PrismaDecimal;
   enabled: boolean;
+  maxOpenTrades: number | null;
+  maxDailyTurnoverNotional: PrismaDecimal | null;
+  cooldownSeconds: number | null;
+  maxConsecutiveRejections: number | null;
 }
 
 export interface SignalReceiptRecord {

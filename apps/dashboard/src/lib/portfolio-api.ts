@@ -173,6 +173,44 @@ export interface RiskConfigAuditLogListResponseDto {
   nextCursor?: string;
 }
 
+export interface StrategyDto {
+  id: string;
+  name: string;
+  description?: string;
+  allowedSides: number[];
+  minIntervalSecs?: number;
+  activeTimeStart?: string;
+  activeTimeEnd?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ListStrategiesResponseDto {
+  strategies: StrategyDto[];
+}
+
+export interface CreateStrategyRequestDto {
+  name: string;
+  description?: string;
+  allowedSides: number[];
+  minIntervalSecs?: number;
+  activeTimeStart?: string;
+  activeTimeEnd?: string;
+}
+
+export interface UpdateStrategyRequestDto {
+  name?: string;
+  description?: string;
+  allowedSides?: number[];
+  minIntervalSecs?: number;
+  activeTimeStart?: string;
+  activeTimeEnd?: string;
+}
+
+export interface AssignStrategyRequestDto {
+  strategyId?: string;
+}
+
 export class DashboardApiError extends Error {
   constructor(
     message: string,
@@ -358,5 +396,41 @@ export const createDashboardApi = (
       await requestJson<GetLatestSignalsResponseDto>(
         `${baseUrl}/signals?limit=${limit}`,
       ),
+
+    listStrategies: async (): Promise<ListStrategiesResponseDto> =>
+      await requestJson<ListStrategiesResponseDto>(`${baseUrl}/strategies`),
+
+    createStrategy: async (
+      payload: CreateStrategyRequestDto,
+    ): Promise<StrategyDto> =>
+      await requestJson<StrategyDto>(`${baseUrl}/strategies`, {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
+
+    updateStrategy: async (
+      strategyId: string,
+      payload: UpdateStrategyRequestDto,
+    ): Promise<StrategyDto> =>
+      await requestJson<StrategyDto>(
+        `${baseUrl}/strategies/${encodeURIComponent(strategyId)}`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify(payload),
+        },
+      ),
+
+    assignStrategyToPortfolio: async (
+      portfolioId: string,
+      payload: AssignStrategyRequestDto,
+    ): Promise<void> => {
+      await requestJson<unknown>(
+        `${baseUrl}/portfolios/${encodeURIComponent(portfolioId)}/strategy`,
+        {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        },
+      );
+    },
   };
 };

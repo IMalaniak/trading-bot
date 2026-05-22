@@ -12,6 +12,7 @@ import { PositionExposureRepository } from './repositories/position-exposure.rep
 import { ReservationRepository } from './repositories/reservation.repository';
 import { RiskConfigRepository } from './repositories/risk-config.repository';
 import { SignalReceiptRepository } from './repositories/signal-receipt.repository';
+import { AutoDisableService } from './services/auto-disable.service';
 import { InstrumentStageService } from './services/instrument-stage.service';
 import { PortfolioStageService } from './services/portfolio-stage.service';
 import { RiskRuleEngine } from './services/risk-rule-engine.service';
@@ -28,6 +29,7 @@ import { SignalTopicConsumer } from './signal-topic.consumer';
     ReservationRepository,
     RiskConfigRepository,
     SignalReceiptRepository,
+    AutoDisableService,
     InstrumentStageService,
     PortfolioStageService,
     PortfolioSignalCandidateEventFactory,
