@@ -33,6 +33,7 @@ export interface PortfolioSummaryDto {
   aggregateExposureNotional: string;
   openPositionCount: number;
   updatedAt: string;
+  strategy?: StrategyDto;
 }
 
 export interface PortfolioPositionDto {

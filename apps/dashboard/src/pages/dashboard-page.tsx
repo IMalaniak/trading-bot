@@ -11,6 +11,7 @@ import { RecentOrdersView } from '../components/recent-orders-view';
 import { RecentSignalsView } from '../components/recent-signals-view';
 import { RiskConfigAuditLogView } from '../components/risk-config-audit-log-view';
 import { RiskDecisionHistoryView } from '../components/risk-decision-history-view';
+import { StrategyAssignmentControl } from '../components/strategy-assignment-control';
 import {
   createDashboardApi,
   type PortfolioInstrumentConfigDto,
@@ -18,6 +19,7 @@ import {
   type RiskConfigAuditLogEntryDto,
   type RiskDecisionDto,
   type SignalDto,
+  type StrategyDto,
   type UpdatePortfolioRequestDto,
 } from '../lib/portfolio-api';
 import { ThemeToggle } from '../theme';
@@ -51,6 +53,11 @@ interface AuditLogState {
   status: LoadStatus;
 }
 
+interface StrategiesState {
+  data: StrategyDto[];
+  status: LoadStatus;
+}
+
 const api = createDashboardApi();
 
 const initialPortfolioState: PortfolioState = {
@@ -74,6 +81,11 @@ const initialAuditLogState: AuditLogState = {
   status: 'idle',
 };
 
+const initialStrategiesState: StrategiesState = {
+  data: [],
+  status: 'idle',
+};
+
 export function DashboardPage() {
   const { portfolioId = '' } = useParams<{ portfolioId: string }>();
   const [state, setState] = useState<PortfolioState>(initialPortfolioState);
@@ -84,6 +96,9 @@ export function DashboardPage() {
   );
   const [auditLogState, setAuditLogState] =
     useState<AuditLogState>(initialAuditLogState);
+  const [strategiesState, setStrategiesState] = useState<StrategiesState>(
+    initialStrategiesState,
+  );
   const [togglingInstrumentId, setTogglingInstrumentId] = useState<
     string | undefined
   >();
@@ -176,12 +191,26 @@ export function DashboardPage() {
     }
   }, [portfolioId]);
 
+  const loadStrategies = useCallback(async () => {
+    setStrategiesState((current) => ({
+      ...current,
+      status: current.data.length > 0 ? 'success' : 'loading',
+    }));
+    try {
+      const result = await api.listStrategies();
+      setStrategiesState({ data: result.strategies, status: 'success' });
+    } catch {
+      setStrategiesState((current) => ({ ...current, status: 'idle' }));
+    }
+  }, []);
+
   useEffect(() => {
     void loadPortfolio();
     void loadSignals();
     void loadDecisions();
     void loadAuditLog();
-  }, [loadPortfolio, loadSignals, loadDecisions, loadAuditLog]);
+    void loadStrategies();
+  }, [loadPortfolio, loadSignals, loadDecisions, loadAuditLog, loadStrategies]);
 
   const handleInstrumentRegistered = useCallback(
     (configuredInstrument: PortfolioInstrumentConfigDto) => {
@@ -246,6 +275,23 @@ export function DashboardPage() {
       setState((current) => {
         if (!current.data) return current;
         return { ...current, data: { ...current.data, summary: updated } };
+      });
+    },
+    [portfolioId],
+  );
+
+  const handleAssignStrategy = useCallback(
+    async (strategyId: string | null) => {
+      await api.assignStrategyToPortfolio(portfolioId, {
+        strategyId: strategyId ?? undefined,
+      });
+      const updated = await api.getPortfolio(portfolioId);
+      setState((current) => {
+        if (!current.data) return current;
+        return {
+          ...current,
+          data: { ...current.data, summary: updated.summary },
+        };
       });
     },
     [portfolioId],
@@ -332,6 +378,14 @@ export function DashboardPage() {
             <PortfolioSettingsEditor
               onSubmit={handleUpdatePortfolio}
               portfolio={state.data.summary}
+            />
+          ) : null}
+          {state.data ? (
+            <StrategyAssignmentControl
+              assignedStrategyId={state.data.summary.strategy?.id}
+              onAssign={handleAssignStrategy}
+              portfolioId={portfolioId}
+              strategies={strategiesState.data}
             />
           ) : null}
           <InstrumentRegistration

@@ -1,4 +1,4 @@
-import { Activity, Clock3, Layers3, Wallet } from 'lucide-react';
+import { Activity, BookOpen, Clock3, Layers3, Wallet } from 'lucide-react';
 
 import {
   exposureUsagePercent,
@@ -61,6 +61,15 @@ export function PortfolioSummary({ data }: { data: PortfolioReadResponseDto }) {
           <span className="h-2 w-2 rounded-full bg-current" />
           {summary.isActive ? 'Active' : 'Inactive'}
         </span>
+        {summary.strategy ? (
+          <span className="inline-flex w-fit items-center gap-1.5 rounded-md bg-violet-100 px-2.5 py-1 text-sm font-medium text-violet-800 dark:bg-violet-950 dark:text-violet-200">
+            <BookOpen aria-hidden="true" className="h-3.5 w-3.5" />
+            <span className="text-xs text-violet-500 dark:text-violet-400">
+              Strategy
+            </span>
+            {summary.strategy.name}
+          </span>
+        ) : null}
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
