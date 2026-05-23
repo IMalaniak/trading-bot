@@ -238,4 +238,14 @@ export class PortfolioQueryRepository {
       ]),
     };
   }
+
+  async findPortfolioSummaryById(
+    portfolioId: string,
+  ): Promise<PortfolioSummaryReadModel | null> {
+    const portfolio = await this.prisma.portfolio.findUnique({
+      where: { id: portfolioId },
+    });
+    if (!portfolio) return null;
+    return this.buildPortfolioSummary(portfolio);
+  }
 }

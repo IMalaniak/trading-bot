@@ -8,10 +8,14 @@ import type {
   UpdatePortfolioRequest,
   UpdateStrategyRequest,
 } from '@trading-bot/common/proto';
-import { DECIMAL_STRING_PATTERN } from '@trading-bot/common/validation';
+import {
+  DECIMAL_STRING_PATTERN,
+  HHMM_TIME_PATTERN,
+} from '@trading-bot/common/validation';
 import {
   IsArray,
   IsBoolean,
+  IsIn,
   IsInt,
   IsNotEmpty,
   IsOptional,
@@ -91,7 +95,7 @@ export class ListRiskDecisionsRequestDto implements ListRiskDecisionsRequest {
   portfolioId: string;
 
   @IsOptional()
-  @IsString()
+  @IsIn(['APPROVED', 'REJECTED'])
   decisionFilter?: string;
 
   @IsOptional()
@@ -149,10 +153,16 @@ export class CreateStrategyRequestDto implements CreateStrategyRequest {
 
   @IsOptional()
   @IsString()
+  @Matches(HHMM_TIME_PATTERN, {
+    message: 'activeTimeStart must be in HH:MM format',
+  })
   activeTimeStart?: string;
 
   @IsOptional()
   @IsString()
+  @Matches(HHMM_TIME_PATTERN, {
+    message: 'activeTimeEnd must be in HH:MM format',
+  })
   activeTimeEnd?: string;
 }
 
@@ -181,10 +191,16 @@ export class UpdateStrategyRequestDto implements UpdateStrategyRequest {
 
   @IsOptional()
   @IsString()
+  @Matches(HHMM_TIME_PATTERN, {
+    message: 'activeTimeStart must be in HH:MM format',
+  })
   activeTimeStart?: string;
 
   @IsOptional()
   @IsString()
+  @Matches(HHMM_TIME_PATTERN, {
+    message: 'activeTimeEnd must be in HH:MM format',
+  })
   activeTimeEnd?: string;
 }
 

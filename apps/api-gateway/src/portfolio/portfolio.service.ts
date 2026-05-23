@@ -500,7 +500,7 @@ export class PortfolioService implements OnModuleInit {
     return this.portfolioManagerClient
       .updateStrategy({
         strategyId,
-        allowedSides: body.allowedSides ?? [],
+        allowedSides: body.allowedSides,
         ...(body.name !== undefined && { name: body.name }),
         ...(body.description !== undefined && {
           description: body.description,

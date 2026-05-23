@@ -138,7 +138,10 @@ export class PortfolioWriteRepository {
     const decisions = await this.prisma.riskDecision.findMany({
       where: {
         portfolioId,
-        ...(decisionFilter
+        ...(decisionFilter &&
+        Object.values(RiskDecisionStatus).includes(
+          decisionFilter as RiskDecisionStatus,
+        )
           ? { decision: decisionFilter as RiskDecisionStatus }
           : {}),
         ...(cursor ? { decidedAt: { lt: new Date(cursor) } } : {}),

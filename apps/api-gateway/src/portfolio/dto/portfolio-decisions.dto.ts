@@ -4,7 +4,7 @@ import {
   RiskDecisionEntry,
 } from '@trading-bot/common/proto';
 import { Type } from 'class-transformer';
-import { IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 
 export const DEFAULT_DECISIONS_LIMIT = 50;
 export const MAX_DECISIONS_LIMIT = 200;
@@ -15,7 +15,7 @@ export class ListRiskDecisionsQueryDto {
     description: 'APPROVED | REJECTED',
   })
   @IsOptional()
-  @IsString()
+  @IsIn(['APPROVED', 'REJECTED'])
   decisionFilter?: string;
 
   @ApiPropertyOptional({

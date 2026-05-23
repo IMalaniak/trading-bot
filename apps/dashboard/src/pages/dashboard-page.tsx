@@ -388,7 +388,6 @@ export function DashboardPage() {
             <StrategyAssignmentControl
               assignedStrategyId={state.data.strategy?.id}
               onAssign={handleAssignStrategy}
-              portfolioId={portfolioId}
               strategies={strategiesState.data}
             />
           ) : null}

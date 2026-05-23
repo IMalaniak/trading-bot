@@ -7,11 +7,14 @@ import type {
 } from '@trading-bot/common/proto';
 
 import { RiskConfigAuditEntityType } from '../../prisma/generated/enums';
-import type { PortfolioModel } from '../../prisma/generated/models';
 import {
   prismaDecimalToString,
   toPrismaDecimal,
 } from '../../prisma/prisma-decimal';
+import {
+  PortfolioQueryRepository,
+  PortfolioSummaryReadModel,
+} from '../repositories/portfolio-query.repository';
 import {
   CreateAuditEntryInput,
   PortfolioWriteRepository,
@@ -20,7 +23,10 @@ import {
 
 @Injectable()
 export class UpdatePortfolioService {
-  constructor(private readonly repository: PortfolioWriteRepository) {}
+  constructor(
+    private readonly repository: PortfolioWriteRepository,
+    private readonly queryRepository: PortfolioQueryRepository,
+  ) {}
 
   async updatePortfolio(
     request: UpdatePortfolioRequest,
@@ -69,27 +75,40 @@ export class UpdatePortfolioService {
     }
 
     if (Object.keys(updateData).length === 0) {
-      return { summary: this.mapSummary(existing) };
+      return {
+        summary: await this.fetchSummary(existing.id),
+      };
     }
 
-    const updated = await this.repository.updatePortfolio(
+    await this.repository.updatePortfolio(
       request.portfolioId,
       updateData,
       auditEntries,
     );
 
-    return { summary: this.mapSummary(updated) };
+    return { summary: await this.fetchSummary(request.portfolioId) };
   }
 
-  private mapSummary(portfolio: PortfolioModel) {
+  private async fetchSummary(portfolioId: string) {
+    const state =
+      await this.queryRepository.findPortfolioSummaryById(portfolioId);
+    if (!state) return undefined;
+    return this.mapSummary(state);
+  }
+
+  private mapSummary(state: PortfolioSummaryReadModel) {
     return {
-      portfolioId: portfolio.id,
-      name: portfolio.name,
-      isActive: portfolio.isActive,
-      exposureCapNotional: prismaDecimalToString(portfolio.exposureCapNotional),
-      aggregateExposureNotional: '0',
-      openPositionCount: 0,
-      updatedAt: portfolio.updatedAt.toISOString(),
+      portfolioId: state.portfolio.id,
+      name: state.portfolio.name,
+      isActive: state.portfolio.isActive,
+      exposureCapNotional: prismaDecimalToString(
+        state.portfolio.exposureCapNotional,
+      ),
+      aggregateExposureNotional: prismaDecimalToString(
+        state.aggregateExposureNotional,
+      ),
+      openPositionCount: state.openPositionCount,
+      updatedAt: state.updatedAt.toISOString(),
     };
   }
 }

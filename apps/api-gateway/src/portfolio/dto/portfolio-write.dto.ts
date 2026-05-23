@@ -8,9 +8,9 @@ import {
   IsBoolean,
   IsInt,
   IsOptional,
-  IsPositive,
   IsString,
   Matches,
+  Min,
 } from 'class-validator';
 
 export class UpdatePortfolioRestRequestDto implements Omit<
@@ -69,7 +69,7 @@ export class UpdatePortfolioInstrumentConfigRestRequestDto implements Omit<
   @ApiPropertyOptional({ example: 5 })
   @IsOptional()
   @IsInt()
-  @IsPositive()
+  @Min(0)
   maxOpenTrades?: number;
 
   @ApiPropertyOptional({ example: '10000' })
@@ -81,13 +81,13 @@ export class UpdatePortfolioInstrumentConfigRestRequestDto implements Omit<
   @ApiPropertyOptional({ example: 60 })
   @IsOptional()
   @IsInt()
-  @IsPositive()
+  @Min(0)
   cooldownSeconds?: number;
 
   @ApiPropertyOptional({ example: 3 })
   @IsOptional()
   @IsInt()
-  @IsPositive()
+  @Min(0)
   maxConsecutiveRejections?: number;
 
   toGRPC(

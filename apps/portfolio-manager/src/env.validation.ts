@@ -1,4 +1,8 @@
-import { createValidateFunction, NodeEnvironment } from '@trading-bot/common';
+import {
+  createValidateFunction,
+  HOST_PORT_PATTERN,
+  NodeEnvironment,
+} from '@trading-bot/common';
 import {
   IsEnum,
   IsInt,
@@ -26,7 +30,7 @@ class EnvironmentVariables implements EnvConfig {
   NODE_ENV: NodeEnvironment;
 
   @IsString()
-  @Matches(/^[\w.-]+(:\d+)?$/, {
+  @Matches(HOST_PORT_PATTERN, {
     message: 'PORTFOLIO_MANAGER_GRPC_URL must be a valid host:port string',
   })
   PORTFOLIO_MANAGER_GRPC_URL: string;

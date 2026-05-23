@@ -1,4 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { HHMM_TIME_PATTERN } from '@trading-bot/common';
 import type { PortfolioSummary } from '@trading-bot/common/proto';
 import {
   IsArray,
@@ -6,6 +7,7 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
+  Matches,
   Min,
 } from 'class-validator';
 
@@ -65,14 +67,20 @@ export class CreateStrategyBodyDto {
   @Min(0)
   minIntervalSecs?: number;
 
-  @ApiPropertyOptional({ example: '09:00' })
+  @ApiPropertyOptional({ example: '09:00', description: 'HH:MM UTC' })
   @IsOptional()
   @IsString()
+  @Matches(HHMM_TIME_PATTERN, {
+    message: 'activeTimeStart must be in HH:MM format',
+  })
   activeTimeStart?: string;
 
-  @ApiPropertyOptional({ example: '17:00' })
+  @ApiPropertyOptional({ example: '17:00', description: 'HH:MM UTC' })
   @IsOptional()
   @IsString()
+  @Matches(HHMM_TIME_PATTERN, {
+    message: 'activeTimeEnd must be in HH:MM format',
+  })
   activeTimeEnd?: string;
 }
 
@@ -88,11 +96,10 @@ export class UpdateStrategyBodyDto {
   @IsString()
   description?: string;
 
-  @ApiPropertyOptional({ example: [1] })
-  @IsOptional()
+  @ApiProperty({ example: [1] })
   @IsArray()
   @IsInt({ each: true })
-  allowedSides?: number[];
+  allowedSides: number[];
 
   @ApiPropertyOptional({ example: 600 })
   @IsOptional()
@@ -100,14 +107,20 @@ export class UpdateStrategyBodyDto {
   @Min(0)
   minIntervalSecs?: number;
 
-  @ApiPropertyOptional({ example: '10:00' })
+  @ApiPropertyOptional({ example: '10:00', description: 'HH:MM UTC' })
   @IsOptional()
   @IsString()
+  @Matches(HHMM_TIME_PATTERN, {
+    message: 'activeTimeStart must be in HH:MM format',
+  })
   activeTimeStart?: string;
 
-  @ApiPropertyOptional({ example: '16:00' })
+  @ApiPropertyOptional({ example: '16:00', description: 'HH:MM UTC' })
   @IsOptional()
   @IsString()
+  @Matches(HHMM_TIME_PATTERN, {
+    message: 'activeTimeEnd must be in HH:MM format',
+  })
   activeTimeEnd?: string;
 }
 

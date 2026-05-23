@@ -9,6 +9,7 @@ import {
   ApiOkResponse,
   ApiTags,
 } from '@nestjs/swagger';
+import { IsNotEmpty, IsUUID } from 'class-validator';
 import { Observable } from 'rxjs';
 
 import { AppErrorResponseDto } from '../app-error-response.dto';
@@ -21,6 +22,8 @@ import {
 import { PortfolioService } from './portfolio.service';
 
 class StrategyParamsDto {
+  @IsNotEmpty()
+  @IsUUID()
   strategyId: string;
 }
 

@@ -12,7 +12,6 @@ export function StrategyAssignmentControl({
 }: {
   assignedStrategyId?: string;
   onAssign: (strategyId: string | null) => Promise<void>;
-  portfolioId: string;
   strategies: StrategyDto[];
 }) {
   const [error, setError] = useState<string | undefined>();

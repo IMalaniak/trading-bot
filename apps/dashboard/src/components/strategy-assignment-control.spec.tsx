@@ -32,7 +32,6 @@ describe('StrategyAssignmentControl', () => {
       <StrategyAssignmentControl
         assignedStrategyId="strategy-1"
         onAssign={vi.fn()}
-        portfolioId="portfolio-1"
         strategies={strategies}
       />,
     );
@@ -45,11 +44,7 @@ describe('StrategyAssignmentControl', () => {
 
   it('shows none when no strategy is assigned', () => {
     render(
-      <StrategyAssignmentControl
-        onAssign={vi.fn()}
-        portfolioId="portfolio-1"
-        strategies={strategies}
-      />,
+      <StrategyAssignmentControl onAssign={vi.fn()} strategies={strategies} />,
     );
 
     expect(
@@ -60,11 +55,7 @@ describe('StrategyAssignmentControl', () => {
   it('calls onAssign with selected strategy id', async () => {
     const onAssign = vi.fn().mockResolvedValue(undefined);
     render(
-      <StrategyAssignmentControl
-        onAssign={onAssign}
-        portfolioId="portfolio-1"
-        strategies={strategies}
-      />,
+      <StrategyAssignmentControl onAssign={onAssign} strategies={strategies} />,
     );
 
     await userEvent.selectOptions(
@@ -83,7 +74,6 @@ describe('StrategyAssignmentControl', () => {
       <StrategyAssignmentControl
         assignedStrategyId="strategy-1"
         onAssign={onAssign}
-        portfolioId="portfolio-1"
         strategies={strategies}
       />,
     );

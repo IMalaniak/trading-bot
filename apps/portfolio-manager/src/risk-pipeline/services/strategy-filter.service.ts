@@ -86,15 +86,20 @@ export class StrategyFilterService {
     return `${hh}:${mm}`;
   }
 
+  private toMinutes(hhmm: string): number {
+    const [hh, mm] = hhmm.split(':').map(Number);
+    return hh * 60 + (mm ?? 0);
+  }
+
   private isWithinTimeWindow(
     time: string,
     start: string,
     end: string,
   ): boolean {
-    if (start <= end) {
-      return time >= start && time <= end;
-    }
-    // overnight window
-    return time >= start || time <= end;
+    const t = this.toMinutes(time);
+    const s = this.toMinutes(start);
+    const e = this.toMinutes(end);
+    // handles overnight windows (e.g. 22:00–02:00)
+    return s <= e ? t >= s && t <= e : t >= s || t <= e;
   }
 }

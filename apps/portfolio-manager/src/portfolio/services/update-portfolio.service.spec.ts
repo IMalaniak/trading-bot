@@ -3,7 +3,14 @@ import type { MockedFunction } from 'vitest';
 
 import { RiskConfigAuditEntityType } from '../../prisma/generated/enums';
 import type { PortfolioModel } from '../../prisma/generated/models';
-import { toPrismaDecimal } from '../../prisma/prisma-decimal';
+import {
+  toPrismaDecimal,
+  zeroPrismaDecimal,
+} from '../../prisma/prisma-decimal';
+import {
+  PortfolioQueryRepository,
+  PortfolioSummaryReadModel,
+} from '../repositories/portfolio-query.repository';
 import { PortfolioWriteRepository } from '../repositories/portfolio-write.repository';
 import { UpdatePortfolioService } from './update-portfolio.service';
 
@@ -20,12 +27,26 @@ describe('UpdatePortfolioService', () => {
     updatedAt: now,
   };
 
+  const buildSummaryState = (
+    portfolio: PortfolioModel,
+  ): PortfolioSummaryReadModel => ({
+    portfolio,
+    aggregateExposureNotional: zeroPrismaDecimal(),
+    openPositionCount: 0,
+    updatedAt: portfolio.updatedAt,
+  });
+
   let repository: {
     findPortfolioById: MockedFunction<
       PortfolioWriteRepository['findPortfolioById']
     >;
     updatePortfolio: MockedFunction<
       PortfolioWriteRepository['updatePortfolio']
+    >;
+  };
+  let queryRepository: {
+    findPortfolioSummaryById: MockedFunction<
+      PortfolioQueryRepository['findPortfolioSummaryById']
     >;
   };
   let service: UpdatePortfolioService;
@@ -35,8 +56,12 @@ describe('UpdatePortfolioService', () => {
       findPortfolioById: vi.fn(),
       updatePortfolio: vi.fn(),
     };
+    queryRepository = {
+      findPortfolioSummaryById: vi.fn(),
+    };
     service = new UpdatePortfolioService(
       repository as unknown as PortfolioWriteRepository,
+      queryRepository as unknown as PortfolioQueryRepository,
     );
   });
 
@@ -48,6 +73,9 @@ describe('UpdatePortfolioService', () => {
       updatedAt: new Date('2026-05-21T10:01:00.000Z'),
     };
     repository.updatePortfolio.mockResolvedValue(updated);
+    queryRepository.findPortfolioSummaryById.mockResolvedValue(
+      buildSummaryState(updated),
+    );
 
     const response = await service.updatePortfolio({
       portfolioId: 'portfolio-alpha',
@@ -76,6 +104,9 @@ describe('UpdatePortfolioService', () => {
     repository.findPortfolioById.mockResolvedValue(existingPortfolio);
     const updated = { ...existingPortfolio, isActive: false };
     repository.updatePortfolio.mockResolvedValue(updated);
+    queryRepository.findPortfolioSummaryById.mockResolvedValue(
+      buildSummaryState(updated),
+    );
 
     await service.updatePortfolio({
       portfolioId: 'portfolio-alpha',
@@ -93,11 +124,15 @@ describe('UpdatePortfolioService', () => {
 
   it('writes one audit entry per changed field', async () => {
     repository.findPortfolioById.mockResolvedValue(existingPortfolio);
-    repository.updatePortfolio.mockResolvedValue({
+    const updated = {
       ...existingPortfolio,
       exposureCapNotional: toPrismaDecimal('3000'),
       isActive: false,
-    });
+    };
+    repository.updatePortfolio.mockResolvedValue(updated);
+    queryRepository.findPortfolioSummaryById.mockResolvedValue(
+      buildSummaryState(updated),
+    );
 
     await service.updatePortfolio({
       portfolioId: 'portfolio-alpha',
@@ -110,6 +145,9 @@ describe('UpdatePortfolioService', () => {
 
   it('no-ops when no fields change', async () => {
     repository.findPortfolioById.mockResolvedValue(existingPortfolio);
+    queryRepository.findPortfolioSummaryById.mockResolvedValue(
+      buildSummaryState(existingPortfolio),
+    );
 
     const response = await service.updatePortfolio({
       portfolioId: 'portfolio-alpha',
