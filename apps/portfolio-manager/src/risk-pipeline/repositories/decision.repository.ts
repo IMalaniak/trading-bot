@@ -93,4 +93,28 @@ export class DecisionRepository {
 
     return decisionRecord;
   }
+
+  async countConsecutiveRejections(
+    portfolioId: string,
+    instrumentId: string,
+    client: PrismaDbClient = this.prisma,
+  ): Promise<number> {
+    const decisions = await client.riskDecision.findMany({
+      where: { portfolioId, instrumentId },
+      orderBy: { decidedAt: 'desc' },
+      select: { decision: true },
+      take: 100,
+    });
+
+    let count = 0;
+    for (const d of decisions) {
+      if (d.decision === RiskDecisionStatus.REJECTED) {
+        count++;
+      } else {
+        break;
+      }
+    }
+
+    return count;
+  }
 }

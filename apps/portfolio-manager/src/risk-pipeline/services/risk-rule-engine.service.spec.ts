@@ -2,7 +2,10 @@ import {
   RiskDecisionReasonCode,
   RiskDecisionStatus,
 } from '../../prisma/generated/enums';
-import { toPrismaDecimal } from '../../prisma/prisma-decimal';
+import {
+  toPrismaDecimal,
+  zeroPrismaDecimal,
+} from '../../prisma/prisma-decimal';
 import { RiskRuleEngine } from './risk-rule-engine.service';
 
 describe('RiskRuleEngine', () => {
@@ -15,6 +18,10 @@ describe('RiskRuleEngine', () => {
     maxTradeNotional: toPrismaDecimal('150'),
     maxPositionNotional: toPrismaDecimal('200'),
     portfolioExposureCapNotional: toPrismaDecimal('300'),
+    maxOpenTrades: null,
+    maxDailyTurnoverNotional: null,
+    cooldownSeconds: null,
+    maxConsecutiveRejections: null,
   };
   const trade = {
     requestedNotional: toPrismaDecimal('100'),
@@ -36,6 +43,8 @@ describe('RiskRuleEngine', () => {
       trade,
       activeInstrumentReservedNotional: toPrismaDecimal('50'),
       activePortfolioReservedNotional: toPrismaDecimal('75'),
+      activeInstrumentReservationCount: 0,
+      dailyTradedNotional: zeroPrismaDecimal(),
     });
 
     expect(result.decision).toBe(RiskDecisionStatus.APPROVED);
@@ -52,6 +61,8 @@ describe('RiskRuleEngine', () => {
       trade,
       activeInstrumentReservedNotional: toPrismaDecimal('0'),
       activePortfolioReservedNotional: toPrismaDecimal('0'),
+      activeInstrumentReservationCount: 0,
+      dailyTradedNotional: zeroPrismaDecimal(),
     });
 
     expect(result.decision).toBe(RiskDecisionStatus.REJECTED);
@@ -70,6 +81,8 @@ describe('RiskRuleEngine', () => {
       },
       activeInstrumentReservedNotional: toPrismaDecimal('0'),
       activePortfolioReservedNotional: toPrismaDecimal('0'),
+      activeInstrumentReservationCount: 0,
+      dailyTradedNotional: zeroPrismaDecimal(),
     });
 
     expect(result.decision).toBe(RiskDecisionStatus.REJECTED);
@@ -85,6 +98,8 @@ describe('RiskRuleEngine', () => {
       trade,
       activeInstrumentReservedNotional: toPrismaDecimal('150'),
       activePortfolioReservedNotional: toPrismaDecimal('0'),
+      activeInstrumentReservationCount: 0,
+      dailyTradedNotional: zeroPrismaDecimal(),
     });
 
     expect(result.decision).toBe(RiskDecisionStatus.REJECTED);
@@ -100,6 +115,8 @@ describe('RiskRuleEngine', () => {
       trade,
       activeInstrumentReservedNotional: toPrismaDecimal('0'),
       activePortfolioReservedNotional: toPrismaDecimal('250'),
+      activeInstrumentReservationCount: 0,
+      dailyTradedNotional: zeroPrismaDecimal(),
     });
 
     expect(result.decision).toBe(RiskDecisionStatus.REJECTED);
@@ -107,5 +124,103 @@ describe('RiskRuleEngine', () => {
       RiskDecisionReasonCode.PORTFOLIO_EXPOSURE_CAP_EXCEEDED,
     ]);
     expectSizedTrade(result, { notional: '100', quantity: '2', price: '50' });
+  });
+
+  describe('maxOpenTrades rule', () => {
+    it('rejects when active reservation count equals maxOpenTrades', () => {
+      const result = service.evaluate({
+        config: { ...config, maxOpenTrades: 2 },
+        trade,
+        activeInstrumentReservedNotional: toPrismaDecimal('50'),
+        activePortfolioReservedNotional: toPrismaDecimal('75'),
+        activeInstrumentReservationCount: 2,
+        dailyTradedNotional: zeroPrismaDecimal(),
+      });
+
+      expect(result.decision).toBe(RiskDecisionStatus.REJECTED);
+      expect(result.reasonCodes).toEqual([
+        RiskDecisionReasonCode.MAX_OPEN_TRADES_EXCEEDED,
+      ]);
+    });
+
+    it('approves when active reservation count is below maxOpenTrades', () => {
+      const result = service.evaluate({
+        config: { ...config, maxOpenTrades: 3 },
+        trade,
+        activeInstrumentReservedNotional: toPrismaDecimal('50'),
+        activePortfolioReservedNotional: toPrismaDecimal('75'),
+        activeInstrumentReservationCount: 2,
+        dailyTradedNotional: zeroPrismaDecimal(),
+      });
+
+      expect(result.decision).toBe(RiskDecisionStatus.APPROVED);
+      expect(result.reasonCodes).toEqual([]);
+    });
+
+    it('approves when maxOpenTrades is null', () => {
+      const result = service.evaluate({
+        config: { ...config, maxOpenTrades: null },
+        trade,
+        activeInstrumentReservedNotional: toPrismaDecimal('0'),
+        activePortfolioReservedNotional: toPrismaDecimal('0'),
+        activeInstrumentReservationCount: 99,
+        dailyTradedNotional: zeroPrismaDecimal(),
+      });
+
+      expect(result.decision).toBe(RiskDecisionStatus.APPROVED);
+      expect(result.reasonCodes).toEqual([]);
+    });
+  });
+
+  describe('maxDailyTurnoverNotional rule', () => {
+    it('rejects when daily traded notional reaches the limit', () => {
+      const result = service.evaluate({
+        config: {
+          ...config,
+          maxDailyTurnoverNotional: toPrismaDecimal('500'),
+        },
+        trade,
+        activeInstrumentReservedNotional: toPrismaDecimal('0'),
+        activePortfolioReservedNotional: toPrismaDecimal('0'),
+        activeInstrumentReservationCount: 0,
+        dailyTradedNotional: toPrismaDecimal('450'),
+      });
+
+      expect(result.decision).toBe(RiskDecisionStatus.REJECTED);
+      expect(result.reasonCodes).toEqual([
+        RiskDecisionReasonCode.DAILY_TURNOVER_LIMIT_EXCEEDED,
+      ]);
+    });
+
+    it('approves when daily traded notional is below the limit', () => {
+      const result = service.evaluate({
+        config: {
+          ...config,
+          maxDailyTurnoverNotional: toPrismaDecimal('500'),
+        },
+        trade,
+        activeInstrumentReservedNotional: toPrismaDecimal('0'),
+        activePortfolioReservedNotional: toPrismaDecimal('0'),
+        activeInstrumentReservationCount: 0,
+        dailyTradedNotional: toPrismaDecimal('300'),
+      });
+
+      expect(result.decision).toBe(RiskDecisionStatus.APPROVED);
+      expect(result.reasonCodes).toEqual([]);
+    });
+
+    it('approves when maxDailyTurnoverNotional is null', () => {
+      const result = service.evaluate({
+        config: { ...config, maxDailyTurnoverNotional: null },
+        trade,
+        activeInstrumentReservedNotional: toPrismaDecimal('0'),
+        activePortfolioReservedNotional: toPrismaDecimal('0'),
+        activeInstrumentReservationCount: 0,
+        dailyTradedNotional: toPrismaDecimal('999999'),
+      });
+
+      expect(result.decision).toBe(RiskDecisionStatus.APPROVED);
+      expect(result.reasonCodes).toEqual([]);
+    });
   });
 });

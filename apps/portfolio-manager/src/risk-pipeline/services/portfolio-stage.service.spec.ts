@@ -19,8 +19,10 @@ import { DecisionRepository } from '../repositories/decision.repository';
 import { PositionExposureRepository } from '../repositories/position-exposure.repository';
 import { ReservationRepository } from '../repositories/reservation.repository';
 import { RiskConfigRepository } from '../repositories/risk-config.repository';
+import { AutoDisableService } from './auto-disable.service';
 import { PortfolioStageService } from './portfolio-stage.service';
 import { RiskRuleEngine } from './risk-rule-engine.service';
+import { StrategyFilterService } from './strategy-filter.service';
 import { TradeSizingService } from './trade-sizing.service';
 
 type TransactionMethod = <T>(
@@ -46,6 +48,9 @@ type MockReservationRepository = {
   sumActiveInstrumentReservedNotional: MockedFunction<
     ReservationRepository['sumActiveInstrumentReservedNotional']
   >;
+  countActiveInstrumentReservations: MockedFunction<
+    ReservationRepository['countActiveInstrumentReservations']
+  >;
   create: MockedFunction<ReservationRepository['create']>;
 };
 type MockPositionExposureRepository = {
@@ -55,6 +60,15 @@ type MockPositionExposureRepository = {
   sumInstrumentPositionExposure: MockedFunction<
     PositionExposureRepository['sumInstrumentPositionExposure']
   >;
+  sumInstrumentDailyFilledNotional: MockedFunction<
+    PositionExposureRepository['sumInstrumentDailyFilledNotional']
+  >;
+};
+type MockAutoDisableService = {
+  handleRejection: MockedFunction<AutoDisableService['handleRejection']>;
+};
+type MockStrategyFilterService = {
+  evaluate: MockedFunction<StrategyFilterService['evaluate']>;
 };
 type MockRiskConfigRepository = {
   instrumentExists: MockedFunction<RiskConfigRepository['instrumentExists']>;
@@ -91,6 +105,8 @@ describe('PortfolioStageService', () => {
   let riskRuleEngine: MockRiskRuleEngine;
   let eventFactory: MockTradeDecisionEventFactory;
   let eventDispatcher: MockEventDispatcher;
+  let autoDisableService: MockAutoDisableService;
+  let strategyFilterService: MockStrategyFilterService;
 
   const candidateMessage = PortfolioSignalCandidate.fromPartial({
     signal: Signal.fromPartial({
@@ -126,10 +142,22 @@ describe('PortfolioStageService', () => {
     maxTradeNotional: toPrismaDecimal('150'),
     maxPositionNotional: toPrismaDecimal('300'),
     portfolioExposureCapNotional: toPrismaDecimal('400'),
+    maxOpenTrades: null,
+    maxDailyTurnoverNotional: null,
+    cooldownSeconds: null,
+    maxConsecutiveRejections: null,
   };
 
   beforeEach(() => {
-    transactionMock = vi.fn((callback) => callback({}));
+    const tx = {
+      portfolio: {
+        findUnique: vi.fn().mockResolvedValue({ strategy: null }),
+      },
+      riskDecision: {
+        findFirst: vi.fn().mockResolvedValue(null),
+      },
+    };
+    transactionMock = vi.fn((callback) => callback(tx));
     prisma = {
       $transaction: transactionMock as unknown as TransactionMethod,
     };
@@ -142,13 +170,10 @@ describe('PortfolioStageService', () => {
       findByCandidateIdempotencyKey: vi.fn(),
       create: vi.fn(),
     };
-    positionExposureRepository = {
-      sumPortfolioPositionExposure: vi.fn(),
-      sumInstrumentPositionExposure: vi.fn(),
-    };
     reservationRepository = {
       sumActivePortfolioReservedNotional: vi.fn(),
       sumActiveInstrumentReservedNotional: vi.fn(),
+      countActiveInstrumentReservations: vi.fn().mockResolvedValue(0),
       create: vi.fn(),
     };
     riskConfigRepository = {
@@ -168,12 +193,25 @@ describe('PortfolioStageService', () => {
     eventDispatcher = {
       enqueueEvent: vi.fn(),
     };
+    positionExposureRepository = {
+      sumPortfolioPositionExposure: vi.fn(),
+      sumInstrumentPositionExposure: vi.fn(),
+      sumInstrumentDailyFilledNotional: vi
+        .fn()
+        .mockResolvedValue(toPrismaDecimal('0')),
+    };
     positionExposureRepository.sumInstrumentPositionExposure.mockResolvedValue(
       toPrismaDecimal('0'),
     );
     positionExposureRepository.sumPortfolioPositionExposure.mockResolvedValue(
       toPrismaDecimal('0'),
     );
+    autoDisableService = {
+      handleRejection: vi.fn().mockResolvedValue(undefined),
+    };
+    strategyFilterService = {
+      evaluate: vi.fn().mockReturnValue(null),
+    };
 
     service = new PortfolioStageService(
       prisma as unknown as PrismaService,
@@ -186,6 +224,8 @@ describe('PortfolioStageService', () => {
       riskRuleEngine,
       eventFactory,
       eventDispatcher as unknown as EventDispatcherService,
+      autoDisableService as unknown as AutoDisableService,
+      strategyFilterService as unknown as StrategyFilterService,
     );
   });
 

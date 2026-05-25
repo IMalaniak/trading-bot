@@ -35,8 +35,10 @@ model Portfolio {
   name                String
   exposureCapNotional Decimal                       @db.Decimal(36, 18)
   isActive            Boolean                       @default(true)
+  strategyId          String?
   createdAt           DateTime                      @default(now())
   updatedAt           DateTime                      @updatedAt
+  strategy            Strategy?                     @relation(fields: [strategyId], references: [id], onDelete: SetNull)
   instrumentConfigs   PortfolioInstrumentConfig[]
   candidateRecords    PortfolioSignalCandidateRecord[]
   decisions           RiskDecision[]
@@ -45,20 +47,26 @@ model Portfolio {
   portfolioFills      PortfolioFill[]
   positions           PortfolioPosition[]
   summarySnapshots    PortfolioSummarySnapshot[]
+  auditLogs           RiskConfigAuditLog[]
 }
 
 model PortfolioInstrumentConfig {
-  id                  String    @id @default(uuid())
-  portfolioId         String
-  instrumentId        String
-  enabled             Boolean   @default(true)
-  targetNotional      Decimal   @db.Decimal(36, 18)
-  maxTradeNotional    Decimal   @db.Decimal(36, 18)
-  maxPositionNotional Decimal   @db.Decimal(36, 18)
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
-  portfolio           Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
-  instrument          Instrument @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
+  id                       String    @id @default(uuid())
+  portfolioId              String
+  instrumentId             String
+  enabled                  Boolean   @default(true)
+  targetNotional           Decimal   @db.Decimal(36, 18)
+  maxTradeNotional         Decimal   @db.Decimal(36, 18)
+  maxPositionNotional      Decimal   @db.Decimal(36, 18)
+  maxOpenTrades            Int?
+  maxDailyTurnoverNotional Decimal?  @db.Decimal(36, 18)
+  cooldownSeconds          Int?
+  maxConsecutiveRejections Int?
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
+  portfolio                Portfolio  @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  instrument               Instrument @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
+  auditLogs                RiskConfigAuditLog[]
 
   @@unique([portfolioId, instrumentId])
   @@index([instrumentId, enabled])
@@ -124,6 +132,11 @@ enum RiskDecisionReasonCode {
   TRADE_CAP_EXCEEDED
   INSTRUMENT_EXPOSURE_CAP_EXCEEDED
   PORTFOLIO_EXPOSURE_CAP_EXCEEDED
+  MAX_OPEN_TRADES_EXCEEDED
+  DAILY_TURNOVER_LIMIT_EXCEEDED
+  STRATEGY_SIDE_FILTER
+  STRATEGY_TIME_FILTER
+  STRATEGY_COOLDOWN_FILTER
 }
 
 model RiskDecision {
@@ -291,4 +304,42 @@ model OutboxEvent {
   dispatchedAt  DateTime?
 
   @@index([status, nextAttemptAt])
+}
+
+// ─── Strategy ────────────────────────────────────────────────────────────────
+
+model Strategy {
+  id              String     @id @default(uuid())
+  name            String     @unique
+  description     String?
+  allowedSides    Int[]
+  minIntervalSecs Int?
+  activeTimeStart String?
+  activeTimeEnd   String?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  portfolios      Portfolio[]
+}
+
+// ─── Risk Config Audit Log ────────────────────────────────────────────────────
+
+enum RiskConfigAuditEntityType {
+  PORTFOLIO
+  INSTRUMENT_CONFIG
+}
+
+model RiskConfigAuditLog {
+  id                        String                   @id @default(uuid())
+  entityType                RiskConfigAuditEntityType
+  portfolioId               String
+  portfolioInstrumentConfigId String?
+  field                     String
+  oldValue                  String?
+  newValue                  String?
+  changedAt                 DateTime                 @default(now())
+  portfolio                 Portfolio                @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  portfolioInstrumentConfig PortfolioInstrumentConfig? @relation(fields: [portfolioInstrumentConfigId], references: [id], onDelete: SetNull)
+
+  @@index([portfolioId, changedAt])
+  @@index([portfolioInstrumentConfigId, changedAt])
 }

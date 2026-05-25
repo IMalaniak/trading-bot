@@ -6,6 +6,7 @@ import { ExposureReservationStatus } from '../../prisma/generated/enums';
 import { PrismaService } from '../../prisma/prisma.service';
 import { PrismaDbClient } from '../../prisma/prisma-db-client';
 import {
+  PrismaDecimal,
   toPrismaDecimal,
   zeroPrismaDecimal,
 } from '../../prisma/prisma-decimal';
@@ -52,6 +53,36 @@ export class PositionExposureRepository {
     );
 
     return this.positionAccounting.calculate(settledFills).exposureNotional;
+  }
+
+  async sumInstrumentDailyFilledNotional(
+    portfolioId: string,
+    instrumentId: string,
+    date: Date,
+    client: PrismaDbClient = this.prisma,
+  ): Promise<PrismaDecimal> {
+    const dayStart = new Date(date);
+    dayStart.setUTCHours(0, 0, 0, 0);
+    const dayEnd = new Date(date);
+    dayEnd.setUTCHours(23, 59, 59, 999);
+
+    const result = await client.portfolioFill.aggregate({
+      where: {
+        portfolioId,
+        instrumentId,
+        filledAt: {
+          gte: dayStart,
+          lte: dayEnd,
+        },
+      },
+      _sum: {
+        fillNotional: true,
+      },
+    });
+
+    return result._sum.fillNotional
+      ? toPrismaDecimal(result._sum.fillNotional.toString())
+      : zeroPrismaDecimal();
   }
 
   private async findActiveReservationKeys(

@@ -1,4 +1,9 @@
-import { AlertTriangle, ArrowRight, BriefcaseBusiness } from 'lucide-react';
+import {
+  AlertTriangle,
+  ArrowRight,
+  BookOpen,
+  BriefcaseBusiness,
+} from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 
@@ -73,7 +78,16 @@ export function PortfolioListPage() {
               Portfolios
             </p>
           </div>
-          <ThemeToggle />
+          <div className="flex items-center gap-3">
+            <Link
+              className="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-zinc-300 bg-white px-3 text-sm font-semibold text-zinc-800 transition hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
+              to="/strategies"
+            >
+              <BookOpen aria-hidden="true" className="h-4 w-4" />
+              Strategies
+            </Link>
+            <ThemeToggle />
+          </div>
         </div>
       </div>
 

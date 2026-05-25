@@ -1,8 +1,9 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import {
+  AssetClassName,
+  assetClassToAssetClassName,
+} from '@trading-bot/common';
 import { Instrument } from '@trading-bot/common/proto';
-
-import { assetClassToAssetClassName } from '../mapper/enum.mapper';
-import { AssetClassName } from './asset-class-name.enum';
 
 export class InstrumentDto implements Omit<Instrument, 'assetClass'> {
   @ApiProperty({ type: String, format: 'uuid' })

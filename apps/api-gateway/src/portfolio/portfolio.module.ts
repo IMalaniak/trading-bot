@@ -14,6 +14,7 @@ import { join } from 'path';
 
 import { PortfolioController } from './portfolio.controller';
 import { PortfolioService } from './portfolio.service';
+import { StrategiesController } from './strategies.controller';
 
 @Module({
   imports: [
@@ -55,7 +56,7 @@ import { PortfolioService } from './portfolio.service';
       },
     ]),
   ],
-  controllers: [PortfolioController],
+  controllers: [PortfolioController, StrategiesController],
   providers: [PortfolioService],
 })
 export class PortfolioModule {}

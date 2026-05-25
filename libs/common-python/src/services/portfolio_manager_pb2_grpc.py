@@ -60,13 +60,67 @@ class RiskAndPortfolioManagerStub(object):
             response_deserializer=services_dot_portfolio__manager__pb2.ListInstrumentsResponse.FromString,
             _registered_method=True,
         )
+        self.UpdatePortfolioInstrumentConfig = channel.unary_unary(
+            "/tradingbot.portfolio_manager.RiskAndPortfolioManager/UpdatePortfolioInstrumentConfig",
+            request_serializer=services_dot_portfolio__manager__pb2.UpdatePortfolioInstrumentConfigRequest.SerializeToString,
+            response_deserializer=services_dot_portfolio__manager__pb2.UpdatePortfolioInstrumentConfigResponse.FromString,
+            _registered_method=True,
+        )
+        self.UpdatePortfolio = channel.unary_unary(
+            "/tradingbot.portfolio_manager.RiskAndPortfolioManager/UpdatePortfolio",
+            request_serializer=services_dot_portfolio__manager__pb2.UpdatePortfolioRequest.SerializeToString,
+            response_deserializer=services_dot_portfolio__manager__pb2.UpdatePortfolioResponse.FromString,
+            _registered_method=True,
+        )
+        self.ListRiskDecisions = channel.unary_unary(
+            "/tradingbot.portfolio_manager.RiskAndPortfolioManager/ListRiskDecisions",
+            request_serializer=services_dot_portfolio__manager__pb2.ListRiskDecisionsRequest.SerializeToString,
+            response_deserializer=services_dot_portfolio__manager__pb2.ListRiskDecisionsResponse.FromString,
+            _registered_method=True,
+        )
+        self.ListRiskConfigAuditLog = channel.unary_unary(
+            "/tradingbot.portfolio_manager.RiskAndPortfolioManager/ListRiskConfigAuditLog",
+            request_serializer=services_dot_portfolio__manager__pb2.ListRiskConfigAuditLogRequest.SerializeToString,
+            response_deserializer=services_dot_portfolio__manager__pb2.ListRiskConfigAuditLogResponse.FromString,
+            _registered_method=True,
+        )
+        self.CreateStrategy = channel.unary_unary(
+            "/tradingbot.portfolio_manager.RiskAndPortfolioManager/CreateStrategy",
+            request_serializer=services_dot_portfolio__manager__pb2.CreateStrategyRequest.SerializeToString,
+            response_deserializer=services_dot_portfolio__manager__pb2.CreateStrategyResponse.FromString,
+            _registered_method=True,
+        )
+        self.UpdateStrategy = channel.unary_unary(
+            "/tradingbot.portfolio_manager.RiskAndPortfolioManager/UpdateStrategy",
+            request_serializer=services_dot_portfolio__manager__pb2.UpdateStrategyRequest.SerializeToString,
+            response_deserializer=services_dot_portfolio__manager__pb2.UpdateStrategyResponse.FromString,
+            _registered_method=True,
+        )
+        self.GetStrategy = channel.unary_unary(
+            "/tradingbot.portfolio_manager.RiskAndPortfolioManager/GetStrategy",
+            request_serializer=services_dot_portfolio__manager__pb2.GetStrategyRequest.SerializeToString,
+            response_deserializer=services_dot_portfolio__manager__pb2.GetStrategyResponse.FromString,
+            _registered_method=True,
+        )
+        self.ListStrategies = channel.unary_unary(
+            "/tradingbot.portfolio_manager.RiskAndPortfolioManager/ListStrategies",
+            request_serializer=services_dot_portfolio__manager__pb2.ListStrategiesRequest.SerializeToString,
+            response_deserializer=services_dot_portfolio__manager__pb2.ListStrategiesResponse.FromString,
+            _registered_method=True,
+        )
+        self.AssignStrategyToPortfolio = channel.unary_unary(
+            "/tradingbot.portfolio_manager.RiskAndPortfolioManager/AssignStrategyToPortfolio",
+            request_serializer=services_dot_portfolio__manager__pb2.AssignStrategyToPortfolioRequest.SerializeToString,
+            response_deserializer=services_dot_portfolio__manager__pb2.AssignStrategyToPortfolioResponse.FromString,
+            _registered_method=True,
+        )
 
 
 class RiskAndPortfolioManagerServicer(object):
     """Missing associated documentation comment in .proto file."""
 
     def RegisterPortfolioInstrument(self, request, context):
-        """Missing associated documentation comment in .proto file."""
+        """--- Existing ---"""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details("Method not implemented!")
         raise NotImplementedError("Method not implemented!")
@@ -84,6 +138,60 @@ class RiskAndPortfolioManagerServicer(object):
         raise NotImplementedError("Method not implemented!")
 
     def ListInstruments(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def UpdatePortfolioInstrumentConfig(self, request, context):
+        """--- Track A: Config updates + audit ---"""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def UpdatePortfolio(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def ListRiskDecisions(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def ListRiskConfigAuditLog(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def CreateStrategy(self, request, context):
+        """--- Track B: Strategy ---"""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def UpdateStrategy(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def GetStrategy(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def ListStrategies(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def AssignStrategyToPortfolio(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details("Method not implemented!")
@@ -111,6 +219,51 @@ def add_RiskAndPortfolioManagerServicer_to_server(servicer, server):
             servicer.ListInstruments,
             request_deserializer=services_dot_portfolio__manager__pb2.ListInstrumentsRequest.FromString,
             response_serializer=services_dot_portfolio__manager__pb2.ListInstrumentsResponse.SerializeToString,
+        ),
+        "UpdatePortfolioInstrumentConfig": grpc.unary_unary_rpc_method_handler(
+            servicer.UpdatePortfolioInstrumentConfig,
+            request_deserializer=services_dot_portfolio__manager__pb2.UpdatePortfolioInstrumentConfigRequest.FromString,
+            response_serializer=services_dot_portfolio__manager__pb2.UpdatePortfolioInstrumentConfigResponse.SerializeToString,
+        ),
+        "UpdatePortfolio": grpc.unary_unary_rpc_method_handler(
+            servicer.UpdatePortfolio,
+            request_deserializer=services_dot_portfolio__manager__pb2.UpdatePortfolioRequest.FromString,
+            response_serializer=services_dot_portfolio__manager__pb2.UpdatePortfolioResponse.SerializeToString,
+        ),
+        "ListRiskDecisions": grpc.unary_unary_rpc_method_handler(
+            servicer.ListRiskDecisions,
+            request_deserializer=services_dot_portfolio__manager__pb2.ListRiskDecisionsRequest.FromString,
+            response_serializer=services_dot_portfolio__manager__pb2.ListRiskDecisionsResponse.SerializeToString,
+        ),
+        "ListRiskConfigAuditLog": grpc.unary_unary_rpc_method_handler(
+            servicer.ListRiskConfigAuditLog,
+            request_deserializer=services_dot_portfolio__manager__pb2.ListRiskConfigAuditLogRequest.FromString,
+            response_serializer=services_dot_portfolio__manager__pb2.ListRiskConfigAuditLogResponse.SerializeToString,
+        ),
+        "CreateStrategy": grpc.unary_unary_rpc_method_handler(
+            servicer.CreateStrategy,
+            request_deserializer=services_dot_portfolio__manager__pb2.CreateStrategyRequest.FromString,
+            response_serializer=services_dot_portfolio__manager__pb2.CreateStrategyResponse.SerializeToString,
+        ),
+        "UpdateStrategy": grpc.unary_unary_rpc_method_handler(
+            servicer.UpdateStrategy,
+            request_deserializer=services_dot_portfolio__manager__pb2.UpdateStrategyRequest.FromString,
+            response_serializer=services_dot_portfolio__manager__pb2.UpdateStrategyResponse.SerializeToString,
+        ),
+        "GetStrategy": grpc.unary_unary_rpc_method_handler(
+            servicer.GetStrategy,
+            request_deserializer=services_dot_portfolio__manager__pb2.GetStrategyRequest.FromString,
+            response_serializer=services_dot_portfolio__manager__pb2.GetStrategyResponse.SerializeToString,
+        ),
+        "ListStrategies": grpc.unary_unary_rpc_method_handler(
+            servicer.ListStrategies,
+            request_deserializer=services_dot_portfolio__manager__pb2.ListStrategiesRequest.FromString,
+            response_serializer=services_dot_portfolio__manager__pb2.ListStrategiesResponse.SerializeToString,
+        ),
+        "AssignStrategyToPortfolio": grpc.unary_unary_rpc_method_handler(
+            servicer.AssignStrategyToPortfolio,
+            request_deserializer=services_dot_portfolio__manager__pb2.AssignStrategyToPortfolioRequest.FromString,
+            response_serializer=services_dot_portfolio__manager__pb2.AssignStrategyToPortfolioResponse.SerializeToString,
         ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -235,6 +388,276 @@ class RiskAndPortfolioManager(object):
             "/tradingbot.portfolio_manager.RiskAndPortfolioManager/ListInstruments",
             services_dot_portfolio__manager__pb2.ListInstrumentsRequest.SerializeToString,
             services_dot_portfolio__manager__pb2.ListInstrumentsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True,
+        )
+
+    @staticmethod
+    def UpdatePortfolioInstrumentConfig(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/tradingbot.portfolio_manager.RiskAndPortfolioManager/UpdatePortfolioInstrumentConfig",
+            services_dot_portfolio__manager__pb2.UpdatePortfolioInstrumentConfigRequest.SerializeToString,
+            services_dot_portfolio__manager__pb2.UpdatePortfolioInstrumentConfigResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True,
+        )
+
+    @staticmethod
+    def UpdatePortfolio(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/tradingbot.portfolio_manager.RiskAndPortfolioManager/UpdatePortfolio",
+            services_dot_portfolio__manager__pb2.UpdatePortfolioRequest.SerializeToString,
+            services_dot_portfolio__manager__pb2.UpdatePortfolioResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True,
+        )
+
+    @staticmethod
+    def ListRiskDecisions(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/tradingbot.portfolio_manager.RiskAndPortfolioManager/ListRiskDecisions",
+            services_dot_portfolio__manager__pb2.ListRiskDecisionsRequest.SerializeToString,
+            services_dot_portfolio__manager__pb2.ListRiskDecisionsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True,
+        )
+
+    @staticmethod
+    def ListRiskConfigAuditLog(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/tradingbot.portfolio_manager.RiskAndPortfolioManager/ListRiskConfigAuditLog",
+            services_dot_portfolio__manager__pb2.ListRiskConfigAuditLogRequest.SerializeToString,
+            services_dot_portfolio__manager__pb2.ListRiskConfigAuditLogResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True,
+        )
+
+    @staticmethod
+    def CreateStrategy(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/tradingbot.portfolio_manager.RiskAndPortfolioManager/CreateStrategy",
+            services_dot_portfolio__manager__pb2.CreateStrategyRequest.SerializeToString,
+            services_dot_portfolio__manager__pb2.CreateStrategyResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True,
+        )
+
+    @staticmethod
+    def UpdateStrategy(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/tradingbot.portfolio_manager.RiskAndPortfolioManager/UpdateStrategy",
+            services_dot_portfolio__manager__pb2.UpdateStrategyRequest.SerializeToString,
+            services_dot_portfolio__manager__pb2.UpdateStrategyResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True,
+        )
+
+    @staticmethod
+    def GetStrategy(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/tradingbot.portfolio_manager.RiskAndPortfolioManager/GetStrategy",
+            services_dot_portfolio__manager__pb2.GetStrategyRequest.SerializeToString,
+            services_dot_portfolio__manager__pb2.GetStrategyResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True,
+        )
+
+    @staticmethod
+    def ListStrategies(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/tradingbot.portfolio_manager.RiskAndPortfolioManager/ListStrategies",
+            services_dot_portfolio__manager__pb2.ListStrategiesRequest.SerializeToString,
+            services_dot_portfolio__manager__pb2.ListStrategiesResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True,
+        )
+
+    @staticmethod
+    def AssignStrategyToPortfolio(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/tradingbot.portfolio_manager.RiskAndPortfolioManager/AssignStrategyToPortfolio",
+            services_dot_portfolio__manager__pb2.AssignStrategyToPortfolioRequest.SerializeToString,
+            services_dot_portfolio__manager__pb2.AssignStrategyToPortfolioResponse.FromString,
             options,
             channel_credentials,
             insecure,

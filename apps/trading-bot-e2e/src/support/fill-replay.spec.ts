@@ -1,3 +1,4 @@
+import { OrderStatusName, SignalSideName } from '@trading-bot/common';
 import { OrderStatus, SignalSide } from '@trading-bot/common/proto';
 import { describe, expect, it } from 'vitest';
 
@@ -19,10 +20,10 @@ describe('buildOrderFillReplay', () => {
       referencePrice: '100',
       requestedNotional: '100',
       requestedQuantity: '1',
-      side: 'BUY',
+      side: SignalSideName.BUY,
       signalId: 'signal-1',
       sourceEventId: 'source-1',
-      status: 'FILLED',
+      status: OrderStatusName.FILLED,
     };
     const fill: ExecutionFillDto = {
       cumulativeFilledNotional: '100',
@@ -34,7 +35,7 @@ describe('buildOrderFillReplay', () => {
       filledAt: '2026-03-25T12:00:05.000Z',
       instrumentId: 'instrument-1',
       orderId: 'order-1',
-      orderStatus: 'FILLED',
+      orderStatus: OrderStatusName.FILLED,
       portfolioId: 'portfolio-alpha',
       sequence: 2,
     };

@@ -1,4 +1,8 @@
-import { createValidateFunction, NodeEnvironment } from '@trading-bot/common';
+import {
+  createValidateFunction,
+  HOST_PORT_PATTERN,
+  NodeEnvironment,
+} from '@trading-bot/common';
 import { IsEnum, IsInt, IsString, Matches, Max, Min } from 'class-validator';
 
 import { DEFAULT_API_GATEWAY_CORS_ORIGINS } from './cors.config';
@@ -23,25 +27,25 @@ class EnvironmentVariables implements EnvConfig {
   PORT: number;
 
   @IsString()
-  @Matches(/^[\w.-]+(:\d+)?$/, {
+  @Matches(HOST_PORT_PATTERN, {
     message: 'PORTFOLIO_MANAGER_GRPC_URL must be a valid host:port string',
   })
   PORTFOLIO_MANAGER_GRPC_URL: string;
 
   @IsString()
-  @Matches(/^[\w.-]+(:\d+)?$/, {
+  @Matches(HOST_PORT_PATTERN, {
     message: 'EXECUTION_ENGINE_GRPC_URL must be a valid host:port string',
   })
   EXECUTION_ENGINE_GRPC_URL: string;
 
   @IsString()
-  @Matches(/^[\w.-]+(:\d+)?$/, {
+  @Matches(HOST_PORT_PATTERN, {
     message: 'DATA_INGESTION_GRPC_URL must be a valid host:port string',
   })
   DATA_INGESTION_GRPC_URL: string;
 
   @IsString()
-  @Matches(/^[\w.-]+(:\d+)?$/, {
+  @Matches(HOST_PORT_PATTERN, {
     message: 'PREDICTION_ENGINE_GRPC_URL must be a valid host:port string',
   })
   PREDICTION_ENGINE_GRPC_URL: string;

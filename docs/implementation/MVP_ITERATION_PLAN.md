@@ -105,6 +105,32 @@ Implemented baseline:
   - deterministic feature-vector ids, Kafka metadata headers, shared topic and
     schema constants, Prometheus metrics, DLQ handling, and e2e coverage for
     duplicate raw-bar idempotency are implemented
+- Strategy and Risk Configuration (this iteration):
+  - `Strategy` model: create, update, list, get, and assign to portfolio; named
+    profiles with `allowedSides`, `minIntervalSecs`, and `activeTimeStart`/`activeTimeEnd`
+  - Strategy signal filter evaluated before numeric risk rules in the portfolio
+    stage: `STRATEGY_SIDE_FILTER`, `STRATEGY_TIME_FILTER`, `STRATEGY_COOLDOWN_FILTER`
+  - Expanded risk rules: `MAX_OPEN_TRADES_EXCEEDED` (per `maxOpenTrades`) and
+    `DAILY_LOSS_LIMIT_EXCEEDED` (per `maxDailyLossNotional`) in portfolio-instrument config
+  - `AutoDisableService` writes a disable record and a `RiskConfigAuditLog` entry
+    after `maxConsecutiveRejections` consecutive rejections
+  - `UpdatePortfolio` and `UpdatePortfolioInstrumentConfig` gRPC methods exposed
+    via `PATCH /api/portfolios/:portfolioId` and
+    `PATCH /api/portfolios/:portfolioId/instrument/:instrumentId`
+  - `RiskConfigAuditLog` table with field-level change tracking, exposed via
+    `ListRiskConfigAuditLog` gRPC and `GET /api/portfolios/:portfolioId/audit`
+  - `ListRiskDecisions` gRPC and `GET /api/portfolios/:portfolioId/decisions` for
+    paginated risk decision history
+  - `CreateStrategy`, `UpdateStrategy`, `GetStrategy`, `ListStrategies`, and
+    `AssignStrategyToPortfolio` gRPC methods exposed via REST strategy endpoints
+  - Dashboard: instrument enable/disable toggle, portfolio settings editor,
+    risk decision history view, config change audit log view, and strategy
+    management (list, detail, create, edit, assign, badge display in portfolio summary)
+  - E2E: `risk-config-update`, `risk-rejection`, `instrument-enable-disable`,
+    and `strategy-signal-filter` Playwright specs
+  - Shared REST name enums (`AssetClassName`, `OrderStatusName`, `SignalSideName`)
+    and proto↔REST mapper functions moved to `libs/common` and consumed everywhere
+
 - Prediction Engine and signal visibility:
   - Python `prediction-engine` service consumes `features.indicators`, runs the
     deterministic `baseline-core-v1` model, skips neutral decisions, and
@@ -158,24 +184,9 @@ iterations.
 
 ### Prediction and Feature Pipeline
 
-- [x] Feature Engineering service consuming raw market data. Implemented as the
-      Rust `feature-engineering` service consuming final `market.raw.data` bars,
-      warming per-instrument rolling state from Data Ingestion gRPC, and exposing
-      Prometheus metrics.
-- [x] Indicator publishing on `features.indicators`. Implemented with
-      protobuf `IndicatorFeatureVector` events, deterministic event ids, Kafka
-      metadata headers, shared topic/schema constants, and e2e coverage for
-      duplicate raw-bar idempotency.
-- [x] Real Prediction Engine producing `trading.signals`. Implemented as the
-      Python `prediction-engine` service consuming `features.indicators`,
-      running deterministic `baseline-core-v1` inference, publishing only BUY
-      and SELL `common.Signal` events, and sending unsupported/malformed inputs
-      through the DLQ path.
-- [x] Signal cache and read API for dashboard signal visibility. Implemented
-      with Redis-backed global and per-instrument recent signal lists,
-      `Signals.GetLatestSignals`, API Gateway `GET /api/signals`, and a
-      Dashboard Recent Signals view. Synthetic `trading.signals` publishing
-      remains test-only fallback code.
+The baseline prediction and feature pipeline is complete; all four major
+milestones are recorded in the Completed Backend Baseline section above.
+
 - [ ] Feature persistence/read API. Missing. The v1 Feature Engineering service
       keeps rolling state in memory and publishes Kafka output only.
 - [ ] Model registry and training pipeline once prediction logic needs
@@ -186,11 +197,10 @@ iterations.
 
 ### Strategy and Risk Configuration
 
-- Strategy/risk configuration APIs in API Gateway and Portfolio Manager.
-- Dashboard strategy editor.
-- Start/stop trading controls.
-- Expanded risk rules beyond the current deterministic MVP checks.
-- Audit views for risk decisions, rejected trades, and configuration changes.
+Strategy/risk configuration APIs, dashboard views, expanded risk rules, and
+audit log are complete;
+
+- [ ] Start/stop trading controls. Not yet implemented.
 
 ### Execution Maturity
 

@@ -4,6 +4,7 @@ import {
   KAFKA_EVENT_PRODUCERS,
   KAFKA_EVENT_SCHEMA_VERSIONS,
   KAFKA_TOPICS,
+  OrderStatusName,
   portfolioKey,
 } from '@trading-bot/common';
 import {
@@ -127,7 +128,7 @@ export const waitForPortfolioReconciliationState = async (
       const filledOrder = latest.recentOrders.find(
         (order) =>
           order.instrumentId === SEEDED_INSTRUMENT_ID &&
-          order.status === 'FILLED' &&
+          order.status === OrderStatusName.FILLED &&
           order.fills.length === 2,
       );
 

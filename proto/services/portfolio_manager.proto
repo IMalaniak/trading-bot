@@ -6,11 +6,27 @@ import "common/instrument.proto";
 import "common/portfolio.proto";
 
 service RiskAndPortfolioManager {
+  // --- Existing ---
   rpc RegisterPortfolioInstrument (RegisterPortfolioInstrumentRequest) returns (RegisterPortfolioInstrumentResponse);
   rpc ListPortfolios(ListPortfoliosRequest) returns (ListPortfoliosResponse);
   rpc GetPortfolio(GetPortfolioRequest) returns (GetPortfolioResponse);
   rpc ListInstruments(ListInstrumentsRequest) returns (ListInstrumentsResponse);
+
+  // --- Track A: Config updates + audit ---
+  rpc UpdatePortfolioInstrumentConfig(UpdatePortfolioInstrumentConfigRequest) returns (UpdatePortfolioInstrumentConfigResponse);
+  rpc UpdatePortfolio(UpdatePortfolioRequest) returns (UpdatePortfolioResponse);
+  rpc ListRiskDecisions(ListRiskDecisionsRequest) returns (ListRiskDecisionsResponse);
+  rpc ListRiskConfigAuditLog(ListRiskConfigAuditLogRequest) returns (ListRiskConfigAuditLogResponse);
+
+  // --- Track B: Strategy ---
+  rpc CreateStrategy(CreateStrategyRequest) returns (CreateStrategyResponse);
+  rpc UpdateStrategy(UpdateStrategyRequest) returns (UpdateStrategyResponse);
+  rpc GetStrategy(GetStrategyRequest) returns (GetStrategyResponse);
+  rpc ListStrategies(ListStrategiesRequest) returns (ListStrategiesResponse);
+  rpc AssignStrategyToPortfolio(AssignStrategyToPortfolioRequest) returns (AssignStrategyToPortfolioResponse);
 }
+
+// ─── Existing request/response messages ─────────────────────────────────────
 
 message RegisterPortfolioInstrumentRequest {
   string portfolio_id = 1;
@@ -42,6 +58,7 @@ message GetPortfolioResponse {
   tradingbot.common.PortfolioSummary summary = 1;
   repeated tradingbot.common.Position positions = 2;
   repeated tradingbot.common.PortfolioInstrumentConfig configured_instruments = 3;
+  optional tradingbot.common.Strategy strategy = 4;
 }
 
 message ListInstrumentsRequest {
@@ -50,4 +67,109 @@ message ListInstrumentsRequest {
 
 message ListInstrumentsResponse {
   repeated tradingbot.common.Instrument instruments = 1;
+}
+
+// ─── Track A: Config update messages ────────────────────────────────────────
+
+message UpdatePortfolioInstrumentConfigRequest {
+  string portfolio_id = 1;
+  string instrument_id = 2;
+  optional bool enabled = 3;
+  optional string target_notional = 4;
+  optional string max_trade_notional = 5;
+  optional string max_position_notional = 6;
+  optional int32 max_open_trades = 7;
+  optional string max_daily_turnover_notional = 8;
+  optional int32 cooldown_seconds = 9;
+  optional int32 max_consecutive_rejections = 10;
+}
+
+message UpdatePortfolioInstrumentConfigResponse {
+  tradingbot.common.PortfolioInstrumentConfig configured_instrument = 1;
+}
+
+message UpdatePortfolioRequest {
+  string portfolio_id = 1;
+  optional string exposure_cap_notional = 2;
+  optional bool is_active = 3;
+}
+
+message UpdatePortfolioResponse {
+  tradingbot.common.PortfolioSummary summary = 1;
+}
+
+message ListRiskDecisionsRequest {
+  string portfolio_id = 1;
+  optional string decision_filter = 2; // "APPROVED" | "REJECTED" — omit for all
+  optional int32 limit = 3;
+  optional string cursor = 4;           // decidedAt cursor for pagination
+}
+
+message ListRiskDecisionsResponse {
+  repeated tradingbot.common.RiskDecisionEntry decisions = 1;
+  optional string next_cursor = 2;
+}
+
+message ListRiskConfigAuditLogRequest {
+  string portfolio_id = 1;
+  optional int32 limit = 2;
+  optional string cursor = 3;           // changedAt cursor for pagination
+}
+
+message ListRiskConfigAuditLogResponse {
+  repeated tradingbot.common.RiskConfigAuditLogEntry entries = 1;
+  optional string next_cursor = 2;
+}
+
+// ─── Track B: Strategy messages ─────────────────────────────────────────────
+
+message CreateStrategyRequest {
+  string name = 1;
+  optional string description = 2;
+  repeated int32 allowed_sides = 3;
+  optional int32 min_interval_secs = 4;
+  optional string active_time_start = 5;
+  optional string active_time_end = 6;
+}
+
+message CreateStrategyResponse {
+  tradingbot.common.Strategy strategy = 1;
+}
+
+message UpdateStrategyRequest {
+  string strategy_id = 1;
+  optional string name = 2;
+  optional string description = 3;
+  repeated int32 allowed_sides = 4;
+  optional int32 min_interval_secs = 5;
+  optional string active_time_start = 6;
+  optional string active_time_end = 7;
+}
+
+message UpdateStrategyResponse {
+  tradingbot.common.Strategy strategy = 1;
+}
+
+message GetStrategyRequest {
+  string strategy_id = 1;
+}
+
+message GetStrategyResponse {
+  tradingbot.common.Strategy strategy = 1;
+}
+
+message ListStrategiesRequest {}
+
+message ListStrategiesResponse {
+  repeated tradingbot.common.Strategy strategies = 1;
+}
+
+message AssignStrategyToPortfolioRequest {
+  string portfolio_id = 1;
+  optional string strategy_id = 2; // omit or null to clear assignment
+}
+
+message AssignStrategyToPortfolioResponse {
+  tradingbot.common.PortfolioSummary summary = 1;
+  optional tradingbot.common.Strategy strategy = 2;
 }

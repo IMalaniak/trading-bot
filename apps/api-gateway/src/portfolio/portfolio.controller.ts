@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+} from '@nestjs/common';
 import {
   ApiBadGatewayResponse,
   ApiBadRequestResponse,
@@ -8,9 +16,16 @@ import {
   ApiOkResponse,
   ApiTags,
 } from '@nestjs/swagger';
+import { IsNotEmpty, IsString } from 'class-validator';
 import { Observable } from 'rxjs';
 
 import { AppErrorResponseDto } from '../app-error-response.dto';
+import {
+  ListRiskConfigAuditLogQueryDto,
+  ListRiskDecisionsQueryDto,
+  RiskConfigAuditLogListResponseDto,
+  RiskDecisionListResponseDto,
+} from './dto/portfolio-decisions.dto';
 import {
   RegisterPortfolioInstrumentRequestDto,
   RegisterPortfolioInstrumentResponseDto,
@@ -19,9 +34,25 @@ import {
   GetPortfolioParamsDto,
   GetPortfolioQueryDto,
   ListPortfoliosResponseDto,
+  PortfolioInstrumentConfigDto,
   PortfolioReadResponseDto,
+  PortfolioSummaryDto,
 } from './dto/portfolio-read.dto';
+import {
+  UpdatePortfolioInstrumentConfigRestRequestDto,
+  UpdatePortfolioRestRequestDto,
+} from './dto/portfolio-write.dto';
+import {
+  AssignStrategyBodyDto,
+  AssignStrategyToPortfolioResponseDto,
+} from './dto/strategy.dto';
 import { PortfolioService } from './portfolio.service';
+
+class PortfolioInstrumentParamsDto extends GetPortfolioParamsDto {
+  @IsString()
+  @IsNotEmpty()
+  instrumentId: string;
+}
 
 @ApiTags('portfolios')
 @Controller('portfolios')
@@ -51,6 +82,36 @@ export class PortfolioController {
     );
   }
 
+  @Patch(':portfolioId')
+  @ApiOkResponse({ type: PortfolioSummaryDto })
+  @ApiBadRequestResponse({ type: AppErrorResponseDto })
+  @ApiBadGatewayResponse({ type: AppErrorResponseDto })
+  @ApiGatewayTimeoutResponse({ type: AppErrorResponseDto })
+  @ApiNotFoundResponse({ type: AppErrorResponseDto })
+  updatePortfolio(
+    @Param() params: GetPortfolioParamsDto,
+    @Body() data: UpdatePortfolioRestRequestDto,
+  ): Observable<PortfolioSummaryDto> {
+    return this.portfolioService.updatePortfolio(params.portfolioId, data);
+  }
+
+  @Patch(':portfolioId/instrument/:instrumentId')
+  @ApiOkResponse({ type: PortfolioInstrumentConfigDto })
+  @ApiBadRequestResponse({ type: AppErrorResponseDto })
+  @ApiBadGatewayResponse({ type: AppErrorResponseDto })
+  @ApiGatewayTimeoutResponse({ type: AppErrorResponseDto })
+  @ApiNotFoundResponse({ type: AppErrorResponseDto })
+  updatePortfolioInstrumentConfig(
+    @Param() params: PortfolioInstrumentParamsDto,
+    @Body() data: UpdatePortfolioInstrumentConfigRestRequestDto,
+  ): Observable<PortfolioInstrumentConfigDto> {
+    return this.portfolioService.updatePortfolioInstrumentConfig(
+      params.portfolioId,
+      params.instrumentId,
+      data,
+    );
+  }
+
   @Post(':portfolioId/instrument')
   @ApiOkResponse({ type: RegisterPortfolioInstrumentResponseDto })
   @ApiBadRequestResponse({ type: AppErrorResponseDto })
@@ -65,6 +126,49 @@ export class PortfolioController {
     return this.portfolioService.registerPortfolioInstrument(
       params.portfolioId,
       data,
+    );
+  }
+
+  @Get(':portfolioId/decisions')
+  @ApiOkResponse({ type: RiskDecisionListResponseDto })
+  @ApiBadGatewayResponse({ type: AppErrorResponseDto })
+  @ApiGatewayTimeoutResponse({ type: AppErrorResponseDto })
+  @ApiNotFoundResponse({ type: AppErrorResponseDto })
+  listRiskDecisions(
+    @Param() params: GetPortfolioParamsDto,
+    @Query() query: ListRiskDecisionsQueryDto,
+  ): Observable<RiskDecisionListResponseDto> {
+    return this.portfolioService.listRiskDecisions(params.portfolioId, query);
+  }
+
+  @Get(':portfolioId/audit')
+  @ApiOkResponse({ type: RiskConfigAuditLogListResponseDto })
+  @ApiBadGatewayResponse({ type: AppErrorResponseDto })
+  @ApiGatewayTimeoutResponse({ type: AppErrorResponseDto })
+  @ApiNotFoundResponse({ type: AppErrorResponseDto })
+  listRiskConfigAuditLog(
+    @Param() params: GetPortfolioParamsDto,
+    @Query() query: ListRiskConfigAuditLogQueryDto,
+  ): Observable<RiskConfigAuditLogListResponseDto> {
+    return this.portfolioService.listRiskConfigAuditLog(
+      params.portfolioId,
+      query,
+    );
+  }
+
+  @Post(':portfolioId/strategy')
+  @ApiOkResponse()
+  @ApiBadRequestResponse({ type: AppErrorResponseDto })
+  @ApiBadGatewayResponse({ type: AppErrorResponseDto })
+  @ApiGatewayTimeoutResponse({ type: AppErrorResponseDto })
+  @ApiNotFoundResponse({ type: AppErrorResponseDto })
+  assignStrategyToPortfolio(
+    @Param() params: GetPortfolioParamsDto,
+    @Body() body: AssignStrategyBodyDto,
+  ): Observable<AssignStrategyToPortfolioResponseDto> {
+    return this.portfolioService.assignStrategyToPortfolio(
+      params.portfolioId,
+      body,
     );
   }
 }

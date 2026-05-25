@@ -35,4 +35,46 @@ message PortfolioInstrumentConfig {
   string max_trade_notional = 5;
   string max_position_notional = 6;
   string updated_at = 7;
+  optional int32 max_open_trades = 8;
+  optional string max_daily_turnover_notional = 9;
+  optional int32 cooldown_seconds = 10;
+  optional int32 max_consecutive_rejections = 11;
+}
+
+// Strategy defines named signal filter rules assigned to a portfolio.
+message Strategy {
+  string id = 1;
+  string name = 2;
+  optional string description = 3;
+  repeated int32 allowed_sides = 4; // empty means all sides; uses SignalSide values
+  optional int32 min_interval_secs = 5;
+  optional string active_time_start = 6; // "HH:MM" UTC
+  optional string active_time_end = 7;   // "HH:MM" UTC
+  string created_at = 8;
+  string updated_at = 9;
+}
+
+// RiskDecisionEntry is a single risk decision record.
+message RiskDecisionEntry {
+  string id = 1;
+  string portfolio_id = 2;
+  string instrument_id = 3;
+  string decision = 4;           // "APPROVED" | "REJECTED"
+  repeated string reason_codes = 5;
+  string requested_notional = 6;
+  string reference_price = 7;
+  string decided_at = 8;
+  string source_event_id = 9;
+}
+
+// RiskConfigAuditLogEntry is a single config change record.
+message RiskConfigAuditLogEntry {
+  string id = 1;
+  string entity_type = 2;        // "PORTFOLIO" | "INSTRUMENT_CONFIG"
+  string portfolio_id = 3;
+  optional string portfolio_instrument_config_id = 4;
+  string field = 5;
+  optional string old_value = 6;
+  optional string new_value = 7;
+  string changed_at = 8;
 }

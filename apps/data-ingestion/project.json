@@ -26,6 +26,16 @@
         "e2e": {}
       }
     },
+    "serve": {
+      "continuous": true,
+      "executor": "nx:run-commands",
+      "cache": false,
+      "dependsOn": ["build"],
+      "options": {
+        "command": "./target/debug/data-ingestion",
+        "cwd": "{workspaceRoot}"
+      }
+    },
     "build": {
       "executor": "nx:run-commands",
       "cache": true,

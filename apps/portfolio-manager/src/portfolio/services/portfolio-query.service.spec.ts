@@ -40,9 +40,11 @@ describe('PortfolioQueryService', () => {
         name: 'Alpha Portfolio',
         isActive: false,
         exposureCapNotional: toPrismaDecimal('1000'),
+        strategyId: null,
         createdAt: updatedAt,
         updatedAt,
       },
+      strategy: null,
       aggregateExposureNotional: toPrismaDecimal('0'),
       openPositionCount: 0,
       updatedAt,
@@ -73,9 +75,11 @@ describe('PortfolioQueryService', () => {
         name: 'Alpha Portfolio',
         isActive: true,
         exposureCapNotional: toPrismaDecimal('1000'),
+        strategyId: null,
         createdAt: updatedAt,
         updatedAt,
       },
+      strategy: null,
       aggregateExposureNotional: toPrismaDecimal('150.5'),
       openPositionCount: 1,
       updatedAt,
@@ -88,6 +92,10 @@ describe('PortfolioQueryService', () => {
           targetNotional: toPrismaDecimal('100'),
           maxTradeNotional: toPrismaDecimal('150'),
           maxPositionNotional: toPrismaDecimal('400'),
+          maxOpenTrades: null,
+          maxDailyTurnoverNotional: null,
+          cooldownSeconds: null,
+          maxConsecutiveRejections: null,
           createdAt: updatedAt,
           updatedAt,
           instrument: {
@@ -172,6 +180,7 @@ describe('PortfolioQueryService', () => {
           name: 'Alpha Portfolio',
           isActive: true,
           exposureCapNotional: toPrismaDecimal('1000'),
+          strategyId: null,
           createdAt: updatedAt,
           updatedAt,
         },
@@ -194,6 +203,74 @@ describe('PortfolioQueryService', () => {
         },
       ],
     });
+  });
+
+  it('includes strategy in response when portfolio has an assigned strategy', async () => {
+    const updatedAt = new Date('2026-03-25T12:00:00.000Z');
+    repository.findPortfolio.mockResolvedValue({
+      portfolio: {
+        id: 'portfolio-alpha',
+        name: 'Alpha Portfolio',
+        isActive: true,
+        exposureCapNotional: toPrismaDecimal('1000'),
+        strategyId: 'strategy-1',
+        createdAt: updatedAt,
+        updatedAt,
+      },
+      strategy: {
+        id: 'strategy-1',
+        name: 'Momentum Only',
+        description: 'A momentum-based strategy',
+        allowedSides: [1, 2],
+        minIntervalSecs: 300,
+        activeTimeStart: null,
+        activeTimeEnd: null,
+        createdAt: updatedAt,
+        updatedAt,
+      },
+      aggregateExposureNotional: toPrismaDecimal('0'),
+      openPositionCount: 0,
+      updatedAt,
+      positions: [],
+      configuredInstruments: [],
+    });
+
+    const response = await service.getPortfolio('portfolio-alpha');
+
+    expect(response.strategy).toEqual({
+      id: 'strategy-1',
+      name: 'Momentum Only',
+      description: 'A momentum-based strategy',
+      allowedSides: [1, 2],
+      minIntervalSecs: 300,
+      createdAt: '2026-03-25T12:00:00.000Z',
+      updatedAt: '2026-03-25T12:00:00.000Z',
+    });
+  });
+
+  it('omits strategy from response when portfolio has no assigned strategy', async () => {
+    const updatedAt = new Date('2026-03-25T12:00:00.000Z');
+    repository.findPortfolio.mockResolvedValue({
+      portfolio: {
+        id: 'portfolio-alpha',
+        name: 'Alpha Portfolio',
+        isActive: true,
+        exposureCapNotional: toPrismaDecimal('1000'),
+        strategyId: null,
+        createdAt: updatedAt,
+        updatedAt,
+      },
+      strategy: null,
+      aggregateExposureNotional: toPrismaDecimal('0'),
+      openPositionCount: 0,
+      updatedAt,
+      positions: [],
+      configuredInstruments: [],
+    });
+
+    const response = await service.getPortfolio('portfolio-alpha');
+
+    expect(response.strategy).toBeUndefined();
   });
 
   it('throws NOT_FOUND for missing portfolios', async () => {

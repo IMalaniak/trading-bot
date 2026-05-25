@@ -71,22 +71,12 @@ impl AppConfig {
     /// then reads each variable. Returns `AppError::Config` for any missing
     /// required variable.
     pub fn from_env() -> Result<Self, AppError> {
-        // Load .env files in priority order (lowest → highest):
-        //
-        //   1. <workspace-root>/.env  — shared vars (KAFKA_BROKERS, gRPC URLs, …)
-        //   2. <service-dir>/.env     — service-specific overrides
-        //
-        // dotenvy does NOT overwrite a variable that is already set in the process
-        // environment, so whichever file is loaded last wins for duplicate keys.
-        // Real-environment variables (set by Docker / k8s) always win over both.
-        //
-        // We locate the workspace root by walking up from the binary's directory
-        // looking for a Cargo.toml that contains `[workspace]`. Falling back to
-        // the current working directory keeps the existing behaviour for tests and
-        // CI where the process is already started from the repo root.
-        let workspace_root = find_workspace_root();
-        dotenvy::from_path(workspace_root.join(".env")).ok(); // shared — ignore if missing
-        dotenvy::dotenv().ok(); // local service .env — ignore if missing
+        #[cfg(not(test))]
+        {
+            let workspace_root = find_workspace_root();
+            dotenvy::from_path(workspace_root.join(".env")).ok(); // shared — ignore if missing
+            dotenvy::dotenv().ok(); // local service .env — ignore if missing
+        }
 
         Ok(AppConfig {
             database_url: require_var("DATA_INGESTION_DATABASE_URL")?,

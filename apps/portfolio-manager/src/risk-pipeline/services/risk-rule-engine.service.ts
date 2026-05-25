@@ -15,6 +15,8 @@ interface EvaluateRiskInput {
   trade: SizedTrade;
   activeInstrumentReservedNotional: SizedTrade['requestedNotional'];
   activePortfolioReservedNotional: SizedTrade['requestedNotional'];
+  activeInstrumentReservationCount: number;
+  dailyTradedNotional: SizedTrade['requestedNotional'];
 }
 
 @Injectable()
@@ -25,6 +27,8 @@ export class RiskRuleEngine {
       trade,
       activeInstrumentReservedNotional,
       activePortfolioReservedNotional,
+      activeInstrumentReservationCount,
+      dailyTradedNotional,
     } = input;
 
     if (!config.enabled) {
@@ -64,6 +68,30 @@ export class RiskRuleEngine {
         ...trade,
         decision: RiskDecisionStatus.REJECTED,
         reasonCodes: [RiskDecisionReasonCode.PORTFOLIO_EXPOSURE_CAP_EXCEEDED],
+      };
+    }
+
+    if (
+      config.maxOpenTrades !== null &&
+      activeInstrumentReservationCount >= config.maxOpenTrades
+    ) {
+      return {
+        ...trade,
+        decision: RiskDecisionStatus.REJECTED,
+        reasonCodes: [RiskDecisionReasonCode.MAX_OPEN_TRADES_EXCEEDED],
+      };
+    }
+
+    if (
+      config.maxDailyTurnoverNotional !== null &&
+      dailyTradedNotional
+        .plus(trade.requestedNotional)
+        .gt(config.maxDailyTurnoverNotional)
+    ) {
+      return {
+        ...trade,
+        decision: RiskDecisionStatus.REJECTED,
+        reasonCodes: [RiskDecisionReasonCode.DAILY_TURNOVER_LIMIT_EXCEEDED],
       };
     }
 

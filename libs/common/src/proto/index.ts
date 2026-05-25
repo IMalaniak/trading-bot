@@ -10,6 +10,9 @@ export {
   PortfolioInstrumentConfig,
   PortfolioSummary,
   Position,
+  RiskConfigAuditLogEntry,
+  RiskDecisionEntry,
+  Strategy,
 } from './common/portfolio';
 export { Signal, SignalSide } from './common/signal';
 export {
@@ -52,15 +55,33 @@ export {
   StopMarketDataSubscriptionResponse,
 } from './services/external_api_facade';
 export {
+  AssignStrategyToPortfolioRequest,
+  AssignStrategyToPortfolioResponse,
+  CreateStrategyRequest,
+  CreateStrategyResponse,
   GetPortfolioRequest,
   GetPortfolioResponse,
+  GetStrategyRequest,
+  GetStrategyResponse,
   ListInstrumentsRequest,
   ListInstrumentsResponse,
   ListPortfoliosRequest,
   ListPortfoliosResponse,
+  ListRiskConfigAuditLogRequest,
+  ListRiskConfigAuditLogResponse,
+  ListRiskDecisionsRequest,
+  ListRiskDecisionsResponse,
+  ListStrategiesRequest,
+  ListStrategiesResponse,
   protobufPackage as PROTOBUF_SERVICES_PORTFOLIO_MANAGER_PACKAGE,
   RegisterPortfolioInstrumentRequest,
   RegisterPortfolioInstrumentResponse,
+  UpdatePortfolioInstrumentConfigRequest,
+  UpdatePortfolioInstrumentConfigResponse,
+  UpdatePortfolioRequest,
+  UpdatePortfolioResponse,
+  UpdateStrategyRequest,
+  UpdateStrategyResponse,
 } from './services/portfolio_manager';
 export {
   GetLatestSignalsRequest,

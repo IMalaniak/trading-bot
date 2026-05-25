@@ -152,6 +152,18 @@ describe('App', () => {
         return Promise.resolve(jsonResponse(signalsFixture));
       }
 
+      if (url === 'http://localhost:3000/api/strategies') {
+        return Promise.resolve(jsonResponse({ strategies: [] }));
+      }
+
+      if (url.includes('/decisions')) {
+        return Promise.resolve(jsonResponse({ decisions: [] }));
+      }
+
+      if (url.includes('/audit')) {
+        return Promise.resolve(jsonResponse({ entries: [] }));
+      }
+
       return Promise.resolve(jsonResponse(portfolioFixture));
     });
     vi.stubGlobal('fetch', fetchMock);
@@ -175,17 +187,21 @@ describe('App', () => {
   it('renders empty configured instruments, positions, and orders states', async () => {
     vi.stubGlobal(
       'fetch',
-      vi
-        .fn()
-        .mockImplementation((url: string) =>
-          Promise.resolve(
-            jsonResponse(
-              url === 'http://localhost:3000/api/signals?limit=10'
-                ? emptySignalsFixture
-                : emptyPortfolioFixture,
-            ),
-          ),
-        ),
+      vi.fn().mockImplementation((url: string) => {
+        if (url === 'http://localhost:3000/api/signals?limit=10') {
+          return Promise.resolve(jsonResponse(emptySignalsFixture));
+        }
+        if (url === 'http://localhost:3000/api/strategies') {
+          return Promise.resolve(jsonResponse({ strategies: [] }));
+        }
+        if (url.includes('/decisions')) {
+          return Promise.resolve(jsonResponse({ decisions: [] }));
+        }
+        if (url.includes('/audit')) {
+          return Promise.resolve(jsonResponse({ entries: [] }));
+        }
+        return Promise.resolve(jsonResponse(emptyPortfolioFixture));
+      }),
     );
 
     renderApp(['/portfolios/portfolio-alpha']);
@@ -201,6 +217,13 @@ describe('App', () => {
     const fetchMock = vi
       .fn()
       .mockImplementation((url: string, init?: RequestInit) => {
+        if (
+          url === 'http://localhost:3000/api/strategies' &&
+          init?.method !== 'POST'
+        ) {
+          return Promise.resolve(jsonResponse({ strategies: [] }));
+        }
+
         if (init?.method === 'POST') {
           return Promise.resolve(
             jsonResponse({
@@ -223,6 +246,14 @@ describe('App', () => {
 
         if (url === 'http://localhost:3000/api/signals?limit=10') {
           return Promise.resolve(jsonResponse(emptySignalsFixture));
+        }
+
+        if (url.includes('/decisions')) {
+          return Promise.resolve(jsonResponse({ decisions: [] }));
+        }
+
+        if (url.includes('/audit')) {
+          return Promise.resolve(jsonResponse({ entries: [] }));
         }
 
         return Promise.resolve(jsonResponse(emptyPortfolioFixture));
@@ -271,6 +302,13 @@ describe('App', () => {
     const fetchMock = vi
       .fn()
       .mockImplementation((url: string, init?: RequestInit) => {
+        if (
+          url === 'http://localhost:3000/api/strategies' &&
+          init?.method !== 'POST'
+        ) {
+          return Promise.resolve(jsonResponse({ strategies: [] }));
+        }
+
         if (init?.method === 'POST') {
           return Promise.resolve(
             jsonResponse(
@@ -285,6 +323,14 @@ describe('App', () => {
 
         if (url === 'http://localhost:3000/api/signals?limit=10') {
           return Promise.resolve(jsonResponse(emptySignalsFixture));
+        }
+
+        if (url.includes('/decisions')) {
+          return Promise.resolve(jsonResponse({ decisions: [] }));
+        }
+
+        if (url.includes('/audit')) {
+          return Promise.resolve(jsonResponse({ entries: [] }));
         }
 
         return Promise.resolve(jsonResponse(emptyPortfolioFixture));

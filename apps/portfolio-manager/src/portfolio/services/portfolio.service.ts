@@ -6,11 +6,11 @@ import {
   RegisterPortfolioInstrumentResponse,
 } from '@trading-bot/common/proto';
 
-import { EventDispatcherService } from '../event-dispatcher/event-dispatcher.service';
-import { InstrumentModel } from '../prisma/generated/models';
-import { PrismaService } from '../prisma/prisma.service';
-import { InstrumentRegisteredEventFactory } from './events/instrument-registered-event.factory';
-import { PortfolioReadMapper } from './mapper/portfolio-read.mapper';
+import { EventDispatcherService } from '../../event-dispatcher/event-dispatcher.service';
+import { InstrumentModel } from '../../prisma/generated/models';
+import { PrismaService } from '../../prisma/prisma.service';
+import { InstrumentRegisteredEventFactory } from '../events/instrument-registered-event.factory';
+import { PortfolioReadMapper } from '../mapper/portfolio-read.mapper';
 
 export const PORTFOLIO_NOT_FOUND_ERROR = 'Portfolio was not found';
 export const INSTRUMENT_ALREADY_ATTACHED_ERROR =

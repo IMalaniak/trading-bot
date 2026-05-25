@@ -157,6 +157,10 @@ describe('InstrumentStageService', () => {
         maxTradeNotional: toPrismaDecimal('150'),
         maxPositionNotional: toPrismaDecimal('250'),
         portfolioExposureCapNotional: toPrismaDecimal('500'),
+        maxOpenTrades: null,
+        maxDailyTurnoverNotional: null,
+        cooldownSeconds: null,
+        maxConsecutiveRejections: null,
       },
     ]);
     signalReceiptRepository.create.mockResolvedValue({

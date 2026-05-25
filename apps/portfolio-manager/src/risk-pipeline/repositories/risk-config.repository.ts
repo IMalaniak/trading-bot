@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../prisma/prisma.service';
 import { PrismaDbClient } from '../../prisma/prisma-db-client';
+import { toPrismaDecimal } from '../../prisma/prisma-decimal';
 import { PortfolioRiskConfig } from '../types/risk-types';
 
 @Injectable()
@@ -51,6 +52,12 @@ export class RiskConfigRepository {
       maxTradeNotional: config.maxTradeNotional,
       maxPositionNotional: config.maxPositionNotional,
       portfolioExposureCapNotional: config.portfolio.exposureCapNotional,
+      maxOpenTrades: config.maxOpenTrades,
+      maxDailyTurnoverNotional: config.maxDailyTurnoverNotional
+        ? toPrismaDecimal(config.maxDailyTurnoverNotional.toString())
+        : null,
+      cooldownSeconds: config.cooldownSeconds,
+      maxConsecutiveRejections: config.maxConsecutiveRejections,
     }));
   }
 
@@ -88,6 +95,12 @@ export class RiskConfigRepository {
       maxTradeNotional: config.maxTradeNotional,
       maxPositionNotional: config.maxPositionNotional,
       portfolioExposureCapNotional: config.portfolio.exposureCapNotional,
+      maxOpenTrades: config.maxOpenTrades,
+      maxDailyTurnoverNotional: config.maxDailyTurnoverNotional
+        ? toPrismaDecimal(config.maxDailyTurnoverNotional.toString())
+        : null,
+      cooldownSeconds: config.cooldownSeconds,
+      maxConsecutiveRejections: config.maxConsecutiveRejections,
     };
   }
 }

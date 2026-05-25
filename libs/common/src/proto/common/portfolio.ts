@@ -44,6 +44,59 @@ export interface PortfolioInstrumentConfig {
   maxTradeNotional: string;
   maxPositionNotional: string;
   updatedAt: string;
+  maxOpenTrades?: number | undefined;
+  maxDailyTurnoverNotional?: string | undefined;
+  cooldownSeconds?: number | undefined;
+  maxConsecutiveRejections?: number | undefined;
+}
+
+/** Strategy defines named signal filter rules assigned to a portfolio. */
+export interface Strategy {
+  id: string;
+  name: string;
+  description?:
+    | string
+    | undefined;
+  /** empty means all sides; uses SignalSide values */
+  allowedSides: number[];
+  minIntervalSecs?:
+    | number
+    | undefined;
+  /** "HH:MM" UTC */
+  activeTimeStart?:
+    | string
+    | undefined;
+  /** "HH:MM" UTC */
+  activeTimeEnd?: string | undefined;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** RiskDecisionEntry is a single risk decision record. */
+export interface RiskDecisionEntry {
+  id: string;
+  portfolioId: string;
+  instrumentId: string;
+  /** "APPROVED" | "REJECTED" */
+  decision: string;
+  reasonCodes: string[];
+  requestedNotional: string;
+  referencePrice: string;
+  decidedAt: string;
+  sourceEventId: string;
+}
+
+/** RiskConfigAuditLogEntry is a single config change record. */
+export interface RiskConfigAuditLogEntry {
+  id: string;
+  /** "PORTFOLIO" | "INSTRUMENT_CONFIG" */
+  entityType: string;
+  portfolioId: string;
+  portfolioInstrumentConfigId?: string | undefined;
+  field: string;
+  oldValue?: string | undefined;
+  newValue?: string | undefined;
+  changedAt: string;
 }
 
 function createBasePosition(): Position {
@@ -309,6 +362,10 @@ function createBasePortfolioInstrumentConfig(): PortfolioInstrumentConfig {
     maxTradeNotional: "",
     maxPositionNotional: "",
     updatedAt: "",
+    maxOpenTrades: undefined,
+    maxDailyTurnoverNotional: undefined,
+    cooldownSeconds: undefined,
+    maxConsecutiveRejections: undefined,
   };
 }
 
@@ -334,6 +391,18 @@ export const PortfolioInstrumentConfig: MessageFns<PortfolioInstrumentConfig> = 
     }
     if (message.updatedAt !== "") {
       writer.uint32(58).string(message.updatedAt);
+    }
+    if (message.maxOpenTrades !== undefined) {
+      writer.uint32(64).int32(message.maxOpenTrades);
+    }
+    if (message.maxDailyTurnoverNotional !== undefined) {
+      writer.uint32(74).string(message.maxDailyTurnoverNotional);
+    }
+    if (message.cooldownSeconds !== undefined) {
+      writer.uint32(80).int32(message.cooldownSeconds);
+    }
+    if (message.maxConsecutiveRejections !== undefined) {
+      writer.uint32(88).int32(message.maxConsecutiveRejections);
     }
     return writer;
   },
@@ -401,6 +470,38 @@ export const PortfolioInstrumentConfig: MessageFns<PortfolioInstrumentConfig> = 
           message.updatedAt = reader.string();
           continue;
         }
+        case 8: {
+          if (tag !== 64) {
+            break;
+          }
+
+          message.maxOpenTrades = reader.int32();
+          continue;
+        }
+        case 9: {
+          if (tag !== 74) {
+            break;
+          }
+
+          message.maxDailyTurnoverNotional = reader.string();
+          continue;
+        }
+        case 10: {
+          if (tag !== 80) {
+            break;
+          }
+
+          message.cooldownSeconds = reader.int32();
+          continue;
+        }
+        case 11: {
+          if (tag !== 88) {
+            break;
+          }
+
+          message.maxConsecutiveRejections = reader.int32();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -424,6 +525,465 @@ export const PortfolioInstrumentConfig: MessageFns<PortfolioInstrumentConfig> = 
     message.maxTradeNotional = object.maxTradeNotional ?? "";
     message.maxPositionNotional = object.maxPositionNotional ?? "";
     message.updatedAt = object.updatedAt ?? "";
+    message.maxOpenTrades = object.maxOpenTrades ?? undefined;
+    message.maxDailyTurnoverNotional = object.maxDailyTurnoverNotional ?? undefined;
+    message.cooldownSeconds = object.cooldownSeconds ?? undefined;
+    message.maxConsecutiveRejections = object.maxConsecutiveRejections ?? undefined;
+    return message;
+  },
+};
+
+function createBaseStrategy(): Strategy {
+  return {
+    id: "",
+    name: "",
+    description: undefined,
+    allowedSides: [],
+    minIntervalSecs: undefined,
+    activeTimeStart: undefined,
+    activeTimeEnd: undefined,
+    createdAt: "",
+    updatedAt: "",
+  };
+}
+
+export const Strategy: MessageFns<Strategy> = {
+  encode(message: Strategy, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.id !== "") {
+      writer.uint32(10).string(message.id);
+    }
+    if (message.name !== "") {
+      writer.uint32(18).string(message.name);
+    }
+    if (message.description !== undefined) {
+      writer.uint32(26).string(message.description);
+    }
+    writer.uint32(34).fork();
+    for (const v of message.allowedSides) {
+      writer.int32(v);
+    }
+    writer.join();
+    if (message.minIntervalSecs !== undefined) {
+      writer.uint32(40).int32(message.minIntervalSecs);
+    }
+    if (message.activeTimeStart !== undefined) {
+      writer.uint32(50).string(message.activeTimeStart);
+    }
+    if (message.activeTimeEnd !== undefined) {
+      writer.uint32(58).string(message.activeTimeEnd);
+    }
+    if (message.createdAt !== "") {
+      writer.uint32(66).string(message.createdAt);
+    }
+    if (message.updatedAt !== "") {
+      writer.uint32(74).string(message.updatedAt);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): Strategy {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseStrategy();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.id = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.name = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.description = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag === 32) {
+            message.allowedSides.push(reader.int32());
+
+            continue;
+          }
+
+          if (tag === 34) {
+            const end2 = reader.uint32() + reader.pos;
+            while (reader.pos < end2) {
+              message.allowedSides.push(reader.int32());
+            }
+
+            continue;
+          }
+
+          break;
+        }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.minIntervalSecs = reader.int32();
+          continue;
+        }
+        case 6: {
+          if (tag !== 50) {
+            break;
+          }
+
+          message.activeTimeStart = reader.string();
+          continue;
+        }
+        case 7: {
+          if (tag !== 58) {
+            break;
+          }
+
+          message.activeTimeEnd = reader.string();
+          continue;
+        }
+        case 8: {
+          if (tag !== 66) {
+            break;
+          }
+
+          message.createdAt = reader.string();
+          continue;
+        }
+        case 9: {
+          if (tag !== 74) {
+            break;
+          }
+
+          message.updatedAt = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  create<I extends Exact<DeepPartial<Strategy>, I>>(base?: I): Strategy {
+    return Strategy.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<Strategy>, I>>(object: I): Strategy {
+    const message = createBaseStrategy();
+    message.id = object.id ?? "";
+    message.name = object.name ?? "";
+    message.description = object.description ?? undefined;
+    message.allowedSides = object.allowedSides?.map((e) => e) || [];
+    message.minIntervalSecs = object.minIntervalSecs ?? undefined;
+    message.activeTimeStart = object.activeTimeStart ?? undefined;
+    message.activeTimeEnd = object.activeTimeEnd ?? undefined;
+    message.createdAt = object.createdAt ?? "";
+    message.updatedAt = object.updatedAt ?? "";
+    return message;
+  },
+};
+
+function createBaseRiskDecisionEntry(): RiskDecisionEntry {
+  return {
+    id: "",
+    portfolioId: "",
+    instrumentId: "",
+    decision: "",
+    reasonCodes: [],
+    requestedNotional: "",
+    referencePrice: "",
+    decidedAt: "",
+    sourceEventId: "",
+  };
+}
+
+export const RiskDecisionEntry: MessageFns<RiskDecisionEntry> = {
+  encode(message: RiskDecisionEntry, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.id !== "") {
+      writer.uint32(10).string(message.id);
+    }
+    if (message.portfolioId !== "") {
+      writer.uint32(18).string(message.portfolioId);
+    }
+    if (message.instrumentId !== "") {
+      writer.uint32(26).string(message.instrumentId);
+    }
+    if (message.decision !== "") {
+      writer.uint32(34).string(message.decision);
+    }
+    for (const v of message.reasonCodes) {
+      writer.uint32(42).string(v!);
+    }
+    if (message.requestedNotional !== "") {
+      writer.uint32(50).string(message.requestedNotional);
+    }
+    if (message.referencePrice !== "") {
+      writer.uint32(58).string(message.referencePrice);
+    }
+    if (message.decidedAt !== "") {
+      writer.uint32(66).string(message.decidedAt);
+    }
+    if (message.sourceEventId !== "") {
+      writer.uint32(74).string(message.sourceEventId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): RiskDecisionEntry {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseRiskDecisionEntry();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.id = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.portfolioId = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.instrumentId = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.decision = reader.string();
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.reasonCodes.push(reader.string());
+          continue;
+        }
+        case 6: {
+          if (tag !== 50) {
+            break;
+          }
+
+          message.requestedNotional = reader.string();
+          continue;
+        }
+        case 7: {
+          if (tag !== 58) {
+            break;
+          }
+
+          message.referencePrice = reader.string();
+          continue;
+        }
+        case 8: {
+          if (tag !== 66) {
+            break;
+          }
+
+          message.decidedAt = reader.string();
+          continue;
+        }
+        case 9: {
+          if (tag !== 74) {
+            break;
+          }
+
+          message.sourceEventId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  create<I extends Exact<DeepPartial<RiskDecisionEntry>, I>>(base?: I): RiskDecisionEntry {
+    return RiskDecisionEntry.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<RiskDecisionEntry>, I>>(object: I): RiskDecisionEntry {
+    const message = createBaseRiskDecisionEntry();
+    message.id = object.id ?? "";
+    message.portfolioId = object.portfolioId ?? "";
+    message.instrumentId = object.instrumentId ?? "";
+    message.decision = object.decision ?? "";
+    message.reasonCodes = object.reasonCodes?.map((e) => e) || [];
+    message.requestedNotional = object.requestedNotional ?? "";
+    message.referencePrice = object.referencePrice ?? "";
+    message.decidedAt = object.decidedAt ?? "";
+    message.sourceEventId = object.sourceEventId ?? "";
+    return message;
+  },
+};
+
+function createBaseRiskConfigAuditLogEntry(): RiskConfigAuditLogEntry {
+  return {
+    id: "",
+    entityType: "",
+    portfolioId: "",
+    portfolioInstrumentConfigId: undefined,
+    field: "",
+    oldValue: undefined,
+    newValue: undefined,
+    changedAt: "",
+  };
+}
+
+export const RiskConfigAuditLogEntry: MessageFns<RiskConfigAuditLogEntry> = {
+  encode(message: RiskConfigAuditLogEntry, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.id !== "") {
+      writer.uint32(10).string(message.id);
+    }
+    if (message.entityType !== "") {
+      writer.uint32(18).string(message.entityType);
+    }
+    if (message.portfolioId !== "") {
+      writer.uint32(26).string(message.portfolioId);
+    }
+    if (message.portfolioInstrumentConfigId !== undefined) {
+      writer.uint32(34).string(message.portfolioInstrumentConfigId);
+    }
+    if (message.field !== "") {
+      writer.uint32(42).string(message.field);
+    }
+    if (message.oldValue !== undefined) {
+      writer.uint32(50).string(message.oldValue);
+    }
+    if (message.newValue !== undefined) {
+      writer.uint32(58).string(message.newValue);
+    }
+    if (message.changedAt !== "") {
+      writer.uint32(66).string(message.changedAt);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): RiskConfigAuditLogEntry {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseRiskConfigAuditLogEntry();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.id = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.entityType = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.portfolioId = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.portfolioInstrumentConfigId = reader.string();
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.field = reader.string();
+          continue;
+        }
+        case 6: {
+          if (tag !== 50) {
+            break;
+          }
+
+          message.oldValue = reader.string();
+          continue;
+        }
+        case 7: {
+          if (tag !== 58) {
+            break;
+          }
+
+          message.newValue = reader.string();
+          continue;
+        }
+        case 8: {
+          if (tag !== 66) {
+            break;
+          }
+
+          message.changedAt = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  create<I extends Exact<DeepPartial<RiskConfigAuditLogEntry>, I>>(base?: I): RiskConfigAuditLogEntry {
+    return RiskConfigAuditLogEntry.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<RiskConfigAuditLogEntry>, I>>(object: I): RiskConfigAuditLogEntry {
+    const message = createBaseRiskConfigAuditLogEntry();
+    message.id = object.id ?? "";
+    message.entityType = object.entityType ?? "";
+    message.portfolioId = object.portfolioId ?? "";
+    message.portfolioInstrumentConfigId = object.portfolioInstrumentConfigId ?? undefined;
+    message.field = object.field ?? "";
+    message.oldValue = object.oldValue ?? undefined;
+    message.newValue = object.newValue ?? undefined;
+    message.changedAt = object.changedAt ?? "";
     return message;
   },
 };

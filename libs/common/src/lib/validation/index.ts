@@ -1,1 +1,1 @@
-export * from './decimal-string-pattern';
+export * from './regex-patterns';

@@ -23,7 +23,7 @@ import { AppModule } from '../app.module';
 import { portfolioManagerRuntimeConfig } from '../config/runtime.config';
 import { EventDispatcherService } from '../event-dispatcher/event-dispatcher.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { PortfolioService } from './portfolio.service';
+import { PortfolioService } from './services/portfolio.service';
 
 describe('PortfolioService integration', () => {
   let moduleRef: TestingModule;

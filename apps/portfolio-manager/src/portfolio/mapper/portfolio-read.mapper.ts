@@ -5,9 +5,11 @@ import {
   ListPortfoliosResponse,
   PortfolioInstrumentConfig,
   PortfolioSummary,
+  Strategy,
 } from '@trading-bot/common/proto';
 
 import { InstrumentModel } from '../../prisma/generated/models';
+import { StrategyModel } from '../../prisma/generated/models';
 import { prismaDecimalToString } from '../../prisma/prisma-decimal';
 import {
   PortfolioInstrumentConfigReadModel,
@@ -35,6 +37,7 @@ export class PortfolioReadMapper {
       configuredInstruments: state.configuredInstruments.map((config) =>
         this.mapConfiguredInstrument(config),
       ),
+      strategy: state.strategy ? this.mapStrategy(state.strategy) : undefined,
     };
   }
 
@@ -57,6 +60,20 @@ export class PortfolioReadMapper {
       maxTradeNotional: prismaDecimalToString(config.maxTradeNotional),
       maxPositionNotional: prismaDecimalToString(config.maxPositionNotional),
       updatedAt: config.updatedAt.toISOString(),
+      ...(config.maxOpenTrades != null && {
+        maxOpenTrades: config.maxOpenTrades,
+      }),
+      ...(config.maxDailyTurnoverNotional != null && {
+        maxDailyTurnoverNotional: prismaDecimalToString(
+          config.maxDailyTurnoverNotional,
+        ),
+      }),
+      ...(config.cooldownSeconds != null && {
+        cooldownSeconds: config.cooldownSeconds,
+      }),
+      ...(config.maxConsecutiveRejections != null && {
+        maxConsecutiveRejections: config.maxConsecutiveRejections,
+      }),
     };
   }
 
@@ -67,6 +84,28 @@ export class PortfolioReadMapper {
       instruments: instruments.map((instrument) =>
         this.instrumentMapper.map(instrument),
       ),
+    };
+  }
+
+  mapStrategy(strategy: StrategyModel): Strategy {
+    return {
+      id: strategy.id,
+      name: strategy.name,
+      ...(strategy.description != null && {
+        description: strategy.description,
+      }),
+      allowedSides: strategy.allowedSides,
+      ...(strategy.minIntervalSecs != null && {
+        minIntervalSecs: strategy.minIntervalSecs,
+      }),
+      ...(strategy.activeTimeStart != null && {
+        activeTimeStart: strategy.activeTimeStart,
+      }),
+      ...(strategy.activeTimeEnd != null && {
+        activeTimeEnd: strategy.activeTimeEnd,
+      }),
+      createdAt: strategy.createdAt.toISOString(),
+      updatedAt: strategy.updatedAt.toISOString(),
     };
   }
 

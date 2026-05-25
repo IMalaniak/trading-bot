@@ -1,12 +1,11 @@
-import { AssetClass, OrderStatus, SignalSide } from '@trading-bot/common/proto';
+import { AssetClass, OrderStatus, SignalSide } from '../../proto';
+import { AssetClassName } from '../enums/asset-class-name.enum';
+import { OrderStatusName } from '../enums/order-status-name.enum';
+import { SignalSideName } from '../enums/signal-side-name.enum';
 
-import { AssetClassName } from '../dto/asset-class-name.enum';
-import { OrderStatusName } from '../dto/order-status-name.enum';
-import { SignalSideName } from '../dto/signal-side-name.enum';
-
-export const assetClassNameToAssetClass: (
+export const assetClassNameToAssetClass = (
   name: AssetClassName,
-) => AssetClass = (name: AssetClassName) => {
+): AssetClass => {
   switch (name) {
     case AssetClassName.ASSET_CLASS_UNSPECIFIED:
       return AssetClass.ASSET_CLASS_UNSPECIFIED;
@@ -19,7 +18,9 @@ export const assetClassNameToAssetClass: (
   }
 };
 
-export const assetClassToAssetClassName = (assetClass: AssetClass) => {
+export const assetClassToAssetClassName = (
+  assetClass: AssetClass,
+): AssetClassName => {
   switch (assetClass) {
     case AssetClass.ASSET_CLASS_UNSPECIFIED:
       return AssetClassName.ASSET_CLASS_UNSPECIFIED;
@@ -61,5 +62,37 @@ export const orderStatusToOrderStatusName = (
       return OrderStatusName.ORDER_STATUS_UNSPECIFIED;
     default:
       return OrderStatusName.ORDER_STATUS_UNSPECIFIED;
+  }
+};
+
+export const signalSideNameToSignalSide = (
+  name: SignalSideName,
+): SignalSide => {
+  switch (name) {
+    case SignalSideName.BUY:
+      return SignalSide.BUY;
+    case SignalSideName.SELL:
+      return SignalSide.SELL;
+    case SignalSideName.SIGNAL_SIDE_UNSPECIFIED:
+      return SignalSide.SIGNAL_SIDE_UNSPECIFIED;
+    default:
+      return SignalSide.UNRECOGNIZED;
+  }
+};
+
+export const orderStatusNameToOrderStatus = (
+  name: OrderStatusName,
+): OrderStatus => {
+  switch (name) {
+    case OrderStatusName.PLACED:
+      return OrderStatus.PLACED;
+    case OrderStatusName.PARTIALLY_FILLED:
+      return OrderStatus.PARTIALLY_FILLED;
+    case OrderStatusName.FILLED:
+      return OrderStatus.FILLED;
+    case OrderStatusName.ORDER_STATUS_UNSPECIFIED:
+      return OrderStatus.ORDER_STATUS_UNSPECIFIED;
+    default:
+      return OrderStatus.UNRECOGNIZED;
   }
 };
