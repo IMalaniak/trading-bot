@@ -35,7 +35,7 @@ rust_decimal = { version = "=1.42.0", features = ["serde-with-str"] }
 
 # Serialization / deserialization (JSON, etc.)
 serde = { version = "=1.0.228", features = ["derive"] }
-serde_json = { version = "=1.0.149" }
+serde_json = { version = "=1.0.150" }
 
 # Structured logging (like `pino` in Node)
 tracing = { version = "=0.1.44" }
