@@ -20,7 +20,7 @@ tokio = { version = "=1.52.3", features = ["full"] }
 
 # gRPC framework (wraps tonic) + protobuf codec
 tonic = { version = "=0.12.3" }
-prost = { version = "=0.13.5" }
+prost = { version = "=0.14.4" }
 prost-types = { version = "=0.13.5" }
 
 # Kafka client (librdkafka bindings)

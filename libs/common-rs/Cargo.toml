@@ -49,4 +49,4 @@ async-trait.workspace = true
 # Centralising this here means every future Rust crate just depends on
 # `trading-common` and gets all proto types — no per-crate build.rs needed.
 tonic-build = { version = "=0.12.3" }
-prost-build = { version = "=0.13.5" }
+prost-build = { version = "=0.14.4" }
