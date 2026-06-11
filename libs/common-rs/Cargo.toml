@@ -48,5 +48,5 @@ async-trait.workspace = true
 #   - tonic service traits (like DataIngestion server/client stubs)
 # Centralising this here means every future Rust crate just depends on
 # `trading-common` and gets all proto types — no per-crate build.rs needed.
-tonic-build = { version = "=0.12.3" }
+tonic-build = { version = "=0.14.6" }
 prost-build = { version = "=0.13.5" }
