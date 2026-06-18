@@ -142,7 +142,7 @@ jobs:
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: "1.95"
+          toolchain: "1.95.0"
           components: clippy, rustfmt
 
       - name: Cache Cargo
@@ -284,7 +284,7 @@ jobs:
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: "1.95"
+          toolchain: "1.95.0"
 
       - name: Cache Cargo
         uses: Swatinem/rust-cache@v2.9.1
@@ -363,7 +363,7 @@ jobs:
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: "1.95"
+          toolchain: "1.95.0"
 
       - name: Cache Cargo
         uses: Swatinem/rust-cache@v2.9.1
@@ -451,7 +451,7 @@ jobs:
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: "1.95"
+          toolchain: "1.95.0"
 
       - name: Cache Cargo
         uses: Swatinem/rust-cache@v2.9.1
@@ -547,7 +547,7 @@ jobs:
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: "1.95"
+          toolchain: "1.95.0"
 
       - name: Cache Cargo
         uses: Swatinem/rust-cache@v2.9.1
