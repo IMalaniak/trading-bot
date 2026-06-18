@@ -23,18 +23,18 @@ jobs:
       run_all_rust: ${{ steps.detect.outputs.run_all_rust }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v6.0.3
         with:
           fetch-depth: 0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v6.4.0
         with:
           node-version-file: .nvmrc
           cache: npm
 
       - name: Cache Nx
-        uses: actions/cache@v5
+        uses: actions/cache@v5.0.5
         with:
           path: ~/.cache/nx
           key: nx-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json') }}
@@ -45,7 +45,7 @@ jobs:
         run: npm ci
 
       - name: Cache node_modules
-        uses: actions/cache@v5
+        uses: actions/cache@v5.0.5
         with:
           path: |
             node_modules
@@ -101,17 +101,17 @@ jobs:
       HEAD: ${{ needs.prepare.outputs.head }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v6.0.3
         with:
           fetch-depth: 0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v6.4.0
         with:
           node-version-file: .nvmrc
 
       - name: Cache Nx
-        uses: actions/cache@v5
+        uses: actions/cache@v5.0.5
         with:
           path: ~/.cache/nx
           key: nx-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json') }}
@@ -120,7 +120,7 @@ jobs:
 
       - name: Restore node_modules
         id: nm-cache
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@v5.0.5
         with:
           path: |
             node_modules
@@ -146,7 +146,7 @@ jobs:
           components: clippy, rustfmt
 
       - name: Cache Cargo
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@v2.9.1
         with:
           shared-key: "rust"
 
@@ -160,7 +160,7 @@ jobs:
 
       - name: Upload artifacts on failure
         if: failure()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: lint-logs
           path: |
@@ -181,17 +181,17 @@ jobs:
       HEAD: ${{ needs.prepare.outputs.head }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v6.0.3
         with:
           fetch-depth: 0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v6.4.0
         with:
           node-version-file: .nvmrc
 
       - name: Cache Nx
-        uses: actions/cache@v5
+        uses: actions/cache@v5.0.5
         with:
           path: ~/.cache/nx
           key: nx-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json') }}
@@ -200,7 +200,7 @@ jobs:
 
       - name: Restore node_modules
         id: nm-cache
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@v5.0.5
         with:
           path: |
             node_modules
@@ -224,7 +224,7 @@ jobs:
 
       - name: Upload artifacts on failure
         if: failure()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: typecheck-logs
           path: |
@@ -243,17 +243,17 @@ jobs:
       HEAD: ${{ needs.prepare.outputs.head }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v6.0.3
         with:
           fetch-depth: 0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v6.4.0
         with:
           node-version-file: .nvmrc
 
       - name: Cache Nx
-        uses: actions/cache@v5
+        uses: actions/cache@v5.0.5
         with:
           path: ~/.cache/nx
           key: nx-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json') }}
@@ -262,7 +262,7 @@ jobs:
 
       - name: Restore node_modules
         id: nm-cache
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@v5.0.5
         with:
           path: |
             node_modules
@@ -287,7 +287,7 @@ jobs:
           toolchain: "1.95"
 
       - name: Cache Cargo
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@v2.9.1
         with:
           shared-key: "rust"
 
@@ -301,7 +301,7 @@ jobs:
 
       - name: Upload artifacts on failure
         if: failure()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: test-logs
           path: |
@@ -322,17 +322,17 @@ jobs:
       HEAD: ${{ needs.prepare.outputs.head }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v6.0.3
         with:
           fetch-depth: 0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v6.4.0
         with:
           node-version-file: .nvmrc
 
       - name: Cache Nx
-        uses: actions/cache@v5
+        uses: actions/cache@v5.0.5
         with:
           path: ~/.cache/nx
           key: nx-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json') }}
@@ -341,7 +341,7 @@ jobs:
 
       - name: Restore node_modules
         id: nm-cache
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@v5.0.5
         with:
           path: |
             node_modules
@@ -366,12 +366,12 @@ jobs:
           toolchain: "1.95"
 
       - name: Cache Cargo
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@v2.9.1
         with:
           shared-key: "rust"
 
       - name: Install sqlx-cli
-        uses: taiki-e/install-action@v2
+        uses: taiki-e/install-action@v2.82.0
         with:
           tool: sqlx-cli
 
@@ -389,7 +389,7 @@ jobs:
 
       - name: Upload artifacts on failure
         if: failure()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: integration-test-logs
           path: |
@@ -410,17 +410,17 @@ jobs:
       HEAD: ${{ needs.prepare.outputs.head }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v6.0.3
         with:
           fetch-depth: 0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v6.4.0
         with:
           node-version-file: .nvmrc
 
       - name: Cache Nx
-        uses: actions/cache@v5
+        uses: actions/cache@v5.0.5
         with:
           path: ~/.cache/nx
           key: nx-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json') }}
@@ -429,7 +429,7 @@ jobs:
 
       - name: Restore node_modules
         id: nm-cache
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@v5.0.5
         with:
           path: |
             node_modules
@@ -454,17 +454,17 @@ jobs:
           toolchain: "1.95"
 
       - name: Cache Cargo
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@v2.9.1
         with:
           shared-key: "rust"
 
       - name: Install sqlx-cli
-        uses: taiki-e/install-action@v2
+        uses: taiki-e/install-action@v2.82.0
         with:
           tool: sqlx-cli
 
       - name: Cache Playwright browsers
-        uses: actions/cache@v5
+        uses: actions/cache@v5.0.5
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json') }}
@@ -486,7 +486,7 @@ jobs:
 
       - name: Upload artifacts on failure
         if: failure()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: full-system-e2e-artifacts
           path: |
@@ -506,17 +506,17 @@ jobs:
       HEAD: ${{ needs.prepare.outputs.head }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v6.0.3
         with:
           fetch-depth: 0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v6.4.0
         with:
           node-version-file: .nvmrc
 
       - name: Cache Nx
-        uses: actions/cache@v5
+        uses: actions/cache@v5.0.5
         with:
           path: ~/.cache/nx
           key: nx-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json') }}
@@ -525,7 +525,7 @@ jobs:
 
       - name: Restore node_modules
         id: nm-cache
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@v5.0.5
         with:
           path: |
             node_modules
@@ -550,7 +550,7 @@ jobs:
           toolchain: "1.95"
 
       - name: Cache Cargo
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@v2.9.1
         with:
           shared-key: "rust"
 
@@ -564,7 +564,7 @@ jobs:
 
       - name: Upload artifacts on failure
         if: failure()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: build-logs
           path: |
