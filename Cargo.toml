@@ -27,7 +27,7 @@ prost-types = { version = "=0.13.5" }
 rdkafka = { version = "=0.39.0", features = ["cmake-build", "sasl", "ssl"] }
 
 # SQL toolkit — async, compile-time checked queries
-sqlx = { version = "=0.8.6", features = ["runtime-tokio", "postgres", "chrono", "uuid", "migrate", "rust_decimal"] }
+sqlx = { version = "=0.9.0", features = ["runtime-tokio", "postgres", "chrono", "uuid", "migrate", "rust_decimal"] }
 
 # Exact fixed-point decimal arithmetic — maps to NUMERIC(36,18) in Postgres.
 # Used for all price/volume fields to avoid floating-point rounding errors.
