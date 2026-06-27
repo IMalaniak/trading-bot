@@ -52,7 +52,7 @@ dotenvy = { version = "=0.15.7" }
 chrono = { version = "=0.4.44", features = ["serde"] }
 
 # UUID generation
-uuid = { version = "=1.23.1", features = ["v4", "serde"] }
+uuid = { version = "=1.23.4", features = ["v4", "serde"] }
 
 # HTTP client (for health checks / REST calls)
 reqwest = { version = "=0.13.4", features = ["json", "rustls-tls"], default-features = false }
