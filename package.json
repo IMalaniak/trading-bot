@@ -70,7 +70,7 @@
     "@vitest/coverage-v8": "4.1.7",
     "@vitest/ui": "4.1.7",
     "browserslist": "4.28.6",
-    "caniuse-lite": "1.0.30001799",
+    "caniuse-lite": "1.0.30001805",
     "eslint": "10.6.0",
     "eslint-config-prettier": "10.1.8",
     "eslint-plugin-prettier": "5.5.6",
